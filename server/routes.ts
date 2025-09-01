@@ -20,10 +20,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Attempting to extract transcript from Notta.AI URL: ${url}`);
       
-      // Launch headless browser
+      // Launch headless browser with additional Chrome args for server environments
       browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process',
+          '--disable-gpu',
+          '--disable-extensions',
+          '--disable-default-apps',
+          '--disable-sync',
+          '--disable-translate',
+          '--hide-scrollbars',
+          '--metrics-recording-only',
+          '--mute-audio',
+          '--no-default-browser-check',
+          '--no-sandbox',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding',
+          '--disable-features=TranslateUI'
+        ],
+        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium-browser'
       });
       
       const page = await browser.newPage();
@@ -33,7 +56,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
       
       // Wait for content to load and try multiple selectors
-      await page.waitForTimeout(3000);
+      await page.waitForFunction(() => document.readyState === 'complete');
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
       // Try to extract transcript using various selectors
       const transcript = await page.evaluate(() => {
