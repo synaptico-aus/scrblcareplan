@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, FileText, Printer } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Download, FileText, Printer, Save } from "lucide-react";
 
 interface CarePlanPreviewProps {
   html: string | null;
@@ -9,6 +12,20 @@ interface CarePlanPreviewProps {
 }
 
 export function CarePlanPreview({ html, isLoading, onExport, onPrint }: CarePlanPreviewProps) {
+  const [saveName, setSaveName] = useState("");
+  const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
+
+  const handleSaveCarePlan = () => {
+    if (!saveName.trim()) {
+      alert("Please enter a name for the care plan");
+      return;
+    }
+    
+    // TODO: Implement actual save functionality
+    console.log("Saving care plan:", { name: saveName, date: saveDate, html });
+    alert(`Care plan "${saveName}" saved for ${saveDate}`);
+  };
+
   return (
     <div className="flex-1 bg-card flex flex-col">
       <div className="p-4 border-b border-border">
@@ -39,6 +56,54 @@ export function CarePlanPreview({ html, isLoading, onExport, onPrint }: CarePlan
           </div>
         </div>
       </div>
+
+      {/* Save Care Plan Section */}
+      {html && (
+        <div className="p-4 border-b border-border bg-muted/30">
+          <h3 className="text-md font-semibold mb-3 flex items-center">
+            <Save className="text-primary mr-2 h-4 w-4" />
+            Save Care Plan
+          </h3>
+          <div className="flex items-end space-x-4">
+            <div className="flex-1">
+              <Label htmlFor="save-name" className="block text-sm font-medium mb-1">
+                Name
+              </Label>
+              <Input
+                id="save-name"
+                data-testid="input-save-name"
+                type="text"
+                placeholder="Enter care plan name"
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="w-40">
+              <Label htmlFor="save-date" className="block text-sm font-medium mb-1">
+                Date
+              </Label>
+              <Input
+                id="save-date"
+                data-testid="input-save-date"
+                type="date"
+                value={saveDate}
+                onChange={(e) => setSaveDate(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <Button
+              onClick={handleSaveCarePlan}
+              disabled={!saveName.trim()}
+              data-testid="button-save-care-plan"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </Button>
+          </div>
+        </div>
+      )}
       
       <div className="flex-1 overflow-y-auto p-6">
         {isLoading ? (
