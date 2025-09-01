@@ -19,6 +19,16 @@ export const careAnalyses = pgTable("care_analyses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const savedCarePlans = pgTable("saved_care_plans", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  clientName: text("client_name").notNull(),
+  html: text("html").notNull(),
+  extractedFacts: jsonb("extracted_facts"),
+  saveDate: timestamp("save_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -28,6 +38,14 @@ export const insertCareAnalysisSchema = createInsertSchema(careAnalyses).pick({
   clientName: true,
   transcript: true,
   processingMode: true,
+});
+
+export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick({
+  name: true,
+  clientName: true,
+  html: true,
+  extractedFacts: true,
+  saveDate: true,
 });
 
 export const factsSchema = z.object({
@@ -70,5 +88,7 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type CareAnalysis = typeof careAnalyses.$inferSelect;
 export type InsertCareAnalysis = z.infer<typeof insertCareAnalysisSchema>;
+export type SavedCarePlan = typeof savedCarePlans.$inferSelect;
+export type InsertSavedCarePlan = z.infer<typeof insertSavedCarePlanSchema>;
 export type ExtractedFacts = z.infer<typeof factsSchema>;
 export type ChatParityRequest = z.infer<typeof chatParityRequestSchema>;

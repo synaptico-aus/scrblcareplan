@@ -1,29 +1,79 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Download, FileText, Printer, Save } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { ExtractedFacts } from "@shared/schema";
 
 interface CarePlanPreviewProps {
   html: string | null;
   isLoading: boolean;
+  clientName: string;
+  extractedFacts: ExtractedFacts | null;
   onExport: () => void;
   onPrint: () => void;
 }
 
-export function CarePlanPreview({ html, isLoading, onExport, onPrint }: CarePlanPreviewProps) {
+export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, onExport, onPrint }: CarePlanPreviewProps) {
   const [saveName, setSaveName] = useState("");
   const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!html) throw new Error("No care plan to save");
+      
+      const response = await apiRequest("POST", "/api/saved-care-plans", {
+        name: saveName.trim(),
+        clientName,
+        html,
+        extractedFacts,
+        saveDate: new Date(saveDate),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-care-plans"] });
+      toast({
+        title: "Care Plan Saved",
+        description: `"${saveName}" has been saved successfully.`,
+      });
+      setSaveName("");
+      setSaveDate(new Date().toISOString().split('T')[0]);
+    },
+    onError: (error) => {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save care plan",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleSaveCarePlan = () => {
     if (!saveName.trim()) {
-      alert("Please enter a name for the care plan");
+      toast({
+        title: "Name Required",
+        description: "Please enter a name for the care plan",
+        variant: "destructive",
+      });
       return;
     }
     
-    // TODO: Implement actual save functionality
-    console.log("Saving care plan:", { name: saveName, date: saveDate, html });
-    alert(`Care plan "${saveName}" saved for ${saveDate}`);
+    if (!html) {
+      toast({
+        title: "No Care Plan",
+        description: "Generate a care plan first before saving",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    saveMutation.mutate();
   };
 
   return (
@@ -94,12 +144,21 @@ export function CarePlanPreview({ html, isLoading, onExport, onPrint }: CarePlan
             </div>
             <Button
               onClick={handleSaveCarePlan}
-              disabled={!saveName.trim()}
+              disabled={!saveName.trim() || !html || saveMutation.isPending}
               data-testid="button-save-care-plan"
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
-              <Save className="h-4 w-4 mr-2" />
-              Save
+              {saveMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save
+                </>
+              )}
             </Button>
           </div>
         </div>

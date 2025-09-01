@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { CarePlanForm } from "@/components/CarePlanForm";
 import { FactsPanel } from "@/components/FactsPanel";
 import { CarePlanPreview } from "@/components/CarePlanPreview";
 import { ExtractedFacts } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Shield } from "lucide-react";
+import { Settings, Shield, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function CarePlanner() {
@@ -130,6 +131,12 @@ I can't find out. I think the words are in the end. I'll pause. Are they... Hell
               <Shield className="text-accent h-4 w-4" />
               <span className="text-sm font-medium text-accent-foreground">HIPAA Compliant</span>
             </div>
+            <Link href="/saved-plans">
+              <Button variant="outline" data-testid="button-saved-plans">
+                <FileText className="h-4 w-4 mr-2" />
+                Saved Plans
+              </Button>
+            </Link>
             <Button variant="outline" data-testid="button-settings">
               <Settings className="h-4 w-4 mr-2" />
               Settings
@@ -160,6 +167,8 @@ I can't find out. I think the words are in the end. I'll pause. Are they... Hell
         <CarePlanPreview
           html={html}
           isLoading={generateMutation.isPending}
+          clientName={clientName}
+          extractedFacts={facts}
           onExport={handleExport}
           onPrint={handlePrint}
         />
