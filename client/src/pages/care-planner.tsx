@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, Shield, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import scrblLogo from "@/assets/scrbl-logo.png";
 
 export default function CarePlanner() {
   const [clientName, setClientName] = useState("");
@@ -325,7 +326,7 @@ export default function CarePlanner() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <img 
-              src="/attached_assets/scrbl-logo.png" 
+              src={scrblLogo} 
               alt="Scrbl Logo" 
               className="h-10 w-auto"
             />
