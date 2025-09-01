@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -65,6 +64,36 @@ export default function SavedPlans() {
     return new Date(date).toLocaleDateString();
   };
 
+  const generateFactsHtml = (facts: ExtractedFacts) => {
+    return `
+      <div style="margin-bottom: 30px; padding: 20px; border: 1px solid #ddd;">
+        <h2 style="font-size: 16pt; font-weight: bold; margin-bottom: 15px;">Extracted Facts</h2>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Client Details</h3>
+          <p><strong>Name:</strong> ${facts.clientDetails?.name || "Not documented"}</p>
+          <p><strong>Language:</strong> ${facts.clientDetails?.language || "Not documented"}</p>
+          <p><strong>Interpreter Required:</strong> ${facts.clientDetails?.interpreterRequired !== undefined ? (facts.clientDetails?.interpreterRequired ? "Yes" : "No") : "Not documented"}</p>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Medical Information</h3>
+          <p><strong>GP:</strong> ${facts.medical?.gp || "Not documented"}</p>
+          <p><strong>Pharmacy:</strong> ${facts.medical?.pharmacy || "Not documented"}</p>
+          <p><strong>Medications:</strong> ${facts.medical?.medications || "Not documented"}</p>
+          <p><strong>Allergies:</strong> ${facts.medical?.allergies || "Not documented"}</p>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Support Network</h3>
+          <p><strong>Primary Contact:</strong> ${facts.support?.primaryContact || "Not documented"}</p>
+          <p><strong>Secondary Contact:</strong> ${facts.support?.secondaryContact || "Not documented"}</p>
+          <p><strong>Living Arrangement:</strong> ${facts.support?.livingArrangement || "Not documented"}</p>
+        </div>
+      </div>
+    `;
+  };
+
   if (selectedPlan) {
     return (
       <div className="min-h-screen bg-background">
@@ -90,12 +119,15 @@ export default function SavedPlans() {
                 onClick={() => {
                   const printWindow = window.open('', '_blank');
                   if (printWindow) {
+                    const facts = selectedPlan.extractedFacts as ExtractedFacts;
+                    const factsSectionHtml = facts ? generateFactsHtml(facts) : '';
+                    
                     printWindow.document.write(`
                       <html>
                         <head>
                           <title>Care Plan - ${selectedPlan.clientName}</title>
                           <style>
-                            body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
+                            body { font-family: 'Inter', sans-serif; margin: 40px; line-height: 1.6; }
                             h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
                             h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
                             h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
@@ -106,6 +138,7 @@ export default function SavedPlans() {
                           </style>
                         </head>
                         <body>
+                          ${factsSectionHtml}
                           ${selectedPlan.html}
                         </body>
                       </html>
@@ -123,157 +156,141 @@ export default function SavedPlans() {
         </header>
 
         {/* Care Plan Content */}
-        <div className="p-6">
-          <Tabs defaultValue="care-plan" className="max-w-6xl mx-auto">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="care-plan" data-testid="tab-care-plan">
-                <FileText className="h-4 w-4 mr-2" />
-                Care Plan
-              </TabsTrigger>
-              <TabsTrigger value="extracted-facts" data-testid="tab-extracted-facts">
-                <Info className="h-4 w-4 mr-2" />
-                Extracted Facts
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="care-plan" className="mt-6">
-              <div className="care-plan-document bg-white shadow-lg rounded-lg p-8">
-                <div 
-                  className="prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: selectedPlan.html }}
-                />
+        <div className="p-6 max-w-6xl mx-auto">
+          {/* Extracted Facts Section */}
+          {selectedPlan.extractedFacts && (
+            <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
+              <div className="flex items-center space-x-2 mb-6">
+                <Info className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-semibold text-foreground">Extracted Facts</h2>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="extracted-facts" className="mt-6">
-              <div className="bg-white shadow-lg rounded-lg p-6">
-                {selectedPlan.extractedFacts ? (
-                  <div className="space-y-6">
-                    {/* Client Details */}
+              
+              <div className="space-y-6">
+                {/* Client Details */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 text-foreground">Client Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h3 className="text-lg font-semibold mb-3 text-foreground">Client Details</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Name</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).clientDetails?.name || "Not documented"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Language</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).clientDetails?.language || "Not documented"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Interpreter Required</p>
-                          <p className="text-foreground">
-                            {(selectedPlan.extractedFacts as ExtractedFacts).clientDetails?.interpreterRequired !== undefined 
-                              ? ((selectedPlan.extractedFacts as ExtractedFacts).clientDetails?.interpreterRequired ? "Yes" : "No")
-                              : "Not documented"}
-                          </p>
-                        </div>
-                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">Name</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).clientDetails?.name || "Not documented"}</p>
                     </div>
-
-                    {/* Medical Information */}
                     <div>
-                      <h3 className="text-lg font-semibold mb-3 text-foreground">Medical Information</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">GP</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).medical?.gp || "Not documented"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Pharmacy</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).medical?.pharmacy || "Not documented"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Medications</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).medical?.medications || "Not documented"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Allergies</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).medical?.allergies || "Not documented"}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm font-medium text-muted-foreground">Equipment</p>
-                          <p className="text-foreground">
-                            {(selectedPlan.extractedFacts as ExtractedFacts).medical?.equipment?.length 
-                              ? (selectedPlan.extractedFacts as ExtractedFacts).medical?.equipment?.join(", ")
-                              : "Not documented"}
-                          </p>
-                        </div>
-                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">Language</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).clientDetails?.language || "Not documented"}</p>
                     </div>
-
-                    {/* Support Network */}
                     <div>
-                      <h3 className="text-lg font-semibold mb-3 text-foreground">Support Network</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Primary Contact</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).support?.primaryContact || "Not documented"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Secondary Contact</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).support?.secondaryContact || "Not documented"}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="text-sm font-medium text-muted-foreground">Living Arrangement</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).support?.livingArrangement || "Not documented"}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Risks */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3 text-foreground">Risk Assessment</h3>
-                      {(selectedPlan.extractedFacts as ExtractedFacts).risks?.length ? (
-                        <div className="space-y-3">
-                          {(selectedPlan.extractedFacts as ExtractedFacts).risks?.map((risk, index) => (
-                            <div key={index} className="border rounded-lg p-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="font-medium text-foreground">{risk.type}</p>
-                                {risk.severity && (
-                                  <Badge variant={risk.severity === "high" ? "destructive" : risk.severity === "medium" ? "default" : "secondary"}>
-                                    {risk.severity}
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-muted-foreground">{risk.description}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-muted-foreground">No risks documented</p>
-                      )}
-                    </div>
-
-                    {/* Preferences */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3 text-foreground">Preferences</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Worker Preferences</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).preferences?.workerPreferences || "Not documented"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Service Delivery Preferences</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).preferences?.serviceDeliveryPreferences || "Not documented"}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Cultural Considerations</p>
-                          <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).preferences?.culturalConsiderations || "Not documented"}</p>
-                        </div>
-                      </div>
+                      <p className="text-sm font-medium text-muted-foreground">Interpreter Required</p>
+                      <p className="text-foreground">
+                        {(selectedPlan.extractedFacts as ExtractedFacts).clientDetails?.interpreterRequired !== undefined 
+                          ? ((selectedPlan.extractedFacts as ExtractedFacts).clientDetails?.interpreterRequired ? "Yes" : "No")
+                          : "Not documented"}
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Info className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground">No extracted facts available for this care plan.</p>
+                </div>
+
+                {/* Medical Information */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 text-foreground">Medical Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">GP</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).medical?.gp || "Not documented"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Pharmacy</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).medical?.pharmacy || "Not documented"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Medications</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).medical?.medications || "Not documented"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Allergies</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).medical?.allergies || "Not documented"}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-sm font-medium text-muted-foreground">Equipment</p>
+                      <p className="text-foreground">
+                        {(selectedPlan.extractedFacts as ExtractedFacts).medical?.equipment?.length 
+                          ? (selectedPlan.extractedFacts as ExtractedFacts).medical?.equipment?.join(", ")
+                          : "Not documented"}
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
+
+                {/* Support Network */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 text-foreground">Support Network</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Primary Contact</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).support?.primaryContact || "Not documented"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Secondary Contact</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).support?.secondaryContact || "Not documented"}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-sm font-medium text-muted-foreground">Living Arrangement</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).support?.livingArrangement || "Not documented"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Risks */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 text-foreground">Risk Assessment</h3>
+                  {(selectedPlan.extractedFacts as ExtractedFacts).risks?.length ? (
+                    <div className="space-y-3">
+                      {(selectedPlan.extractedFacts as ExtractedFacts).risks?.map((risk, index) => (
+                        <div key={index} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-medium text-foreground">{risk.type}</p>
+                            {risk.severity && (
+                              <Badge variant={risk.severity === "high" ? "destructive" : risk.severity === "medium" ? "default" : "secondary"}>
+                                {risk.severity}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{risk.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No risks documented</p>
+                  )}
+                </div>
+
+                {/* Preferences */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 text-foreground">Preferences</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Worker Preferences</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).preferences?.workerPreferences || "Not documented"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Service Delivery Preferences</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).preferences?.serviceDeliveryPreferences || "Not documented"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Cultural Considerations</p>
+                      <p className="text-foreground">{(selectedPlan.extractedFacts as ExtractedFacts).preferences?.culturalConsiderations || "Not documented"}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+          )}
+          
+          {/* Care Plan Document */}
+          <div className="care-plan-document bg-white shadow-lg rounded-lg p-8">
+            <div 
+              dangerouslySetInnerHTML={{ __html: selectedPlan.html }}
+            />
+          </div>
         </div>
       </div>
     );
