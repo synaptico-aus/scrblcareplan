@@ -179,15 +179,36 @@ All goals MUST follow SMARTA framework:
 - **TIME-LIMITED**: Set clear timeframes tied to client's ability (typically 3-month quarterly cycles)
 - **AGREED**: Goals must be co-designed with client and include their verbal commitment
 
+## SALVEO HOMECARE SERVICE ALIGNMENT (MANDATORY)
+Every goal MUST specify which Salveo HomeCare service will be used and include pricing:
+
+**Care and Support Services:**
+- Domestic Assistance (cleaning, linen, laundry): $85/hour
+- Personal Care (shower, toileting): $85/hour (day), $95/hour (night)
+- Social Support: $85/hour (day) + $1.40/km for transport
+- Transport: $85/hour (day) + $1.40/km
+- Respite Care: $85/hour (day), $95/hour (night)
+- Light Home & Gardening Maintenance: $85/hour
+
+**Health and Nursing Services:**
+- Enrolled Nurse: $121/hour (day)
+- Registered Nurse: $148.50/hour (day)
+- Allied Health Therapist (Physio/OT): $180/hour
+
+**Service Categories for Support at Home Program:**
+- Clinical Care (100% government funded)
+- Independence Support 
+- Everyday Living
+
 Examples:
 ❌ Generic: "I want to be healthy"
-✅ SMARTA: "I will walk 15 minutes each day, 3 days a week, for the next 6 weeks to improve my fitness"
+✅ SMARTA + Salveo: "I will receive Allied Health Therapy from Salveo HomeCare for 1 hour fortnightly ($180/hour, $360/month) to improve my balance and mobility over the next 3 months"
 
-❌ Not relevant: "I will walk daily" (when client dislikes walking)  
-✅ Relevant: "I will tend to my garden for 20 minutes, twice weekly" (when client loves gardening)
+❌ Vague: "I need help with cleaning"
+✅ SMARTA + Salveo: "I will have Domestic Assistance from Salveo HomeCare for 2 hours weekly ($85/hour, $680/month) to maintain my home including cleaning, laundry and linen changes"
 
-❌ Not measurable: "I want to dress myself better"
-✅ Measurable: "I want to dress myself independently, with no assistance, within 6 weeks"
+❌ No service specified: "I want to dress myself independently"
+✅ SMARTA + Salveo: "I will work with Personal Care support from Salveo HomeCare (3 hours weekly, $85/hour, $1020/month) to dress myself independently within 6 weeks"
 
 ## Transcript handling
 - Ignore IVR menus, timestamps, and administrative questions (e.g., "This call is recorded", "Can I have your name?")
@@ -206,8 +227,9 @@ Client Name: ${clientName}
 Transcript:
 ${transcript}
 
-CRITICAL: For the "My Goals" section, apply SMARTA principles to create high-quality, compliant goals:
+CRITICAL: For the "My Goals" section, apply SMARTA principles AND Salveo HomeCare service alignment:
 
+**SMARTA Requirements:**
 1. **SPECIFIC**: Use the client's own words and language. Be precise about who, what, where, when, why
 2. **MEASURABLE**: Include trackable metrics (time, frequency, distance, etc.) so progress can be monitored
 3. **ACHIEVABLE**: Ensure goals balance challenge with realistic expectations based on the client's capacity
@@ -215,7 +237,20 @@ CRITICAL: For the "My Goals" section, apply SMARTA principles to create high-qua
 5. **TIME-LIMITED**: Set clear timeframes appropriate to client's ability (typically 3-month quarterly cycles)
 6. **AGREED**: Frame as collaborative goals developed together with the client
 
-Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame it using SMARTA principles. Only use the fallback sentence for sections where no relevant information was discussed.`
+**MANDATORY Salveo Service Specifications:**
+Every goal MUST specify:
+- Which Salveo HomeCare service will be used (Personal Care, Domestic Assistance, Allied Health, etc.)
+- Exact hourly rate ($85, $121, $148.50, $180/hour)
+- Frequency (daily, weekly, fortnightly)
+- Monthly cost calculation
+- Service category (Clinical Care/Independence Support/Everyday Living)
+
+Examples of properly formatted goals:
+"I will receive Personal Care assistance from Salveo HomeCare support workers 3 times weekly (3 hours each, $85/hour, $1020/month) to shower and dress independently by March 2025 under the Independence Support category."
+
+"I will have Domestic Assistance from Salveo HomeCare for 2 hours fortnightly ($85/hour, $340/month) to maintain my home including cleaning and laundry under the Everyday Living category."
+
+Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame using BOTH SMARTA principles AND specific Salveo service alignment. Only use the fallback sentence for sections where no relevant information was discussed.`
         }
       ],
     });
