@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Download, FileText, Printer, Save, Clock, DollarSign } from "lucide-react";
+import { Download, FileText, Printer, Save, Clock, DollarSign, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
@@ -27,6 +28,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [isBudgetOpen, setIsBudgetOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -261,11 +263,23 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
 
       {/* Budget Estimation Section */}
       {html && budgetEstimate && (
-        <div className="p-4 border-b border-border bg-accent/5">
-          <h3 className="text-md font-semibold mb-3 flex items-center">
-            <DollarSign className="text-primary mr-2 h-4 w-4" />
-            Budget Estimation (90% of Quarterly Allocation)
-          </h3>
+        <Collapsible open={isBudgetOpen} onOpenChange={setIsBudgetOpen}>
+          <div className="p-4 border-b border-border bg-accent/5">
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                className="w-full justify-between p-0 h-auto hover:bg-transparent"
+                data-testid="button-toggle-budget"
+              >
+                <h3 className="text-md font-semibold flex items-center">
+                  <DollarSign className="text-primary mr-2 h-4 w-4" />
+                  Budget Estimation (90% of Quarterly Allocation)
+                </h3>
+                {isBudgetOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+            
+            <CollapsibleContent className="mt-3">
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Budget Summary */}
@@ -321,7 +335,9 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
               </div>
             </div>
           </div>
-        </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
       )}
       
       <div className="flex-1 overflow-y-auto p-6">
