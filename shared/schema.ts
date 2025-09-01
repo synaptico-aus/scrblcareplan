@@ -49,10 +49,16 @@ export const fundingLevels = {
     level4: { name: "HCP Level 4", quarterlyAmount: 16236.00 }
   },
   sah: {
-    level1: { name: "SaH Level 1", quarterlyAmount: 2775.00 },
-    level2: { name: "SaH Level 2", quarterlyAmount: 4873.75 },
-    level3: { name: "SaH Level 3", quarterlyAmount: 10461.75 },
-    level4: { name: "SaH Level 4", quarterlyAmount: 16236.00 }
+    level1: { name: "SaH Level 1", quarterlyAmount: 2750.00 },
+    level2: { name: "SaH Level 2", quarterlyAmount: 4000.00 },
+    level3: { name: "SaH Level 3", quarterlyAmount: 5500.00 },
+    level4: { name: "SaH Level 4", quarterlyAmount: 7500.00 },
+    level5: { name: "SaH Level 5", quarterlyAmount: 10000.00 },
+    level6: { name: "SaH Level 6", quarterlyAmount: 12000.00 },
+    level7: { name: "SaH Level 7", quarterlyAmount: 14500.00 },
+    level8: { name: "SaH Level 8", quarterlyAmount: 19500.00 },
+    restorative: { name: "Restorative Care Pathway", quarterlyAmount: 6000.00 },
+    endoflife: { name: "End-of-Life Pathway", quarterlyAmount: 25000.00 }
   }
 } as const;
 
@@ -103,7 +109,7 @@ export const chatParityRequestSchema = z.object({
   transcript: z.string().min(1, "Transcript is required"),
   template: z.literal("gold-standard"),
   fundingType: z.enum(["hcp", "sah"]).optional(),
-  fundingLevel: z.enum(["level1", "level2", "level3", "level4"]).optional(),
+  fundingLevel: z.enum(["level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "restorative", "endoflife"]).optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

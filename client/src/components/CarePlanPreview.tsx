@@ -34,7 +34,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const calculateBudgetEstimate = () => {
     if (!html || !fundingType || !fundingLevel) return null;
 
-    const budgetData = fundingLevels[fundingType as keyof typeof fundingLevels]?.[fundingLevel as keyof typeof fundingLevels["hcp"]];
+    const budgetData = fundingLevels[fundingType as keyof typeof fundingLevels]?.[fundingLevel as keyof (typeof fundingLevels)[typeof fundingType]];
     if (!budgetData) return null;
 
     const quarterlyBudget = budgetData.quarterlyAmount;

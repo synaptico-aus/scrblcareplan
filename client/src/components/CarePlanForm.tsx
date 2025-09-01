@@ -18,8 +18,8 @@ interface CarePlanFormProps {
   setProcessingMode: (mode: "ai" | "offline") => void;
   fundingType: "hcp" | "sah" | "";
   setFundingType: (type: "hcp" | "sah" | "") => void;
-  fundingLevel: "level1" | "level2" | "level3" | "level4" | "";
-  setFundingLevel: (level: "level1" | "level2" | "level3" | "level4" | "") => void;
+  fundingLevel: "level1" | "level2" | "level3" | "level4" | "level5" | "level6" | "level7" | "level8" | "restorative" | "endoflife" | "";
+  setFundingLevel: (level: "level1" | "level2" | "level3" | "level4" | "level5" | "level6" | "level7" | "level8" | "restorative" | "endoflife" | "") => void;
   onGenerate: () => void;
   onFetchFromNotta: () => void;
   isLoading: boolean;
@@ -97,12 +97,26 @@ export function CarePlanForm({
                   <SelectValue placeholder="Select level" />
                 </SelectTrigger>
                 <SelectContent>
-                  {fundingType && (
+                  {fundingType === "hcp" && (
                     <>
-                      <SelectItem value="level1">{fundingLevels[fundingType as keyof typeof fundingLevels].level1.name}</SelectItem>
-                      <SelectItem value="level2">{fundingLevels[fundingType as keyof typeof fundingLevels].level2.name}</SelectItem>
-                      <SelectItem value="level3">{fundingLevels[fundingType as keyof typeof fundingLevels].level3.name}</SelectItem>
-                      <SelectItem value="level4">{fundingLevels[fundingType as keyof typeof fundingLevels].level4.name}</SelectItem>
+                      <SelectItem value="level1">{fundingLevels.hcp.level1.name}</SelectItem>
+                      <SelectItem value="level2">{fundingLevels.hcp.level2.name}</SelectItem>
+                      <SelectItem value="level3">{fundingLevels.hcp.level3.name}</SelectItem>
+                      <SelectItem value="level4">{fundingLevels.hcp.level4.name}</SelectItem>
+                    </>
+                  )}
+                  {fundingType === "sah" && (
+                    <>
+                      <SelectItem value="level1">{fundingLevels.sah.level1.name}</SelectItem>
+                      <SelectItem value="level2">{fundingLevels.sah.level2.name}</SelectItem>
+                      <SelectItem value="level3">{fundingLevels.sah.level3.name}</SelectItem>
+                      <SelectItem value="level4">{fundingLevels.sah.level4.name}</SelectItem>
+                      <SelectItem value="level5">{fundingLevels.sah.level5.name}</SelectItem>
+                      <SelectItem value="level6">{fundingLevels.sah.level6.name}</SelectItem>
+                      <SelectItem value="level7">{fundingLevels.sah.level7.name}</SelectItem>
+                      <SelectItem value="level8">{fundingLevels.sah.level8.name}</SelectItem>
+                      <SelectItem value="restorative">{fundingLevels.sah.restorative.name}</SelectItem>
+                      <SelectItem value="endoflife">{fundingLevels.sah.endoflife.name}</SelectItem>
                     </>
                   )}
                 </SelectContent>
@@ -114,10 +128,10 @@ export function CarePlanForm({
           {fundingType && fundingLevel && (
             <div className="bg-muted/50 p-3 rounded-lg">
               <p className="text-sm font-medium text-foreground">
-                Quarterly Budget: ${fundingLevels[fundingType as keyof typeof fundingLevels][fundingLevel as keyof typeof fundingLevels["hcp"]].quarterlyAmount.toLocaleString()}
+                Quarterly Budget: ${fundingLevels[fundingType as keyof typeof fundingLevels][fundingLevel as keyof (typeof fundingLevels)[typeof fundingType]].quarterlyAmount.toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">
-                Available for care (90%): ${(fundingLevels[fundingType as keyof typeof fundingLevels][fundingLevel as keyof typeof fundingLevels["hcp"]].quarterlyAmount * 0.9).toLocaleString()}
+                Available for care (90%): ${(fundingLevels[fundingType as keyof typeof fundingLevels][fundingLevel as keyof (typeof fundingLevels)[typeof fundingType]].quarterlyAmount * 0.9).toLocaleString()}
               </p>
             </div>
           )}

@@ -16,7 +16,7 @@ export default function CarePlanner() {
   const [nottaUrl, setNottaUrl] = useState("");
   const [processingMode, setProcessingMode] = useState<"ai" | "offline">("ai");
   const [fundingType, setFundingType] = useState<"hcp" | "sah" | "">("");
-  const [fundingLevel, setFundingLevel] = useState<"level1" | "level2" | "level3" | "level4" | "">("");
+  const [fundingLevel, setFundingLevel] = useState<"level1" | "level2" | "level3" | "level4" | "level5" | "level6" | "level7" | "level8" | "restorative" | "endoflife" | "">("");
   const [facts, setFacts] = useState<ExtractedFacts | null>(null);
   const [html, setHtml] = useState<string | null>(null);
   const [isFactsPanelCollapsed, setIsFactsPanelCollapsed] = useState(false);
