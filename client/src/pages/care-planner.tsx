@@ -11,8 +11,12 @@ import { Settings, Shield, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function CarePlanner() {
-  const [clientName, setClientName] = useState("");
-  const [transcript, setTranscript] = useState("");
+  const [clientName, setClientName] = useState("Lucia Barrientos");
+  const [transcript, setTranscript] = useState(`Unknown speaker 00:00
+and no cultural factors and do you have mum's pension and Medicare card to hand at all please yep okay thank you I don't know where I just put my Medicare and pension if you've got it please oh yeah lovely thank you that's all I need those just type those in so Medicare we've got three two one one four five three oh five one and then pension is see on three one five nine four seven six yeah...
+
+Unknown speaker 03:08
+I can't find out. I think the words are in the end. I'll pause. Are they... Hello. Would you like to put a secondary contact at all, Jose? Yeah, my brother. Westa W-E-S-T-R. Same surname? Let me just copy that quick...`);
   const [processingMode, setProcessingMode] = useState<"ai" | "offline">("ai");
   const [facts, setFacts] = useState<ExtractedFacts | null>(null);
   const [html, setHtml] = useState<string | null>(null);

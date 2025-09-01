@@ -45,8 +45,7 @@ export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick
   clientName: true,
   html: true,
   extractedFacts: true,
-}).extend({
-  saveDate: z.coerce.date(),
+  saveDate: true,
 });
 
 export const factsSchema = z.object({
