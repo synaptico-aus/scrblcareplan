@@ -136,29 +136,6 @@ export function CarePlanForm({
             </div>
           )}
           
-          <div className="flex items-center space-x-3">
-            <span className="text-sm font-medium">Processing Mode:</span>
-            <div className="flex bg-muted rounded-lg p-1">
-              <Button
-                data-testid="button-ai-mode"
-                variant={processingMode === "ai" ? "default" : "ghost"}
-                size="sm"
-                className="px-3 py-1 rounded text-sm"
-                onClick={() => setProcessingMode("ai")}
-              >
-                AI Mode
-              </Button>
-              <Button
-                data-testid="button-offline-mode"
-                variant={processingMode === "offline" ? "default" : "ghost"}
-                size="sm"
-                className="px-3 py-1 rounded text-sm"
-                onClick={() => setProcessingMode("offline")}
-              >
-                Offline
-              </Button>
-            </div>
-          </div>
         </div>
       </div>
 
