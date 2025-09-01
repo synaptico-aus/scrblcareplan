@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Settings, Link2 } from "lucide-react";
+import { fundingLevels } from "@shared/schema";
 
 interface CarePlanFormProps {
   clientName: string;
@@ -14,6 +16,10 @@ interface CarePlanFormProps {
   setNottaUrl: (url: string) => void;
   processingMode: "ai" | "offline";
   setProcessingMode: (mode: "ai" | "offline") => void;
+  fundingType: "hcp" | "sah" | "";
+  setFundingType: (type: "hcp" | "sah" | "") => void;
+  fundingLevel: "level1" | "level2" | "level3" | "level4" | "";
+  setFundingLevel: (level: "level1" | "level2" | "level3" | "level4" | "") => void;
   onGenerate: () => void;
   onFetchFromNotta: () => void;
   isLoading: boolean;
@@ -29,6 +35,10 @@ export function CarePlanForm({
   setNottaUrl,
   processingMode,
   setProcessingMode,
+  fundingType,
+  setFundingType,
+  fundingLevel,
+  setFundingLevel,
   onGenerate,
   onFetchFromNotta,
   isLoading,
@@ -61,6 +71,57 @@ export function CarePlanForm({
               onChange={(e) => setClientName(e.target.value)}
             />
           </div>
+          
+          {/* Funding Level Selection */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="funding-type" className="block text-sm font-medium text-foreground mb-2">
+                Funding Type
+              </Label>
+              <Select value={fundingType} onValueChange={setFundingType}>
+                <SelectTrigger data-testid="select-funding-type">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hcp">Home Care Package</SelectItem>
+                  <SelectItem value="sah">Support at Home</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="funding-level" className="block text-sm font-medium text-foreground mb-2">
+                Funding Level
+              </Label>
+              <Select value={fundingLevel} onValueChange={setFundingLevel} disabled={!fundingType}>
+                <SelectTrigger data-testid="select-funding-level">
+                  <SelectValue placeholder="Select level" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fundingType && (
+                    <>
+                      <SelectItem value="level1">{fundingLevels[fundingType as keyof typeof fundingLevels].level1.name}</SelectItem>
+                      <SelectItem value="level2">{fundingLevels[fundingType as keyof typeof fundingLevels].level2.name}</SelectItem>
+                      <SelectItem value="level3">{fundingLevels[fundingType as keyof typeof fundingLevels].level3.name}</SelectItem>
+                      <SelectItem value="level4">{fundingLevels[fundingType as keyof typeof fundingLevels].level4.name}</SelectItem>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {/* Display quarterly budget */}
+          {fundingType && fundingLevel && (
+            <div className="bg-muted/50 p-3 rounded-lg">
+              <p className="text-sm font-medium text-foreground">
+                Quarterly Budget: ${fundingLevels[fundingType as keyof typeof fundingLevels][fundingLevel as keyof typeof fundingLevels["hcp"]].quarterlyAmount.toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Available for care (90%): ${(fundingLevels[fundingType as keyof typeof fundingLevels][fundingLevel as keyof typeof fundingLevels["hcp"]].quarterlyAmount * 0.9).toLocaleString()}
+              </p>
+            </div>
+          )}
+          
           <div className="flex items-center space-x-3">
             <span className="text-sm font-medium">Processing Mode:</span>
             <div className="flex bg-muted rounded-lg p-1">

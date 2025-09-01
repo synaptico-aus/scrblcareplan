@@ -15,6 +15,8 @@ export default function CarePlanner() {
   const [transcript, setTranscript] = useState("");
   const [nottaUrl, setNottaUrl] = useState("");
   const [processingMode, setProcessingMode] = useState<"ai" | "offline">("ai");
+  const [fundingType, setFundingType] = useState<"hcp" | "sah" | "">("");
+  const [fundingLevel, setFundingLevel] = useState<"level1" | "level2" | "level3" | "level4" | "">("");
   const [facts, setFacts] = useState<ExtractedFacts | null>(null);
   const [html, setHtml] = useState<string | null>(null);
   const [isFactsPanelCollapsed, setIsFactsPanelCollapsed] = useState(false);
@@ -48,10 +50,12 @@ export default function CarePlanner() {
   });
 
   const generateMutation = useMutation({
-    mutationFn: async ({ clientName, transcript, mode }: { 
+    mutationFn: async ({ clientName, transcript, mode, fundingType, fundingLevel }: { 
       clientName: string; 
       transcript: string; 
-      mode: "ai" | "offline" 
+      mode: "ai" | "offline";
+      fundingType?: string;
+      fundingLevel?: string;
     }) => {
       const startTime = Date.now();
       setGenerationStartTime(startTime);
@@ -60,7 +64,9 @@ export default function CarePlanner() {
       const response = await apiRequest("POST", endpoint, {
         clientName,
         transcript,
-        template: "gold-standard"
+        template: "gold-standard",
+        fundingType: fundingType || undefined,
+        fundingLevel: fundingLevel || undefined
       });
       
       const endTime = Date.now();
@@ -147,7 +153,9 @@ export default function CarePlanner() {
     generateMutation.mutate({
       clientName: clientName.trim(),
       transcript: transcript.trim(),
-      mode: processingMode
+      mode: processingMode,
+      fundingType: fundingType || undefined,
+      fundingLevel: fundingLevel || undefined
     });
   };
 
@@ -234,6 +242,10 @@ export default function CarePlanner() {
           setNottaUrl={setNottaUrl}
           processingMode={processingMode}
           setProcessingMode={setProcessingMode}
+          fundingType={fundingType}
+          setFundingType={setFundingType}
+          fundingLevel={fundingLevel}
+          setFundingLevel={setFundingLevel}
           onGenerate={handleGenerate}
           onFetchFromNotta={handleFetchFromNotta}
           isLoading={generateMutation.isPending}
@@ -254,6 +266,8 @@ export default function CarePlanner() {
           extractedFacts={facts}
           generationStartTime={generationStartTime}
           generationTime={generationTime}
+          fundingType={fundingType}
+          fundingLevel={fundingLevel}
           onExport={handleExport}
           onPrint={handlePrint}
         />

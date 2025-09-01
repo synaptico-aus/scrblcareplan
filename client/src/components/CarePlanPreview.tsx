@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Download, FileText, Printer, Save, Clock } from "lucide-react";
+import { Download, FileText, Printer, Save, Clock, DollarSign } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ExtractedFacts } from "@shared/schema";
+import { ExtractedFacts, fundingLevels } from "@shared/schema";
 
 interface CarePlanPreviewProps {
   html: string | null;
@@ -16,17 +16,70 @@ interface CarePlanPreviewProps {
   extractedFacts: ExtractedFacts | null;
   generationStartTime: number | null;
   generationTime: number | null;
+  fundingType: string;
+  fundingLevel: string;
   onExport: () => void;
   onPrint: () => void;
 }
 
-export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, generationStartTime, generationTime, onExport, onPrint }: CarePlanPreviewProps) {
+export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, generationStartTime, generationTime, fundingType, fundingLevel, onExport, onPrint }: CarePlanPreviewProps) {
   const [saveName, setSaveName] = useState("");
   const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Budget calculation function
+  const calculateBudgetEstimate = () => {
+    if (!html || !fundingType || !fundingLevel) return null;
+
+    const budgetData = fundingLevels[fundingType as keyof typeof fundingLevels]?.[fundingLevel as keyof typeof fundingLevels["hcp"]];
+    if (!budgetData) return null;
+
+    const quarterlyBudget = budgetData.quarterlyAmount;
+    const availableBudget = quarterlyBudget * 0.9; // 90% available for care
+
+    // Extract service costs from HTML goals section
+    const serviceMatches = html.match(/\$\d+\/hour.*?\$\d+\/month/g) || [];
+    const services: Array<{name: string; hourlyRate: number; monthlyRate: number}> = [];
+    
+    serviceMatches.forEach(match => {
+      const hourlyMatch = match.match(/\$(\d+)\/hour/);
+      const monthlyMatch = match.match(/\$(\d+)\/month/);
+      if (hourlyMatch && monthlyMatch) {
+        const context = html.substring(html.indexOf(match) - 100, html.indexOf(match) + 100);
+        let serviceName = "Care Service";
+        
+        if (context.includes("Personal Care")) serviceName = "Personal Care";
+        else if (context.includes("Domestic Assistance")) serviceName = "Domestic Assistance";
+        else if (context.includes("Allied Health")) serviceName = "Allied Health Therapy";
+        else if (context.includes("Social Support")) serviceName = "Social Support";
+        else if (context.includes("Nursing")) serviceName = "Nursing Care";
+        
+        services.push({
+          name: serviceName,
+          hourlyRate: parseInt(hourlyMatch[1]),
+          monthlyRate: parseInt(monthlyMatch[1])
+        });
+      }
+    });
+
+    const totalMonthlyCost = services.reduce((sum, service) => sum + service.monthlyRate, 0);
+    const quarterlyEstimate = totalMonthlyCost * 3;
+
+    return {
+      quarterlyBudget,
+      availableBudget,
+      services,
+      totalMonthlyCost,
+      quarterlyEstimate,
+      remainingBudget: availableBudget - quarterlyEstimate,
+      utilizationPercentage: (quarterlyEstimate / availableBudget) * 100
+    };
+  };
+
+  const budgetEstimate = calculateBudgetEstimate();
 
   // Set default save name to client name when care plan is generated
   useEffect(() => {
@@ -195,6 +248,71 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
                 </>
               )}
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Budget Estimation Section */}
+      {html && budgetEstimate && (
+        <div className="p-4 border-b border-border bg-accent/5">
+          <h3 className="text-md font-semibold mb-3 flex items-center">
+            <DollarSign className="text-primary mr-2 h-4 w-4" />
+            Budget Estimation (90% of Quarterly Allocation)
+          </h3>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Budget Summary */}
+            <div className="bg-card border border-border rounded-lg p-4">
+              <h4 className="font-medium text-sm text-muted-foreground mb-3">Budget Summary</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Quarterly Budget:</span>
+                  <span className="font-medium">${budgetEstimate.quarterlyBudget.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Available for Care (90%):</span>
+                  <span className="font-medium">${budgetEstimate.availableBudget.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Estimated Quarterly Cost:</span>
+                  <span className="font-medium">${budgetEstimate.quarterlyEstimate.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span>Remaining Budget:</span>
+                  <span className={`font-medium ${budgetEstimate.remainingBudget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    ${budgetEstimate.remainingBudget.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Budget Utilization:</span>
+                  <span className={`font-medium ${budgetEstimate.utilizationPercentage > 100 ? 'text-red-600' : 'text-green-600'}`}>
+                    {budgetEstimate.utilizationPercentage.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Service Breakdown */}
+            <div className="bg-card border border-border rounded-lg p-4">
+              <h4 className="font-medium text-sm text-muted-foreground mb-3">Service Breakdown</h4>
+              <div className="space-y-2">
+                {budgetEstimate.services.map((service, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm">
+                    <div>
+                      <div className="font-medium">{service.name}</div>
+                      <div className="text-xs text-muted-foreground">${service.hourlyRate}/hour</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium">${service.monthlyRate}/month</div>
+                      <div className="text-xs text-muted-foreground">${(service.monthlyRate * 3).toLocaleString()}/quarter</div>
+                    </div>
+                  </div>
+                ))}
+                {budgetEstimate.services.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No services with pricing found in goals</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

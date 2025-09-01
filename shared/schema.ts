@@ -40,6 +40,22 @@ export const insertCareAnalysisSchema = createInsertSchema(careAnalyses).pick({
   processingMode: true,
 });
 
+// Funding level and budget definitions
+export const fundingLevels = {
+  hcp: {
+    level1: { name: "HCP Level 1", quarterlyAmount: 2775.00 },
+    level2: { name: "HCP Level 2", quarterlyAmount: 4873.75 },
+    level3: { name: "HCP Level 3", quarterlyAmount: 10461.75 },
+    level4: { name: "HCP Level 4", quarterlyAmount: 16236.00 }
+  },
+  sah: {
+    level1: { name: "SaH Level 1", quarterlyAmount: 2775.00 },
+    level2: { name: "SaH Level 2", quarterlyAmount: 4873.75 },
+    level3: { name: "SaH Level 3", quarterlyAmount: 10461.75 },
+    level4: { name: "SaH Level 4", quarterlyAmount: 16236.00 }
+  }
+} as const;
+
 export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick({
   name: true,
   clientName: true,
@@ -86,6 +102,8 @@ export const chatParityRequestSchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
   transcript: z.string().min(1, "Transcript is required"),
   template: z.literal("gold-standard"),
+  fundingType: z.enum(["hcp", "sah"]).optional(),
+  fundingLevel: z.enum(["level1", "level2", "level3", "level4"]).optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
