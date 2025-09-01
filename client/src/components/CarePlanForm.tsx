@@ -3,17 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Upload, Settings } from "lucide-react";
+import { Upload, Settings, Link2 } from "lucide-react";
 
 interface CarePlanFormProps {
   clientName: string;
   setClientName: (name: string) => void;
   transcript: string;
   setTranscript: (transcript: string) => void;
+  nottaUrl: string;
+  setNottaUrl: (url: string) => void;
   processingMode: "ai" | "offline";
   setProcessingMode: (mode: "ai" | "offline") => void;
   onGenerate: () => void;
+  onFetchFromNotta: () => void;
   isLoading: boolean;
+  isFetchingNotta: boolean;
 }
 
 export function CarePlanForm({
@@ -21,10 +25,14 @@ export function CarePlanForm({
   setClientName,
   transcript,
   setTranscript,
+  nottaUrl,
+  setNottaUrl,
   processingMode,
   setProcessingMode,
   onGenerate,
-  isLoading
+  onFetchFromNotta,
+  isLoading,
+  isFetchingNotta
 }: CarePlanFormProps) {
   return (
     <div className="w-1/3 bg-card border-r border-border flex flex-col">
@@ -89,7 +97,48 @@ export function CarePlanForm({
             Assessment Transcript
           </h3>
           <p className="text-sm text-muted-foreground">
-            Paste the raw assessment transcript below. Include all dialogue, timestamps, and administrative content.
+            Paste the raw assessment transcript below or import from Notta.AI. Include all dialogue, timestamps, and administrative content.
+          </p>
+        </div>
+        
+        {/* Notta URL Input */}
+        <div className="mb-4">
+          <Label htmlFor="notta-url" className="block text-sm font-medium text-foreground mb-2">
+            Import from Notta.AI (Optional)
+          </Label>
+          <div className="flex space-x-2">
+            <div className="flex-1">
+              <Input
+                id="notta-url"
+                data-testid="input-notta-url"
+                type="url"
+                className="w-full"
+                placeholder="https://app.notta.ai/share/..."
+                value={nottaUrl}
+                onChange={(e) => setNottaUrl(e.target.value)}
+              />
+            </div>
+            <Button
+              data-testid="button-fetch-notta"
+              variant="outline"
+              onClick={onFetchFromNotta}
+              disabled={!nottaUrl.trim() || isFetchingNotta || isLoading}
+            >
+              {isFetchingNotta ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                  Fetching...
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Import
+                </>
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Enter a Notta.AI share URL to automatically import the transcript
           </p>
         </div>
         <div className="flex-1 relative">
@@ -114,7 +163,7 @@ I can't find out. I think the words are in the end...`}
             data-testid="button-generate-care-plan"
             className="flex-1"
             onClick={onGenerate}
-            disabled={isLoading || !clientName.trim() || !transcript.trim()}
+            disabled={isLoading || isFetchingNotta || !clientName.trim() || !transcript.trim()}
           >
             {isLoading ? (
               <>

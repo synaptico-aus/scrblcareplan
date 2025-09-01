@@ -13,12 +13,14 @@ import { Button } from "@/components/ui/button";
 export default function CarePlanner() {
   const [clientName, setClientName] = useState("");
   const [transcript, setTranscript] = useState("");
+  const [nottaUrl, setNottaUrl] = useState("");
   const [processingMode, setProcessingMode] = useState<"ai" | "offline">("ai");
   const [facts, setFacts] = useState<ExtractedFacts | null>(null);
   const [html, setHtml] = useState<string | null>(null);
   const [isFactsPanelCollapsed, setIsFactsPanelCollapsed] = useState(false);
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
+  const [isFetchingNotta, setIsFetchingNotta] = useState(false);
   
   const { toast } = useToast();
 
@@ -62,6 +64,41 @@ export default function CarePlanner() {
       });
     },
   });
+
+  const handleFetchFromNotta = async () => {
+    if (!nottaUrl.trim()) {
+      toast({
+        title: "Missing URL",
+        description: "Please enter a Notta.AI share URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsFetchingNotta(true);
+    try {
+      const response = await apiRequest("POST", "/api/fetch-notta", {
+        url: nottaUrl.trim()
+      });
+      const data = await response.json();
+      
+      if (data.transcript) {
+        setTranscript(data.transcript);
+        toast({
+          title: "Import Successful",
+          description: "Transcript imported from Notta.AI",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Import Failed",
+        description: (error as Error).message || "Failed to fetch transcript from Notta.AI",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetchingNotta(false);
+    }
+  };
 
   const handleGenerate = () => {
     if (!clientName.trim() || !transcript.trim()) {
@@ -159,10 +196,14 @@ export default function CarePlanner() {
           setClientName={setClientName}
           transcript={transcript}
           setTranscript={setTranscript}
+          nottaUrl={nottaUrl}
+          setNottaUrl={setNottaUrl}
           processingMode={processingMode}
           setProcessingMode={setProcessingMode}
           onGenerate={handleGenerate}
+          onFetchFromNotta={handleFetchFromNotta}
           isLoading={generateMutation.isPending}
+          isFetchingNotta={isFetchingNotta}
         />
 
         <FactsPanel
