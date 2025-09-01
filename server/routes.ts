@@ -5,6 +5,7 @@ import { chatParityRequestSchema, insertSavedCarePlanSchema } from "@shared/sche
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
+import puppeteer from "puppeteer";
 
 const nottaUrlSchema = z.object({
   url: z.string().url()
@@ -13,32 +14,90 @@ const nottaUrlSchema = z.object({
 export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/fetch-notta", async (req, res) => {
+    let browser;
     try {
       const { url } = nottaUrlSchema.parse(req.body);
       
-      // Notta.AI loads content dynamically, so we can't extract it server-side
-      // Return helpful instructions for manual copy/paste
-      return res.status(400).json({ 
-        message: "Notta.AI loads transcript content dynamically. Please open the link, copy the transcript text from the page, and paste it into the transcript field instead.",
-        instructionsHtml: `
-          <div>
-            <h3>How to copy transcript from Notta.AI:</h3>
-            <ol>
-              <li>Open the Notta.AI share link in your browser</li>
-              <li>Wait for the page to load completely</li>
-              <li>Select all the transcript text (Ctrl+A or Cmd+A)</li>
-              <li>Copy the text (Ctrl+C or Cmd+C)</li>
-              <li>Paste it into the transcript field below</li>
-            </ol>
-          </div>
-        `
+      console.log(`Attempting to extract transcript from Notta.AI URL: ${url}`);
+      
+      // Launch headless browser
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
       });
       
-    } catch (error) {
-      console.error("Error with Notta.AI URL:", error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Invalid Notta.AI URL format" 
+      const page = await browser.newPage();
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      
+      // Navigate to the page
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+      
+      // Wait for content to load and try multiple selectors
+      await page.waitForTimeout(3000);
+      
+      // Try to extract transcript using various selectors
+      const transcript = await page.evaluate(() => {
+        // Try multiple possible selectors for transcript content
+        const selectors = [
+          '[data-testid*="transcript"]',
+          '.transcript-content',
+          '.transcript-text',
+          '[class*="transcript"]',
+          'pre',
+          '.content-text',
+          '[data-transcript]',
+          '.meeting-transcript',
+          'div[contenteditable="true"]'
+        ];
+        
+        for (const selector of selectors) {
+          const element = document.querySelector(selector);
+          if (element && element.textContent && element.textContent.trim().length > 50) {
+            return element.textContent.trim();
+          }
+        }
+        
+        // Try to find any text content that looks like a transcript
+        const allText = document.body.innerText;
+        const lines = allText.split('\n').filter(line => line.trim().length > 10);
+        
+        // Look for patterns that suggest transcript content
+        for (let i = 0; i < lines.length - 5; i++) {
+          const section = lines.slice(i, i + 5).join('\n');
+          // Check if this looks like transcript content
+          if (section.match(/\d{1,2}:\d{2}/) || 
+              section.match(/Speaker \d+/i) ||
+              section.match(/Unknown speaker/i) ||
+              (section.length > 200 && section.split(' ').length > 30)) {
+            // Found potential transcript, get more context
+            const fullTranscript = lines.slice(i, Math.min(i + 100, lines.length)).join('\n');
+            if (fullTranscript.length > 100) {
+              return fullTranscript.trim();
+            }
+          }
+        }
+        
+        return null;
       });
+      
+      if (!transcript) {
+        return res.status(400).json({ 
+          message: "Could not extract transcript content from Notta.AI page. The page may still be loading or the share link may not contain transcript text." 
+        });
+      }
+      
+      console.log(`Successfully extracted transcript: ${transcript.length} characters`);
+      res.json({ transcript });
+      
+    } catch (error) {
+      console.error("Error extracting Notta.AI transcript:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to extract transcript from Notta.AI" 
+      });
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
     }
   });
   
