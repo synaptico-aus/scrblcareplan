@@ -34,7 +34,14 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const calculateBudgetEstimate = () => {
     if (!html || !fundingType || !fundingLevel) return null;
 
-    const budgetData = fundingLevels[fundingType as keyof typeof fundingLevels]?.[fundingLevel as keyof (typeof fundingLevels)[typeof fundingType]];
+    let budgetData: { name: string; quarterlyAmount: number } | undefined;
+    
+    if (fundingType === "hcp" && fundingLevel in fundingLevels.hcp) {
+      budgetData = fundingLevels.hcp[fundingLevel as keyof typeof fundingLevels.hcp];
+    } else if (fundingType === "sah" && fundingLevel in fundingLevels.sah) {
+      budgetData = fundingLevels.sah[fundingLevel as keyof typeof fundingLevels.sah];
+    }
+    
     if (!budgetData) return null;
 
     const quarterlyBudget = budgetData.quarterlyAmount;
