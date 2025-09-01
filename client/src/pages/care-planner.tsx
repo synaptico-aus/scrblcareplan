@@ -17,6 +17,8 @@ export default function CarePlanner() {
   const [facts, setFacts] = useState<ExtractedFacts | null>(null);
   const [html, setHtml] = useState<string | null>(null);
   const [isFactsPanelCollapsed, setIsFactsPanelCollapsed] = useState(false);
+  const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
+  const [generationTime, setGenerationTime] = useState<number | null>(null);
   
   const { toast } = useToast();
 
@@ -26,12 +28,20 @@ export default function CarePlanner() {
       transcript: string; 
       mode: "ai" | "offline" 
     }) => {
+      const startTime = Date.now();
+      setGenerationStartTime(startTime);
+      
       const endpoint = mode === "ai" ? "/api/chat-parity" : "/api/offline-analysis";
       const response = await apiRequest("POST", endpoint, {
         clientName,
         transcript,
         template: "gold-standard"
       });
+      
+      const endTime = Date.now();
+      const totalTime = Math.round((endTime - startTime) / 1000);
+      setGenerationTime(totalTime);
+      
       return response.json();
     },
     onSuccess: (data) => {
@@ -39,10 +49,12 @@ export default function CarePlanner() {
       setHtml(data.html);
       toast({
         title: "Care Plan Generated",
-        description: "Successfully generated Gold Standard Care Plan",
+        description: `Successfully generated in ${generationTime} seconds`,
       });
     },
     onError: (error) => {
+      setGenerationStartTime(null);
+      setGenerationTime(null);
       toast({
         title: "Generation Failed",
         description: error.message || "Failed to generate care plan",
@@ -165,6 +177,8 @@ export default function CarePlanner() {
           isLoading={generateMutation.isPending}
           clientName={clientName}
           extractedFacts={facts}
+          generationStartTime={generationStartTime}
+          generationTime={generationTime}
           onExport={handleExport}
           onPrint={handlePrint}
         />

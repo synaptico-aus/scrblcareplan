@@ -3,7 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, FileText, Printer, Save } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Download, FileText, Printer, Save, Clock } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ExtractedFacts } from "@shared/schema";
@@ -13,13 +14,17 @@ interface CarePlanPreviewProps {
   isLoading: boolean;
   clientName: string;
   extractedFacts: ExtractedFacts | null;
+  generationStartTime: number | null;
+  generationTime: number | null;
   onExport: () => void;
   onPrint: () => void;
 }
 
-export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, onExport, onPrint }: CarePlanPreviewProps) {
+export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, generationStartTime, generationTime, onExport, onPrint }: CarePlanPreviewProps) {
   const [saveName, setSaveName] = useState("");
   const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -29,6 +34,29 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, o
       setSaveName(clientName);
     }
   }, [html, clientName, saveName]);
+
+  // Timer for elapsed time during generation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isLoading && generationStartTime) {
+      interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - generationStartTime) / 1000);
+        setElapsedTime(elapsed);
+        
+        // Simulate progress based on elapsed time (reaches ~90% at 60 seconds)
+        const progressValue = Math.min(90, (elapsed / 60) * 90);
+        setProgress(progressValue);
+      }, 1000);
+    } else {
+      setElapsedTime(0);
+      setProgress(0);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLoading, generationStartTime]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -174,14 +202,33 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, o
       <div className="flex-1 overflow-y-auto p-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center">
+            <div className="text-center max-w-md w-full">
               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <p className="text-lg font-medium text-foreground">Generating Care Plan...</p>
               <p className="text-sm text-muted-foreground mt-2">Processing transcript with AI</p>
+              
+              {/* Progress Bar */}
+              <div className="mt-6 space-y-3">
+                <Progress value={progress} className="w-full" />
+                <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+                  <Clock className="h-4 w-4" />
+                  <span>Elapsed time: {elapsedTime}s</span>
+                </div>
+              </div>
             </div>
           </div>
         ) : html ? (
           <div className="max-w-4xl mx-auto care-plan-document bg-white shadow-lg rounded-lg p-8" data-testid="care-plan-content">
+            {/* Generation Time Header */}
+            {generationTime && (
+              <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-center space-x-2 text-green-700">
+                  <Clock className="h-4 w-4" />
+                  <span className="text-sm font-medium">Generated in {generationTime} seconds</span>
+                </div>
+              </div>
+            )}
+            
             <div 
               className="prose prose-sm max-w-none"
               dangerouslySetInnerHTML={{ __html: html }}
