@@ -324,11 +324,11 @@ export default function CarePlanner() {
       <header className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="bg-primary text-primary-foreground p-2 rounded-lg">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 2h12v8H4V6zm2 2h8v2H6V8zm0 3h8v1H6v-1z" clipRule="evenodd" />
-              </svg>
-            </div>
+            <img 
+              src="/attached_assets/scrbl-logo.png" 
+              alt="Scrbl Logo" 
+              className="h-10 w-auto"
+            />
             <div>
               <h1 className="text-xl font-semibold text-foreground">scrbl_v2</h1>
               <p className="text-sm text-muted-foreground">Digital Care Plan Agent</p>
