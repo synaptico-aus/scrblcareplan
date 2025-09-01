@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { CarePlanForm } from "@/components/CarePlanForm";
 import { FactsPanel } from "@/components/FactsPanel";
@@ -23,6 +23,29 @@ export default function CarePlanner() {
   const [isFetchingNotta, setIsFetchingNotta] = useState(false);
   
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Auto-save mutation
+  const autoSaveMutation = useMutation({
+    mutationFn: async ({ name, clientName, html, extractedFacts }: {
+      name: string;
+      clientName: string;
+      html: string;
+      extractedFacts: ExtractedFacts | null;
+    }) => {
+      const response = await apiRequest("POST", "/api/saved-care-plans", {
+        name,
+        clientName,
+        html,
+        extractedFacts,
+        saveDate: new Date(),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-care-plans"] });
+    },
+  });
 
   const generateMutation = useMutation({
     mutationFn: async ({ clientName, transcript, mode }: { 
@@ -49,9 +72,19 @@ export default function CarePlanner() {
     onSuccess: (data) => {
       setFacts(data.facts);
       setHtml(data.html);
+      
+      // Auto-save the generated care plan
+      const autoSaveName = `${clientName} - ${new Date().toLocaleDateString('en-AU')}`;
+      autoSaveMutation.mutate({
+        name: autoSaveName,
+        clientName,
+        html: data.html,
+        extractedFacts: data.facts,
+      });
+      
       toast({
-        title: "Care Plan Generated",
-        description: `Successfully generated in ${generationTime} seconds`,
+        title: "Care Plan Generated & Saved",
+        description: `Generated in ${generationTime} seconds and automatically saved as "${autoSaveName}"`,
       });
     },
     onError: (error) => {
