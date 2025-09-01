@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Settings, Link2 } from "lucide-react";
+import { Upload, Settings, Link2, ChevronDown, ChevronUp } from "lucide-react";
 import { fundingLevels } from "@shared/schema";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface CarePlanFormProps {
   clientName: string;
@@ -44,6 +45,8 @@ export function CarePlanForm({
   isLoading,
   isFetchingNotta
 }: CarePlanFormProps) {
+  const [isNottaOpen, setIsNottaOpen] = useState(false);
+  
   return (
     <div className="w-1/3 bg-card border-r border-border flex flex-col">
       {/* Client Information */}
@@ -153,46 +156,57 @@ export function CarePlanForm({
           </p>
         </div>
         
-        {/* Notta URL Input */}
-        <div className="mb-4">
-          <Label htmlFor="notta-url" className="block text-sm font-medium text-foreground mb-2">
-            Import from Notta.AI (Optional)
-          </Label>
-          <div className="flex space-x-2">
-            <div className="flex-1">
-              <Input
-                id="notta-url"
-                data-testid="input-notta-url"
-                type="url"
-                className="w-full"
-                placeholder="https://app.notta.ai/share/..."
-                value={nottaUrl}
-                onChange={(e) => setNottaUrl(e.target.value)}
-              />
-            </div>
-            <Button
-              data-testid="button-fetch-notta"
-              variant="outline"
-              onClick={onFetchFromNotta}
-              disabled={!nottaUrl.trim() || isFetchingNotta || isLoading}
-            >
-              {isFetchingNotta ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                  Fetching...
-                </>
+        {/* Notta URL Input - Collapsible */}
+        <Collapsible open={isNottaOpen} onOpenChange={setIsNottaOpen} className="mb-4">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full justify-between p-0 h-auto">
+              <Label className="text-sm font-medium text-foreground cursor-pointer">
+                Import from Notta.AI (Optional)
+              </Label>
+              {isNottaOpen ? (
+                <ChevronUp className="h-4 w-4" />
               ) : (
-                <>
-                  <Link2 className="h-4 w-4 mr-2" />
-                  Import
-                </>
+                <ChevronDown className="h-4 w-4" />
               )}
             </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Enter a Notta.AI share URL to automatically import the transcript
-          </p>
-        </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 mt-2">
+            <div className="flex space-x-2">
+              <div className="flex-1">
+                <Input
+                  id="notta-url"
+                  data-testid="input-notta-url"
+                  type="url"
+                  className="w-full"
+                  placeholder="https://app.notta.ai/share/..."
+                  value={nottaUrl}
+                  onChange={(e) => setNottaUrl(e.target.value)}
+                />
+              </div>
+              <Button
+                data-testid="button-fetch-notta"
+                variant="outline"
+                onClick={onFetchFromNotta}
+                disabled={!nottaUrl.trim() || isFetchingNotta || isLoading}
+              >
+                {isFetchingNotta ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    Fetching...
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-4 w-4 mr-2" />
+                    Import
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter a Notta.AI share URL to automatically import the transcript
+            </p>
+          </CollapsibleContent>
+        </Collapsible>
         <div className="flex-1 relative">
           <Textarea
             data-testid="textarea-transcript"
