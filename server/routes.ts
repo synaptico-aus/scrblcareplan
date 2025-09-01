@@ -16,69 +16,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { url } = nottaUrlSchema.parse(req.body);
       
-      // Fetch the Notta.AI share page
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Notta.AI page: ${response.status}`);
-      }
-      
-      const html = await response.text();
-      
-      // Extract transcript from the HTML
-      // Look for transcript content in script tags or text content
-      const transcriptMatch = html.match(/<script[^>]*>[\s\S]*?window\.__NUXT__\s*=\s*({[\s\S]*?});[\s\S]*?<\/script>/) ||
-                            html.match(/transcript["\']:\s*["\']([^"']*)["\']/) ||
-                            html.match(/"text":\s*"([^"]*)"/) ||
-                            html.match(/data-transcript="([^"]*)"/) ||
-                            html.match(/<div[^>]*class="[^"]*transcript[^"]*"[^>]*>([\s\S]*?)<\/div>/);
-      
-      let transcript = "";
-      if (transcriptMatch) {
-        // Try to extract from different possible patterns
-        if (transcriptMatch[1]) {
-          try {
-            // If it's JSON data, try to parse it
-            const jsonData = JSON.parse(transcriptMatch[1]);
-            transcript = jsonData.transcript || jsonData.text || "";
-          } catch {
-            // If JSON parsing fails, use the raw match
-            transcript = transcriptMatch[1];
-          }
-        }
-      }
-      
-      // If no specific transcript found, look for any meaningful text content
-      if (!transcript) {
-        // Remove HTML tags and scripts
-        const textContent = html
-          .replace(/<script[\s\S]*?<\/script>/gi, '')
-          .replace(/<style[\s\S]*?<\/style>/gi, '')
-          .replace(/<[^>]*>/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
-        // Look for patterns that might indicate transcript content
-        const contentMatch = textContent.match(/(?:Unknown speaker|Speaker \d+|Transcript:)[\s\S]*/) ||
-                            textContent.match(/\d{2}:\d{2}[\s\S]*/) ||
-                            textContent.match(/transcript[\s\S]{50,}/i);
-        
-        if (contentMatch) {
-          transcript = contentMatch[0].trim();
-        }
-      }
-      
-      if (!transcript) {
-        return res.status(400).json({ 
-          message: "Could not extract transcript from Notta.AI URL. Please ensure the URL is a valid share link." 
-        });
-      }
-      
-      res.json({ transcript });
+      // Notta.AI loads content dynamically, so we can't extract it server-side
+      // Return helpful instructions for manual copy/paste
+      return res.status(400).json({ 
+        message: "Notta.AI loads transcript content dynamically. Please open the link, copy the transcript text from the page, and paste it into the transcript field instead.",
+        instructionsHtml: `
+          <div>
+            <h3>How to copy transcript from Notta.AI:</h3>
+            <ol>
+              <li>Open the Notta.AI share link in your browser</li>
+              <li>Wait for the page to load completely</li>
+              <li>Select all the transcript text (Ctrl+A or Cmd+A)</li>
+              <li>Copy the text (Ctrl+C or Cmd+C)</li>
+              <li>Paste it into the transcript field below</li>
+            </ol>
+          </div>
+        `
+      });
       
     } catch (error) {
-      console.error("Error fetching Notta.AI transcript:", error);
+      console.error("Error with Notta.AI URL:", error);
       res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to fetch transcript from Notta.AI" 
+        message: error instanceof Error ? error.message : "Invalid Notta.AI URL format" 
       });
     }
   });

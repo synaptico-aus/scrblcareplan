@@ -138,8 +138,25 @@ export function CarePlanForm({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Enter a Notta.AI share URL to automatically import the transcript
+            Enter a Notta.AI share URL, then copy the transcript manually from the opened page.
           </p>
+          {nottaUrl && (
+            <div className="mt-2">
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                onClick={() => window.open(nottaUrl, '_blank')}
+                className="text-xs"
+                data-testid="button-open-notta"
+              >
+                Open Notta Link in New Tab
+              </Button>
+              <p className="text-xs text-muted-foreground mt-1">
+                → Open link → Select all text → Copy → Paste into transcript field below
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex-1 relative">
           <Textarea

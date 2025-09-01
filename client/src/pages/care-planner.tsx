@@ -90,9 +90,10 @@ export default function CarePlanner() {
         });
       }
     } catch (error) {
+      const errorMessage = (error as any)?.response?.data?.message || (error as Error).message || "Failed to fetch transcript from Notta.AI";
       toast({
-        title: "Import Failed",
-        description: (error as Error).message || "Failed to fetch transcript from Notta.AI",
+        title: "Manual Copy Required",
+        description: "Notta.AI requires manual copying. Open the link in your browser and copy/paste the transcript.",
         variant: "destructive",
       });
     } finally {
