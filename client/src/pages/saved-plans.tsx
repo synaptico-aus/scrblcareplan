@@ -288,7 +288,7 @@ export default function SavedPlans() {
           {/* Care Plan Document */}
           <div className="care-plan-document bg-white shadow-lg rounded-lg p-8">
             <div 
-              dangerouslySetInnerHTML={{ __html: selectedPlan.html }}
+              dangerouslySetInnerHTML={{ __html: selectedPlan.html as string }}
             />
           </div>
         </div>
