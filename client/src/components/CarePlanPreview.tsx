@@ -386,7 +386,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
                 compliant with Australian Aged Care Standards.
               </p>
               <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 max-w-md mx-auto">
-                <div className="flex items-center space-x-2 mb-2">
+                <div className="flex items-center justify-center space-x-2 mb-2">
                   <div className="w-3 h-3 bg-accent rounded-full"></div>
                   <span className="text-sm font-medium text-accent">Privacy Act Compliant</span>
                 </div>
