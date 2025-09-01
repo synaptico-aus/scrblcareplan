@@ -15,10 +15,10 @@ export async function extractFactsFromTranscript(transcript: string, clientName:
           content: `You are an AI care-planning assistant for the Australian home care sector. Extract key facts from assessment transcripts.
 
 Rules:
-- Extract facts ONLY if clearly stated in the transcript
-- Ignore IVR menus, timestamps, and administrative questions
-- Focus on: language, interpreter needs, GP/pharmacy, equipment, services, risks, preferences
-- Do not invent details
+- Extract facts that are clearly mentioned or strongly implied in the transcript
+- Ignore IVR menus, timestamps, and administrative questions  
+- Look for: language mentions, communication needs, medical practitioners, equipment, family members, risks, daily routines, mobility aids, mental health mentions
+- Be thorough but accurate - extract information that's actually discussed
 
 Respond with JSON in this exact format:
 {
@@ -54,8 +54,15 @@ Respond with JSON in this exact format:
 }`
         },
         {
-          role: "user",
-          content: `Client Name: ${clientName}\n\nTranscript:\n${transcript}`
+          role: "user", 
+          content: `Extract key facts from this assessment transcript. Look for clearly stated information about language, family, medical details, equipment, and social needs.
+
+Client Name: ${clientName}
+
+Transcript:
+${transcript}
+
+Build comprehensive facts from the information discussed, not just isolated details.`
         }
       ],
       response_format: { type: "json_object" },
@@ -158,22 +165,22 @@ For Goals format exactly like this:
 
 ## Transcript handling
 - Ignore IVR menus, timestamps, and administrative questions (e.g., "This call is recorded", "Can I have your name?")
-- Extract facts only if clearly stated: language, interpreter, GP/pharmacy, equipment (wheelchair, walker, grab rails, shower chair, ramp, lifter, electric bed, lift recliner, personal alarm), services/frequency/times, risks (falls, pain with score, mental health, CALD), preferences (female worker, after 11am)
-- Build narrative paragraphs by stitching adjacent relevant sentences; only light grammar fixes
-- When unsure, prefer the fallback sentence
-- No placeholders besides the fallback sentence
-- No disclaimers beyond what's explicitly listed`
+- Extract and build narratives from information that's clearly discussed in the transcript
+- Look for: client's language needs, family relationships, medical practitioners, equipment used, daily routines, social support, mental health concerns, mobility limitations, living arrangements
+- Build meaningful first-person narratives using the information provided
+- Use the fallback sentence only when a section has no relevant information in the transcript
+- Focus on creating coherent care plan sections that reflect what was actually discussed`
         },
         {
           role: "user",
-          content: `Generate a complete Gold Standard Care Plan HTML for:
+          content: `Generate a complete Gold Standard Care Plan HTML for this client. Extract and use the information that's clearly discussed in the transcript to build meaningful care plan sections.
 
 Client Name: ${clientName}
 
 Transcript:
 ${transcript}
 
-Output the full Care Plan HTML exactly in the required order and formatting rules.`
+Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. Only use the fallback sentence for sections where no relevant information was discussed.`
         }
       ],
     });
