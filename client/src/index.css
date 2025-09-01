@@ -115,6 +115,35 @@
   line-height: 1.6;
 }
 
+.care-plan-document h1 {
+  font-size: 1.5em;
+  font-weight: bold;
+  margin: 1.5em 0 0.5em 0;
+  color: #1a1a1a;
+}
+
+.care-plan-document h2 {
+  font-size: 1.25em;
+  font-weight: bold;
+  margin: 1.25em 0 0.5em 0;
+  color: #1a1a1a;
+}
+
+.care-plan-document h3 {
+  font-size: 1.1em;
+  font-weight: bold;
+  margin: 1em 0 0.5em 0;
+  color: #1a1a1a;
+}
+
+.care-plan-document p {
+  margin: 0.5em 0;
+}
+
+.care-plan-document strong {
+  font-weight: bold;
+}
+
 .care-plan-document table {
   width: 100%;
   border-collapse: collapse;
