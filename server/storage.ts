@@ -1,5 +1,7 @@
-import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan } from "@shared/schema";
+import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, users, careAnalyses, savedCarePlans } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -96,4 +98,75 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async createCareAnalysis(analysis: InsertCareAnalysis & { extractedFacts?: any; generatedHtml?: string }): Promise<CareAnalysis> {
+    const [careAnalysis] = await db
+      .insert(careAnalyses)
+      .values({
+        clientName: analysis.clientName,
+        transcript: analysis.transcript,
+        extractedFacts: analysis.extractedFacts || null,
+        generatedHtml: analysis.generatedHtml || null,
+        processingMode: analysis.processingMode || "ai",
+      })
+      .returning();
+    return careAnalysis;
+  }
+
+  async getCareAnalysis(id: string): Promise<CareAnalysis | undefined> {
+    const [careAnalysis] = await db.select().from(careAnalyses).where(eq(careAnalyses.id, id));
+    return careAnalysis || undefined;
+  }
+
+  async getCareAnalysesByClient(clientName: string): Promise<CareAnalysis[]> {
+    return await db.select().from(careAnalyses).where(eq(careAnalyses.clientName, clientName));
+  }
+
+  async createSavedCarePlan(carePlan: InsertSavedCarePlan): Promise<SavedCarePlan> {
+    const [savedCarePlan] = await db
+      .insert(savedCarePlans)
+      .values({
+        name: carePlan.name,
+        clientName: carePlan.clientName,
+        html: carePlan.html,
+        extractedFacts: carePlan.extractedFacts || null,
+        saveDate: carePlan.saveDate,
+      })
+      .returning();
+    return savedCarePlan;
+  }
+
+  async getSavedCarePlans(): Promise<SavedCarePlan[]> {
+    return await db.select().from(savedCarePlans).orderBy(savedCarePlans.createdAt);
+  }
+
+  async getSavedCarePlan(id: string): Promise<SavedCarePlan | undefined> {
+    const [savedCarePlan] = await db.select().from(savedCarePlans).where(eq(savedCarePlans.id, id));
+    return savedCarePlan || undefined;
+  }
+
+  async deleteSavedCarePlan(id: string): Promise<boolean> {
+    const result = await db.delete(savedCarePlans).where(eq(savedCarePlans.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+}
+
+export const storage = new DatabaseStorage();
