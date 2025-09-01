@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,13 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, o
   const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Set default save name to client name when care plan is generated
+  useEffect(() => {
+    if (html && clientName && !saveName) {
+      setSaveName(clientName);
+    }
+  }, [html, clientName, saveName]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
