@@ -330,8 +330,8 @@ export default function CarePlanner() {
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-foreground">Scrbl Gold Standard Care Planner</h1>
-              <p className="text-sm text-muted-foreground">Australian Aged Care Assessment Tool</p>
+              <h1 className="text-xl font-semibold text-foreground">scrbl_v2</h1>
+              <p className="text-sm text-muted-foreground">Digital Care Planning Assistant</p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
