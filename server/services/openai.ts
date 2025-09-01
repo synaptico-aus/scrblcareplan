@@ -85,9 +85,11 @@ export async function generateCarePlanHtml(transcript: string, clientName: strin
 
 Your job: read a full assessment transcript between a care partner and a client/family, and generate a **Gold Standard draft Care Plan** aligned with:
 - Aged Care Act (current)
-- Support at Home Program (from July 2025)
+- Support at Home Program (from November 1, 2025)
 - Aged Care Quality Standards (1–8)
 - Salveo "Gold Standard" headings and order
+- Single Assessment System with Integrated Assessment Tool (IAT)
+- Quarterly care plan review cycle (not annual)
 
 ## Non-negotiable rules
 - Use **first-person "I" statements** in a clinical, plain-English, narrative style.
@@ -107,12 +109,13 @@ Your job: read a full assessment transcript between a care partner and a client/
    - Date of this Care Plan: 
    - Preferred Name: 
    - Full Name: 
-   - Purpose of this Care Plan: 
+   - Purpose of this Care Plan: To outline services and supports under the Support at Home Program (November 2025)
    - Preferred Language: 
    - Interpreter required?:
 4. People involved in developing my care plan
 5. Things to consider about my cultural, diversity, values and belief
 6. My care worker, communication and service delivery preferences
+   - Single Provider Model: Under Support at Home, one provider manages all care coordination
 7. My Preferred Support People
 8. Informal Supports
 9. Important things to know about me
@@ -128,9 +131,12 @@ Your job: read a full assessment transcript between a care partner and a client/
     - Specific Risks
 12. Emergency Contacts & Instructions
 13. My Goals (render each goal exactly as specified)
-14. Budget
+14. Budget and Service Classifications
+    - Service Category: Clinical Care (100% government funded) / Independence Support / Everyday Living
+    - Quarterly Budget Allocation
+    - Classification Level (1-8 under Support at Home)
 15. Care Plan Consent and Distribution
-16. Prepared By (Name: __________ | Role: Care Partner, Date: Today | Review Date: in ~6 months | Signature: __________)
+16. Prepared By (Name: __________ | Role: Care Partner, Date: Today | Review Date: Quarterly (every 3 months) | Signature: __________)
 17. Transcript Summary – {Client Name} (map to Standards 1–8)
     - Standard 1 – Consumer dignity and choice
     - Standard 2 – Ongoing assessment and planning with consumers
@@ -162,6 +168,7 @@ For Goals format exactly like this:
 <p>Abilities and considerations (risks): …</p>
 <p>How will we do this? (Tasks): …</p>
 <p>Who is responsible?: When will it be done?: How much will it cost?: …</p>
+<p>Service Category: Clinical Care / Independence Support / Everyday Living</p>
 
 ## Transcript handling
 - Ignore IVR menus, timestamps, and administrative questions (e.g., "This call is recorded", "Can I have your name?")
