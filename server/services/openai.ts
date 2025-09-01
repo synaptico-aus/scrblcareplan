@@ -2,13 +2,15 @@ import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: 60000, // 60 second timeout
 });
 
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
+  console.log("Starting fact extraction for client:", clientName);
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4-turbo",
       messages: [
         {
           role: "system",
@@ -68,16 +70,20 @@ Build comprehensive facts from the information discussed, not just isolated deta
       response_format: { type: "json_object" },
     });
 
-    return JSON.parse(response.choices[0].message.content || "{}");
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    console.log("Fact extraction completed successfully");
+    return result;
   } catch (error) {
+    console.error("Fact extraction failed:", error);
     throw new Error("Failed to extract facts from transcript: " + (error instanceof Error ? error.message : "Unknown error"));
   }
 }
 
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
+  console.log("Starting care plan generation for client:", clientName);
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
@@ -185,8 +191,11 @@ Create comprehensive care plan sections based on the information provided in the
       ],
     });
 
-    return response.choices[0].message.content || "";
+    const result = response.choices[0].message.content || "";
+    console.log("Care plan generation completed successfully");
+    return result;
   } catch (error) {
+    console.error("Care plan generation failed:", error);
     throw new Error("Failed to generate care plan: " + (error instanceof Error ? error.message : "Unknown error"));
   }
 }
