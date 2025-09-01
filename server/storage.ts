@@ -1,7 +1,7 @@
 import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, users, careAnalyses, savedCarePlans } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -155,7 +155,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSavedCarePlans(): Promise<SavedCarePlan[]> {
-    return await db.select().from(savedCarePlans).orderBy(savedCarePlans.createdAt);
+    return await db.select().from(savedCarePlans).orderBy(sql`${savedCarePlans.createdAt} DESC`);
   }
 
   async getSavedCarePlan(id: string): Promise<SavedCarePlan | undefined> {

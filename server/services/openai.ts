@@ -163,12 +163,31 @@ For Dignity of Risk table use this exact format:
   </tbody>
 </table>
 
-For Goals format exactly like this:
+For Goals format exactly like this using SMARTA principles:
 <p><strong>GOAL 1</strong> Goal: …</p>
 <p>Abilities and considerations (risks): …</p>
 <p>How will we do this? (Tasks): …</p>
 <p>Who is responsible?: When will it be done?: How much will it cost?: …</p>
 <p>Service Category: Clinical Care / Independence Support / Everyday Living</p>
+
+## SMARTA Goal-Setting Principles (CRITICAL for Support at Home compliance)
+All goals MUST follow SMARTA framework:
+- **SPECIFIC**: Use client's own language, be precise about who/what/where/when/why
+- **MEASURABLE**: Include trackable metrics so client can monitor progress  
+- **ACHIEVABLE**: Balance challenge with realistic expectations based on client capacity
+- **RELEVANT**: Must align with client's interests, needs and values - avoid generic goals
+- **TIME-LIMITED**: Set clear timeframes tied to client's ability (typically 3-month quarterly cycles)
+- **AGREED**: Goals must be co-designed with client and include their verbal commitment
+
+Examples:
+❌ Generic: "I want to be healthy"
+✅ SMARTA: "I will walk 15 minutes each day, 3 days a week, for the next 6 weeks to improve my fitness"
+
+❌ Not relevant: "I will walk daily" (when client dislikes walking)  
+✅ Relevant: "I will tend to my garden for 20 minutes, twice weekly" (when client loves gardening)
+
+❌ Not measurable: "I want to dress myself better"
+✅ Measurable: "I want to dress myself independently, with no assistance, within 6 weeks"
 
 ## Transcript handling
 - Ignore IVR menus, timestamps, and administrative questions (e.g., "This call is recorded", "Can I have your name?")
@@ -180,14 +199,23 @@ For Goals format exactly like this:
         },
         {
           role: "user",
-          content: `Generate a complete Gold Standard Care Plan HTML for this client. Extract and use the information that's clearly discussed in the transcript to build meaningful care plan sections.
+          content: `Generate a complete Gold Standard Care Plan HTML for this client following Support at Home Program requirements (November 2025).
 
 Client Name: ${clientName}
 
 Transcript:
 ${transcript}
 
-Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. Only use the fallback sentence for sections where no relevant information was discussed.`
+CRITICAL: For the "My Goals" section, apply SMARTA principles to create high-quality, compliant goals:
+
+1. **SPECIFIC**: Use the client's own words and language. Be precise about who, what, where, when, why
+2. **MEASURABLE**: Include trackable metrics (time, frequency, distance, etc.) so progress can be monitored
+3. **ACHIEVABLE**: Ensure goals balance challenge with realistic expectations based on the client's capacity
+4. **RELEVANT**: Goals must align with the client's stated interests, needs and values - avoid generic health goals
+5. **TIME-LIMITED**: Set clear timeframes appropriate to client's ability (typically 3-month quarterly cycles)
+6. **AGREED**: Frame as collaborative goals developed together with the client
+
+Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame it using SMARTA principles. Only use the fallback sentence for sections where no relevant information was discussed.`
         }
       ],
     });
