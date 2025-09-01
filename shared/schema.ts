@@ -46,6 +46,10 @@ export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick
   html: true,
   extractedFacts: true,
   saveDate: true,
+}).extend({
+  saveDate: z.string().or(z.date()).transform((val) => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
 });
 
 export const factsSchema = z.object({
