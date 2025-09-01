@@ -230,7 +230,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
             )}
             
             <div 
-              className="prose prose-sm max-w-none"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           </div>
