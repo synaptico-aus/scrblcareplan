@@ -3,7 +3,7 @@ import OpenAI from "openai";
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 60000, // 60 second timeout for deployment environments
+  timeout: 120000, // 120 second timeout for deployment environments
   maxRetries: 2 // Reduce retries for faster failure handling
 });
 
@@ -11,7 +11,7 @@ export async function extractFactsFromTranscript(transcript: string, clientName:
   try {
     // Add timeout wrapper for deployment environment
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('OpenAI fact extraction timeout')), 45000)
+      setTimeout(() => reject(new Error('OpenAI fact extraction timeout')), 90000)
     );
     
     const response = await Promise.race([
@@ -91,7 +91,7 @@ export async function generateCarePlanHtml(transcript: string, clientName: strin
   try {
     // Add timeout wrapper for deployment environment 
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('OpenAI care plan generation timeout')), 45000)
+      setTimeout(() => reject(new Error('OpenAI care plan generation timeout')), 90000)
     );
     
     const response = await Promise.race([
