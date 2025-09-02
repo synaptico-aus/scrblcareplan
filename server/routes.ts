@@ -224,30 +224,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send initial update
       eventEmitter.emit('generation-update', {
         sessionId,
-        type: 'status',
-        message: 'Starting care plan generation...',
+        type: 'action',
+        action: 'Initializing AI care planning agent',
         step: 1,
-        totalSteps: 4
+        totalSteps: 8
+      });
+
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Connecting to OpenAI GPT-5 model',
+        step: 2,
+        totalSteps: 8
       });
 
       // Step 1: Extract facts
       eventEmitter.emit('generation-update', {
         sessionId,
-        type: 'status', 
-        message: 'Analyzing transcript and extracting key facts...',
-        step: 2,
-        totalSteps: 4
+        type: 'action',
+        action: 'Analyzing transcript for key client information',
+        step: 3,
+        totalSteps: 8
+      });
+
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Extracting medical history, support networks, and risk factors',
+        step: 4,
+        totalSteps: 8
       });
 
       const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
 
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Facts extraction complete - proceeding to care plan generation',
+        step: 5,
+        totalSteps: 8
+      });
+
       // Step 2: Generate care plan
       eventEmitter.emit('generation-update', {
         sessionId,
-        type: 'status',
-        message: 'Generating Gold Standard Care Plan using Australian standards...',
-        step: 3,
-        totalSteps: 4
+        type: 'action',
+        action: 'Generating Gold Standard Care Plan using Australian Aged Care standards',
+        step: 6,
+        totalSteps: 8
+      });
+
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Applying Support at Home Program requirements and SMARTA goal principles',
+        step: 7,
+        totalSteps: 8
       });
 
       const generatedHtml = await generateCarePlanHtml(transcript, clientName);
@@ -255,10 +287,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {
         sessionId,
-        type: 'status',
-        message: 'Saving care plan and finalizing...',
-        step: 4,
-        totalSteps: 4
+        type: 'action',
+        action: 'Finalizing care plan and saving to database',
+        step: 8,
+        totalSteps: 8
       });
 
       const analysis = await storage.createCareAnalysis({
