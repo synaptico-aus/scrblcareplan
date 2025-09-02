@@ -5,6 +5,7 @@ import { CarePlanForm } from "@/components/CarePlanForm";
 import { FactsPanel } from "@/components/FactsPanel";
 import { CarePlanPreview } from "@/components/CarePlanPreview";
 import { AgentUpdates } from "@/components/AgentUpdates";
+import { SettingsDialog } from "@/components/SettingsDialog";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +27,7 @@ export default function CarePlanner() {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [isFetchingNotta, setIsFetchingNotta] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -367,7 +369,13 @@ export default function CarePlanner() {
                 <span className="hidden sm:inline">Saved Plans</span>
               </Button>
             </Link>
-            <Button variant="outline" size="sm" data-testid="button-settings" className="text-xs sm:text-sm">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              data-testid="button-settings" 
+              className="text-xs sm:text-sm"
+              onClick={() => setIsSettingsOpen(true)}
+            >
               <Settings className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Settings</span>
             </Button>
@@ -426,6 +434,12 @@ export default function CarePlanner() {
           onPrint={handlePrint}
         />
       </div>
+
+      {/* Settings Dialog */}
+      <SettingsDialog 
+        open={isSettingsOpen} 
+        onOpenChange={setIsSettingsOpen} 
+      />
     </div>
   );
 }
