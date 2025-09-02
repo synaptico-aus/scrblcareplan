@@ -191,8 +191,23 @@ export default function SavedPlans() {
   };
   
   const handleDownloadDocument = (doc: ClientDocument) => {
+    // Convert raw storage URL to backend authenticated route
+    let downloadUrl = doc.objectPath;
+    
+    // If it's a raw Google Cloud Storage URL, convert it to use our backend route
+    if (downloadUrl.startsWith('https://storage.googleapis.com/')) {
+      // Extract the path after the bucket name
+      const url = new URL(downloadUrl);
+      const pathParts = url.pathname.split('/');
+      if (pathParts.length >= 3) {
+        // Skip the first empty part and bucket name, get the object path
+        const objectPath = pathParts.slice(2).join('/');
+        downloadUrl = `/objects/${objectPath}`;
+      }
+    }
+    
     const link = document.createElement('a');
-    link.href = doc.objectPath;
+    link.href = downloadUrl;
     link.download = doc.fileName;
     link.target = '_blank';
     document.body.appendChild(link);
