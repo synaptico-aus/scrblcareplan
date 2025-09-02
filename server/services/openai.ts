@@ -9,8 +9,8 @@ const openai = new OpenAI({
 
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
   try {
-    // For very long transcripts (4+ hours), use chunked processing for better performance
-    const isLongTranscript = transcript.length > 15000; // ~4 hour threshold
+    // For very long transcripts (massive assessments), use optimized processing  
+    const isLongTranscript = transcript.length > 5000; // Optimize for 30k+ word transcripts
     
     if (isLongTranscript) {
       // Process in optimized chunks for long transcripts
@@ -87,8 +87,8 @@ Build comprehensive facts from the information discussed, not just isolated deta
 
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
   try {
-    // For very long transcripts (4+ hours), use optimized processing
-    const isLongTranscript = transcript.length > 15000; // ~4 hour threshold
+    // For very long transcripts (massive assessments), use optimized processing
+    const isLongTranscript = transcript.length > 5000; // Optimize for 30k+ word transcripts
     
     if (isLongTranscript) {
       // Use condensed key facts approach for long transcripts
@@ -337,9 +337,9 @@ Respond with JSON in this exact format:
 
 Client: ${clientName}
 
-Key Sections: ${transcript.slice(0, 8000)}
+Key Sections: ${transcript.slice(0, 3000)}
 
-[OPTIMIZED FOR LONG TRANSCRIPT - focusing on essential facts only]`
+[OPTIMIZED FOR MASSIVE TRANSCRIPT (30k+ words) - focusing on essential facts only]`
       }
     ],
     response_format: { type: "json_object" },
@@ -374,9 +374,9 @@ Output HTML only with proper headings and structure.`
 
 Client: ${clientName}
 
-Key Information: ${transcript.slice(0, 6000)}
+Key Information: ${transcript.slice(0, 2000)}
 
-[OPTIMIZED FOR LONG TRANSCRIPT - create comprehensive care plan with SMARTA goals and Salveo service alignment]`
+[OPTIMIZED FOR MASSIVE TRANSCRIPT (30k+ words) - create comprehensive care plan with SMARTA goals and Salveo service alignment]`
       }
     ],
   });
