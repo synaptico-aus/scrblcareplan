@@ -18,6 +18,26 @@ const nottaUrlSchema = z.object({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
+  // Health check endpoint for autoscale platforms
+  app.get("/health", async (req, res) => {
+    try {
+      // Basic health check - server is responding
+      const healthStatus = {
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      };
+      
+      res.status(200).json(healthStatus);
+    } catch (error) {
+      res.status(503).json({
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
   app.post("/api/fetch-notta", async (req, res) => {
     let browser;
     try {
