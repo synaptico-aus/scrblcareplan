@@ -51,6 +51,9 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
         try {
           const update: AgentUpdate = JSON.parse(event.data);
           
+          // Debug logging for deployment issues
+          console.log('SSE Event received:', update);
+          
           if (update.type === 'ping' || (update as any).type === 'connected') {
             return;
           }
@@ -70,7 +73,7 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
             onComplete(update.result);
           }
         } catch (error) {
-          console.error('Error parsing SSE data:', error);
+          console.error('Error parsing SSE data:', error, 'Raw data:', event.data);
         }
       };
 
@@ -214,7 +217,7 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
           {isConnected ? (
             <span className="flex items-center justify-center gap-1">
               <div className="w-1 h-1 bg-green-500 rounded-full"></div>
-              Real-time updates active
+{currentStep > 0 ? `Processing step ${currentStep} of ${totalSteps}...` : 'Waiting for updates...'}
             </span>
           ) : (
             <span className="flex items-center justify-center gap-1">

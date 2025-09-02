@@ -208,6 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const updateHandler = (update: any) => {
       if (update.sessionId === sessionId) {
         try {
+          console.log('Sending SSE update to session:', sessionId, update);
           res.write(`data: ${JSON.stringify(update)}\n\n`);
           if ('flush' in res && typeof (res as any).flush === 'function') {
             (res as any).flush();
@@ -253,6 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Send initial update
+      console.log('Emitting initial update for session:', sessionId);
       eventEmitter.emit('generation-update', {
         sessionId,
         type: 'action',
