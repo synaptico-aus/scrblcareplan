@@ -306,8 +306,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId,
         type: 'complete',
         message: 'Care plan generation complete!',
-        step: 4,
-        totalSteps: 4,
+        step: 8,
+        totalSteps: 8,
         result: {
           html: generatedHtml,
           facts: extractedFacts,
