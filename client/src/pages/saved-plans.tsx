@@ -361,13 +361,14 @@ export default function SavedPlans() {
     return (
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+        <header className="bg-card border-b border-border px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <Button 
                 variant="outline" 
                 onClick={() => setSelectedPlan(null)}
                 data-testid="button-back-to-client"
+                size="sm"
               >
                 ← Back to {selectedPlan.clientName}
               </Button>
@@ -376,7 +377,7 @@ export default function SavedPlans() {
                 <p className="text-sm text-muted-foreground">Client: {selectedPlan.clientName}</p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -411,21 +412,25 @@ export default function SavedPlans() {
                   }
                 }}
                 data-testid="button-print-plan"
+                size="sm"
+                className="w-full sm:w-auto"
               >
                 Print
               </Button>
               <Button
                 onClick={() => handleExportToPDF(selectedPlan)}
-                className="bg-red-500 text-white hover:bg-red-600"
+                className="bg-red-500 text-white hover:bg-red-600 w-full sm:w-auto"
                 data-testid="button-export-pdf"
+                size="sm"
               >
                 <FileType className="h-4 w-4 mr-2" />
                 Export to PDF
               </Button>
               <Button
                 onClick={() => handleExportToWord(selectedPlan)}
-                className="bg-blue-500 text-white hover:bg-blue-600"
+                className="bg-blue-500 text-white hover:bg-blue-600 w-full sm:w-auto"
                 data-testid="button-export-word"
+                size="sm"
               >
                 <Download className="h-4 w-4 mr-2" />
                 Export to Word
@@ -435,7 +440,7 @@ export default function SavedPlans() {
         </header>
 
         {/* Care Plan Content */}
-        <div className="p-6 max-w-6xl mx-auto">
+        <div className="p-4 sm:p-6 max-w-6xl mx-auto">
           {/* Extracted Facts Section */}
           {selectedPlan.extractedFacts && (
             <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
@@ -565,7 +570,7 @@ export default function SavedPlans() {
           )}
           
           {/* Care Plan Document */}
-          <div className="care-plan-document bg-white shadow-lg rounded-lg p-8">
+          <div className="care-plan-document bg-white shadow-lg rounded-lg p-4 sm:p-8">
             {/* Scrbl Logo Header */}
             <div className="flex justify-center mb-8 pb-6 border-b border-gray-200">
               <img 
@@ -591,22 +596,23 @@ export default function SavedPlans() {
     return (
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <header className="bg-card border-b border-border px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+        <header className="bg-card border-b border-border px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <Button 
                 variant="outline" 
                 onClick={handleBackToFolders}
                 data-testid="button-back-to-folders"
+                size="sm"
               >
                 ← Back to Client Folders
               </Button>
-              <div className="bg-primary text-primary-foreground p-2 rounded-lg">
-                <Folder className="w-6 h-6" />
+              <div className="bg-primary text-primary-foreground p-1.5 sm:p-2 rounded-lg">
+                <Folder className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">{getDisplayName(selectedClient)}</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-lg sm:text-xl font-semibold text-foreground">{getDisplayName(selectedClient)}</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   {clientPlans.length} care plan{clientPlans.length !== 1 ? 's' : ''} • {selectedClientDocuments.length} document{selectedClientDocuments.length !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -615,7 +621,7 @@ export default function SavedPlans() {
               <ObjectUploader
                 clientName={selectedClient}
                 onUploadComplete={handleUploadComplete}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
               >
                 <Upload className="h-4 w-4 mr-2" />
                 Upload Document
@@ -624,7 +630,7 @@ export default function SavedPlans() {
           </div>
         </header>
 
-        <div className="p-6 space-y-8">
+        <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
           {/* Care Plans Section */}
           <div>
             <h2 className="text-lg font-semibold mb-4 flex items-center">
@@ -637,22 +643,23 @@ export default function SavedPlans() {
                 <p className="text-muted-foreground">No care plans for this client</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {clientPlans.map((plan) => (
                   <Card key={plan.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader>
-                      <CardTitle className="text-lg">{plan.name}</CardTitle>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base sm:text-lg">{plan.name}</CardTitle>
                       <CardDescription className="flex items-center">
                         <Calendar className="h-4 w-4 mr-1" />
                         {formatDate(plan.saveDate)}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
+                    <CardContent className="pt-0">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between space-y-2 sm:space-y-0 sm:space-x-2">
                         <Button 
                           onClick={() => handleViewPlan(plan)}
                           size="sm"
                           data-testid={`button-view-plan-${plan.id}`}
+                          className="w-full sm:w-auto"
                         >
                           <Eye className="h-4 w-4 mr-2" />
                           View Plan
@@ -662,6 +669,7 @@ export default function SavedPlans() {
                           size="sm"
                           onClick={() => handleDeletePlan(plan.id, plan.name)}
                           data-testid={`button-delete-plan-${plan.id}`}
+                          className="w-full sm:w-auto"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -686,10 +694,10 @@ export default function SavedPlans() {
                 <p className="text-sm text-muted-foreground mt-1">Use the "Upload Document" button to add files</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {selectedClientDocuments.map((document) => (
                   <Card key={document.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader>
+                    <CardHeader className="pb-3">
                       <CardTitle className="text-sm truncate">{document.fileName}</CardTitle>
                       <CardDescription>
                         <div className="flex items-center justify-between text-xs">
@@ -701,12 +709,13 @@ export default function SavedPlans() {
                         )}
                       </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
+                    <CardContent className="pt-0">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between space-y-2 sm:space-y-0 sm:space-x-2">
                         <Button 
                           size="sm"
                           onClick={() => handleDownloadDocument(document)}
                           data-testid={`button-download-document-${document.id}`}
+                          className="w-full sm:w-auto"
                         >
                           <Download className="h-4 w-4 mr-2" />
                           Download
@@ -716,6 +725,7 @@ export default function SavedPlans() {
                           size="sm"
                           onClick={() => deleteDocumentMutation.mutate(document.id)}
                           data-testid={`button-delete-document-${document.id}`}
+                          className="w-full sm:w-auto"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -735,38 +745,39 @@ export default function SavedPlans() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b border-border px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-primary text-primary-foreground p-2 rounded-lg">
-              <Folder className="w-6 h-6" />
+      <header className="bg-card border-b border-border px-4 sm:px-6 py-3 sm:py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="bg-primary text-primary-foreground p-1.5 sm:p-2 rounded-lg">
+              <Folder className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-foreground">Client Folders</h1>
-              <p className="text-sm text-muted-foreground">Organize care plans and documents by client</p>
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground">Client Folders</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Organize care plans and documents by client</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
             <Link href="/">
-              <Button variant="outline" data-testid="button-back-to-planner">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to Planner
+              <Button variant="outline" data-testid="button-back-to-planner" size="sm" className="w-full sm:w-auto">
+                <ArrowLeft className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Back to Planner</span>
+                <span className="sm:hidden">Planner</span>
               </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         {/* Search */}
         <div className="mb-6">
-          <div className="relative max-w-md">
+          <div className="relative w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search clients..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 w-full"
               data-testid="input-search-clients"
             />
           </div>
@@ -794,7 +805,7 @@ export default function SavedPlans() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredClientFolders.map((folder) => (
               <Card 
                 key={folder.clientName} 

@@ -315,39 +315,40 @@ export default function CarePlanner() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b border-border px-6 py-4">
+      <header className="bg-card border-b border-border px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <img 
               src={scrblLogo} 
               alt="Scrbl Logo" 
-              className="h-10 w-auto"
+              className="h-8 sm:h-10 w-auto"
             />
             <div>
-              <h1 className="text-xl font-semibold text-foreground">scrbl_v2</h1>
-              <p className="text-sm text-muted-foreground">Digital Care Plan Agent</p>
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground">scrbl_v2</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Digital Care Plan Agent</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center justify-center space-x-2 bg-accent/10 px-3 py-1 rounded-full">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="hidden lg:flex items-center justify-center space-x-2 bg-accent/10 px-3 py-1 rounded-full">
               <Shield className="text-accent h-4 w-4" />
               <span className="text-sm font-medium text-accent-foreground">Privacy Act Compliant</span>
             </div>
             <Link href="/saved-plans">
-              <Button variant="outline" data-testid="button-saved-plans">
-                <FileText className="h-4 w-4 mr-2" />
-                Saved Plans
+              <Button variant="outline" size="sm" data-testid="button-saved-plans" className="text-xs sm:text-sm">
+                <FileText className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Saved Plans</span>
               </Button>
             </Link>
-            <Button variant="outline" data-testid="button-settings">
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
+            <Button variant="outline" size="sm" data-testid="button-settings" className="text-xs sm:text-sm">
+              <Settings className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Settings</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-80px)]">
+      {/* Mobile/Tablet: Stack vertically, Desktop: Side by side */}
+      <div className="flex flex-col lg:flex-row lg:h-[calc(100vh-80px)]">
         <CarePlanForm
           clientName={clientName}
           setClientName={setClientName}

@@ -271,40 +271,44 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   };
 
   return (
-    <div className="flex-1 bg-card flex flex-col">
+    <div className="w-full lg:flex-1 bg-card flex flex-col lg:min-h-0">
       <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-2 lg:space-y-0">
           <h2 className="text-lg font-semibold flex items-center">
             <FileText className="text-primary mr-2 h-5 w-5" />
             Care Plan Preview
           </h2>
-          <div className="flex space-x-2">
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
             <Button
               variant="outline"
               onClick={onPrint}
               disabled={!html}
               data-testid="button-print"
+              size="sm"
+              className="w-full sm:w-auto"
             >
-              <Printer className="h-4 w-4 mr-2" />
-              Print
+              <Printer className="h-4 w-4 sm:mr-2" />
+              <span className="sm:inline">Print</span>
             </Button>
             <Button
               onClick={handleExportToPDF}
               disabled={!html}
-              className="bg-red-500 text-white hover:bg-red-600"
+              className="bg-red-500 text-white hover:bg-red-600 w-full sm:w-auto"
               data-testid="button-export-pdf"
+              size="sm"
             >
-              <FileType className="h-4 w-4 mr-2" />
-              Export to PDF
+              <FileType className="h-4 w-4 sm:mr-2" />
+              <span className="sm:inline">Export to PDF</span>
             </Button>
             <Button
               onClick={handleExportToWord}
               disabled={!html}
-              className="bg-blue-500 text-white hover:bg-blue-600"
+              className="bg-blue-500 text-white hover:bg-blue-600 w-full sm:w-auto"
               data-testid="button-export-word"
+              size="sm"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Export to Word
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span className="sm:inline">Export to Word</span>
             </Button>
           </div>
         </div>
@@ -317,7 +321,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
             <Save className="text-primary mr-2 h-4 w-4" />
             Save Care Plan
           </h3>
-          <div className="flex items-end space-x-4">
+          <div className="flex flex-col sm:flex-row sm:items-end space-y-3 sm:space-y-0 sm:space-x-4">
             <div className="flex-1">
               <Label htmlFor="save-name" className="block text-sm font-medium mb-1">
                 Name
@@ -332,7 +336,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
                 className="w-full"
               />
             </div>
-            <div className="w-40">
+            <div className="sm:w-40">
               <Label htmlFor="save-date" className="block text-sm font-medium mb-1">
                 Date
               </Label>
@@ -349,7 +353,8 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
               onClick={handleSaveCarePlan}
               disabled={!saveName.trim() || !html || saveMutation.isPending}
               data-testid="button-save-care-plan"
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
+              size="lg"
             >
               {saveMutation.isPending ? (
                 <>

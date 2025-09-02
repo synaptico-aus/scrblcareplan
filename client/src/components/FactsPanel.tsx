@@ -12,21 +12,23 @@ interface FactsPanelProps {
 export function FactsPanel({ facts, isProcessing, isCollapsed, onToggleCollapse }: FactsPanelProps) {
   if (isCollapsed) {
     return (
-      <div className="w-12 bg-secondary border-r border-border flex flex-col items-center py-4">
+      <div className="w-full lg:w-12 bg-secondary lg:border-r border-border flex lg:flex-col items-center py-2 lg:py-4">
         <Button
           variant="ghost"
-          size="icon"
+          size="sm"
           onClick={onToggleCollapse}
           data-testid="button-expand-facts"
+          className="lg:size-icon"
         >
-          <ChevronLeft className="h-4 w-4 rotate-180" />
+          <ChevronLeft className="h-4 w-4 lg:rotate-180" />
+          <span className="ml-2 lg:hidden">Show Facts</span>
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="w-80 bg-secondary border-r border-border flex flex-col">
+    <div className="w-full lg:w-80 bg-secondary lg:border-r border-border flex flex-col lg:min-h-0">
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold flex items-center">

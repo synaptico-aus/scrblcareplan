@@ -48,9 +48,9 @@ export function CarePlanForm({
   const [isNottaOpen, setIsNottaOpen] = useState(false);
   
   return (
-    <div className="w-1/3 bg-card border-r border-border flex flex-col">
+    <div className="w-full lg:w-1/3 bg-card lg:border-r border-border flex flex-col lg:min-h-0">
       {/* Client Information */}
-      <div className="p-6 border-b border-border">
+      <div className="p-4 sm:p-6 border-b border-border">
         <h2 className="text-lg font-semibold mb-4 flex items-center">
           <div className="bg-primary text-primary-foreground p-1.5 rounded-lg mr-3">
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -76,7 +76,7 @@ export function CarePlanForm({
           </div>
           
           {/* Funding Level Selection */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <Label htmlFor="funding-type" className="block text-sm font-medium text-foreground mb-2">
                 Funding Type
@@ -143,7 +143,7 @@ export function CarePlanForm({
       </div>
 
       {/* Transcript Input */}
-      <div className="flex-1 p-6 flex flex-col">
+      <div className="flex-1 p-4 sm:p-6 flex flex-col">
         <div className="mb-4">
           <h3 className="text-md font-semibold mb-2 flex items-center">
             <svg className="w-5 h-5 text-primary mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -171,7 +171,7 @@ export function CarePlanForm({
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2 mt-2">
-            <div className="flex space-x-2">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
               <div className="flex-1">
                 <Input
                   id="notta-url"
@@ -188,6 +188,7 @@ export function CarePlanForm({
                 variant="outline"
                 onClick={onFetchFromNotta}
                 disabled={!nottaUrl.trim() || isFetchingNotta || isLoading}
+                className="w-full sm:w-auto"
               >
                 {isFetchingNotta ? (
                   <>
@@ -224,12 +225,13 @@ I can't find out. I think the words are in the end...`}
           />
         </div>
         
-        <div className="mt-4 flex space-x-3">
+        <div className="mt-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <Button
             data-testid="button-generate-care-plan"
             className="flex-1"
             onClick={onGenerate}
             disabled={isLoading || isFetchingNotta || !clientName.trim() || !transcript.trim()}
+            size="lg"
           >
             {isLoading ? (
               <>
