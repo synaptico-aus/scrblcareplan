@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileEdit } from "lucide-react";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts } from "@shared/schema";
@@ -59,16 +59,6 @@ export default function SavedPlans() {
     if (confirm(`Are you sure you want to delete "${planName}"?`)) {
       deleteMutation.mutate(id);
     }
-  };
-
-  const handleExportPDF = (planId: string, planName: string, type: 'editable' | 'standard') => {
-    const url = `/api/saved-care-plans/${planId}/export-pdf?type=${type}`;
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `care-plan-${planName.replace(/[^a-zA-Z0-9]/g, '-')}-${type}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const formatDate = (date: string | Date) => {
@@ -161,24 +151,6 @@ export default function SavedPlans() {
                 data-testid="button-print-plan"
               >
                 Print
-              </Button>
-              
-              <Button
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
-                onClick={() => handleExportPDF(selectedPlan.id, selectedPlan.clientName, 'editable')}
-                data-testid="button-export-editable-pdf"
-              >
-                <FileEdit className="h-4 w-4 mr-2" />
-                Export Editable PDF
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={() => handleExportPDF(selectedPlan.id, selectedPlan.clientName, 'standard')}
-                data-testid="button-export-standard-pdf"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export PDF
               </Button>
             </div>
           </div>
@@ -427,16 +399,6 @@ export default function SavedPlans() {
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         View
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleExportPDF(plan.id, plan.clientName, 'editable')}
-                        className="text-primary hover:text-primary"
-                        data-testid={`button-export-editable-${plan.id}`}
-                        title="Export Editable PDF"
-                      >
-                        <FileEdit className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
