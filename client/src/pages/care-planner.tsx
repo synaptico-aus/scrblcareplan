@@ -331,7 +331,7 @@ export default function CarePlanner() {
           <div className="flex items-center space-x-2 sm:space-x-3">
             <div className="hidden lg:flex items-center justify-center space-x-2 bg-accent/10 px-3 py-1 rounded-full">
               <Shield className="text-accent h-4 w-4" />
-              <span className="text-sm font-medium text-accent-foreground">Privacy Act Compliant</span>
+              <span className="text-sm font-medium text-foreground">Privacy Act Compliant</span>
             </div>
             <Link href="/saved-plans">
               <Button variant="outline" size="sm" data-testid="button-saved-plans" className="text-xs sm:text-sm">
