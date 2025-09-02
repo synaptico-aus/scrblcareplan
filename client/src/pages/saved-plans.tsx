@@ -191,9 +191,17 @@ export default function SavedPlans() {
   };
   
   const handleDownloadDocument = (doc: ClientDocument) => {
-    // The objectPath is already normalized by the backend to use /objects/ format
+    let downloadUrl = doc.objectPath;
+    
+    // Handle both old format (Google Cloud Storage URLs) and new format (/objects/ paths)
+    if (downloadUrl.startsWith('https://storage.googleapis.com/')) {
+      // For old documents, request download through backend API which will handle the conversion
+      downloadUrl = `/api/documents/download?url=${encodeURIComponent(downloadUrl)}`;
+    }
+    // New documents already have the correct /objects/ path format
+    
     const link = document.createElement('a');
-    link.href = doc.objectPath;
+    link.href = downloadUrl;
     link.download = doc.fileName;
     link.target = '_blank';
     document.body.appendChild(link);

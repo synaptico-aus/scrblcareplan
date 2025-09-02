@@ -323,6 +323,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Handle downloads for legacy documents with Google Cloud Storage URLs
+  app.get("/api/documents/download", async (req, res) => {
+    try {
+      const { url } = req.query;
+      if (!url || typeof url !== 'string') {
+        return res.status(400).json({ error: "URL parameter is required" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      const normalizedPath = objectStorageService.normalizeObjectEntityPath(url);
+      
+      if (normalizedPath.startsWith('/objects/')) {
+        // Convert to proper object file and download
+        const objectFile = await objectStorageService.getObjectEntityFile(normalizedPath);
+        objectStorageService.downloadObject(objectFile, res);
+      } else {
+        return res.status(400).json({ error: "Invalid document URL" });
+      }
+    } catch (error) {
+      console.error("Error downloading legacy document:", error);
+      res.status(404).json({ error: "File not found" });
+    }
+  });
+  
   // Client document routes
   app.post("/api/client-documents", async (req, res) => {
     try {
