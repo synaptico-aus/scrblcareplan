@@ -2,13 +2,21 @@ import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: 60000, // 60 second timeout for deployment environments
+  maxRetries: 2 // Reduce retries for faster failure handling
 });
 
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
+    // Add timeout wrapper for deployment environment
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('OpenAI fact extraction timeout')), 45000)
+    );
+    
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: "gpt-5",
       messages: [
         {
           role: "system",
@@ -66,18 +74,30 @@ Build comprehensive facts from the information discussed, not just isolated deta
         }
       ],
       response_format: { type: "json_object" },
-    });
+      temperature: 0.1, // Lower temperature for faster, more consistent responses
+    }),
+    timeoutPromise
+  ]);
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
+    if (error instanceof Error && error.message.includes('timeout')) {
+      throw new Error("AI processing took too long. Please try with a shorter transcript.");
+    }
     throw new Error("Failed to extract facts from transcript: " + (error instanceof Error ? error.message : "Unknown error"));
   }
 }
 
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
+    // Add timeout wrapper for deployment environment 
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('OpenAI care plan generation timeout')), 45000)
+    );
+    
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: "gpt-5",
       messages: [
         {
           role: "system",
@@ -253,10 +273,16 @@ Examples of properly formatted goals:
 Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame using BOTH SMARTA principles AND specific Salveo service alignment. Only use the fallback sentence for sections where no relevant information was discussed.`
         }
       ],
-    });
+      temperature: 0.1, // Lower temperature for faster responses
+    }),
+    timeoutPromise
+  ]) as any;
 
     return response.choices[0].message.content || "";
   } catch (error) {
+    if (error instanceof Error && error.message.includes('timeout')) {
+      throw new Error("AI processing took too long. Please try with a shorter transcript.");
+    }
     throw new Error("Failed to generate care plan: " + (error instanceof Error ? error.message : "Unknown error"));
   }
 }
