@@ -233,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       eventEmitter.emit('generation-update', {
         sessionId,
         type: 'action',
-        action: 'Connecting to OpenAI GPT-5 model',
+        action: 'Connecting to Knowledge Bank',
         step: 2,
         totalSteps: 8
       });
