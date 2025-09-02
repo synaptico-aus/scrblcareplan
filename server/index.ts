@@ -39,22 +39,12 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    // Log the error for debugging
-    log(`ERROR ${req.method} ${req.path} ${status}: ${message}`);
-    
-    // Don't re-throw in production to prevent server crashes in autoscale environment
-    if (!res.headersSent) {
-      res.status(status).json({ message });
-    }
-    
-    // Only re-throw in development for debugging
-    if (app.get("env") === "development") {
-      throw err;
-    }
+    res.status(status).json({ message });
+    throw err;
   });
 
   // importantly only setup vite in development and after
@@ -66,63 +56,16 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // For autoscale deployment compatibility, force port 3000
-  // Override any environment PORT setting for better deployment compatibility
-  const port = 3000;
+  // ALWAYS serve the app on the port specified in the environment variable PORT
+  // Other ports are firewalled. Default to 5000 if not specified.
+  // this serves both the API and the client.
+  // It is the only port that is not firewalled.
+  const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
-  }).on('error', (err: any) => {
-    if (err.code === 'EADDRINUSE') {
-      log(`Port ${port} is already in use. Trying alternative ports...`);
-      // Try ports 3001, 3002, etc. for development fallback
-      const tryPort = (portToTry: number) => {
-        if (portToTry > 3010) {
-          log('Could not find an available port. Exiting.');
-          process.exit(1);
-        }
-        server.listen({
-          port: portToTry,
-          host: "0.0.0.0",
-          reusePort: true,
-        }, () => {
-          log(`serving on port ${portToTry}`);
-        }).on('error', (retryErr: any) => {
-          if (retryErr.code === 'EADDRINUSE') {
-            tryPort(portToTry + 1);
-          } else {
-            throw retryErr;
-          }
-        });
-      };
-      tryPort(3001);
-    } else {
-      throw err;
-    }
   });
-  
-  // Graceful shutdown for autoscale environment
-  const gracefulShutdown = (signal: string) => {
-    log(`Received ${signal}. Starting graceful shutdown...`);
-    server.close((err) => {
-      if (err) {
-        log(`Error during shutdown: ${err.message}`);
-        process.exit(1);
-      }
-      log('Server shut down successfully');
-      process.exit(0);
-    });
-    
-    // Force shutdown after 10 seconds
-    setTimeout(() => {
-      log('Forcing shutdown...');
-      process.exit(1);
-    }, 10000);
-  };
-  
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 })();
