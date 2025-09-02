@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info } from "lucide-react";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts } from "@shared/schema";
 import scrblLogo from "@/assets/scrbl-logo.png";
+// @ts-ignore
+import html2pdf from "html2pdf.js";
 
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,6 +65,97 @@ export default function SavedPlans() {
 
   const formatDate = (date: string | Date) => {
     return new Date(date).toLocaleDateString();
+  };
+
+  const handleExportToPDF = (plan: SavedCarePlan) => {
+    // Create a complete HTML document with Scrbl logo
+    const htmlWithLogo = `
+      <html>
+        <head>
+          <title>Care Plan - ${plan.clientName}</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
+            .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
+            .logo-header img { height: 60px; }
+            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
+            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
+            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
+            p { margin-bottom: 6pt; }
+            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
+            th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
+            th { background-color: #f0f0f0; }
+          </style>
+        </head>
+        <body>
+          <div class="logo-header">
+            <img src="${scrblLogo}" alt="Scrbl Logo" />
+          </div>
+          ${plan.html}
+        </body>
+      </html>
+    `;
+    
+    const element = document.createElement('div');
+    element.innerHTML = htmlWithLogo;
+    
+    const opt = {
+      margin: 1,
+      filename: `${plan.clientName || 'care-plan'}-${new Date(plan.saveDate).toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(element).save();
+    
+    toast({
+      title: "PDF Export Started",
+      description: `Exporting "${plan.name}" to PDF...`,
+    });
+  };
+
+  const handleExportToWord = (plan: SavedCarePlan) => {
+    // Create a complete HTML document with Scrbl logo for Word
+    const htmlWithLogo = `
+      <html>
+        <head>
+          <title>Care Plan - ${plan.clientName}</title>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
+            .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
+            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
+            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
+            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
+            p { margin-bottom: 6pt; }
+            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
+            th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
+            th { background-color: #f0f0f0; }
+          </style>
+        </head>
+        <body>
+          <div class="logo-header">
+            <h2>Scrbl - Digital Care Plan Agent</h2>
+          </div>
+          ${plan.html}
+        </body>
+      </html>
+    `;
+    
+    const blob = new Blob([htmlWithLogo], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${plan.clientName || 'care-plan'}-${new Date(plan.saveDate).toISOString().split('T')[0]}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Word Export Complete",
+      description: `"${plan.name}" has been exported as a Word document.`,
+    });
   };
 
   const generateFactsHtml = (facts: ExtractedFacts) => {
@@ -151,6 +244,22 @@ export default function SavedPlans() {
                 data-testid="button-print-plan"
               >
                 Print
+              </Button>
+              <Button
+                onClick={() => handleExportToPDF(selectedPlan)}
+                className="bg-red-500 text-white hover:bg-red-600"
+                data-testid="button-export-pdf"
+              >
+                <FileType className="h-4 w-4 mr-2" />
+                Export to PDF
+              </Button>
+              <Button
+                onClick={() => handleExportToWord(selectedPlan)}
+                className="bg-blue-500 text-white hover:bg-blue-600"
+                data-testid="button-export-word"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export to Word
               </Button>
             </div>
           </div>

@@ -281,13 +281,6 @@ export default function CarePlanner() {
     });
   };
 
-  const handleExport = () => {
-    // TODO: Implement Word document export
-    toast({
-      title: "Export Feature",
-      description: "Word export functionality coming soon",
-    });
-  };
 
   const handlePrint = () => {
     if (html) {
@@ -390,7 +383,6 @@ export default function CarePlanner() {
           generationTime={generationTime}
           fundingType={fundingType}
           fundingLevel={fundingLevel}
-          onExport={handleExport}
           onPrint={handlePrint}
         />
       </div>
