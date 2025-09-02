@@ -9,6 +9,7 @@ import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info } from "
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts } from "@shared/schema";
+import scrblLogo from "@/assets/scrbl-logo.png";
 
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -287,6 +288,15 @@ export default function SavedPlans() {
           
           {/* Care Plan Document */}
           <div className="care-plan-document bg-white shadow-lg rounded-lg p-8">
+            {/* Scrbl Logo Header */}
+            <div className="flex justify-center mb-8 pb-6 border-b border-gray-200">
+              <img 
+                src={scrblLogo} 
+                alt="Scrbl Logo" 
+                className="h-16 w-auto"
+              />
+            </div>
+            
             <div 
               dangerouslySetInnerHTML={{ __html: selectedPlan.html as string }}
             />
