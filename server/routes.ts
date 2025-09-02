@@ -327,7 +327,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/client-documents", async (req, res) => {
     try {
       const validatedData = insertClientDocumentSchema.parse(req.body);
-      const document = await storage.createClientDocument(validatedData);
+      
+      // Normalize the object path if it's a raw Google Cloud Storage URL
+      const objectStorageService = new ObjectStorageService();
+      const normalizedPath = objectStorageService.normalizeObjectEntityPath(validatedData.objectPath);
+      
+      const documentData = {
+        ...validatedData,
+        objectPath: normalizedPath
+      };
+      
+      const document = await storage.createClientDocument(documentData);
       res.status(201).json(document);
     } catch (error) {
       console.error("Error creating client document:", error);
