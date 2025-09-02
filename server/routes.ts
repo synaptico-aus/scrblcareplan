@@ -292,6 +292,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
 
       eventEmitter.emit('generation-update', {
@@ -302,6 +304,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       // Step 2: Generate care plan
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -311,6 +315,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       eventEmitter.emit('generation-update', {
         sessionId,
         type: 'action',
@@ -318,6 +324,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         step: 7,
         totalSteps: 8
       });
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       const generatedHtml = await generateCarePlanHtml(transcript, clientName);
 
