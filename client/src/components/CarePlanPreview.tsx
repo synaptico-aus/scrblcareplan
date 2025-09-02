@@ -59,10 +59,43 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
       const hourlyMatch = match.match(/\$(\d+)\/hour/);
       const monthlyMatch = match.match(/\$(\d+)\/month/);
       if (hourlyMatch && monthlyMatch) {
-        const context = html.substring(html.indexOf(match) - 100, html.indexOf(match) + 100);
+        // Get broader context to find service category and description
+        const matchIndex = html.indexOf(match);
+        const context = html.substring(matchIndex - 500, matchIndex + 500);
         let serviceName = "Care Service";
         
-        if (context.includes("Personal Care")) serviceName = "Personal Care";
+        // Look for Service Category patterns first
+        if (context.includes("Service Category: Clinical Care")) {
+          if (context.includes("physiotherap") || context.includes("Physiotherap")) {
+            serviceName = "Physiotherapy";
+          } else if (context.includes("podiatr") || context.includes("Podiatr")) {
+            serviceName = "Podiatry";
+          } else if (context.includes("Allied Health") || context.includes("allied health")) {
+            serviceName = "Allied Health Therapy";
+          } else {
+            serviceName = "Clinical Care";
+          }
+        } else if (context.includes("Service Category: Everyday Living")) {
+          if (context.includes("Domestic Assistance") || context.includes("domestic assistance")) {
+            serviceName = "Domestic Assistance";
+          } else if (context.includes("Personal Care") || context.includes("personal care")) {
+            serviceName = "Personal Care";
+          } else {
+            serviceName = "Everyday Living";
+          }
+        } else if (context.includes("Service Category: Social Support") || context.includes("Service Category: Independence Support")) {
+          if (context.includes("Social Support/Shopping") || context.includes("shopping")) {
+            serviceName = "Social Support - Shopping";
+          } else if (context.includes("Community Access") || context.includes("community access")) {
+            serviceName = "Social Support - Community Access";
+          } else if (context.includes("transport") || context.includes("Transport")) {
+            serviceName = "Social Support - Transport";
+          } else {
+            serviceName = "Social Support";
+          }
+        }
+        // Fallback to basic keyword matching if Service Category not found
+        else if (context.includes("Personal Care")) serviceName = "Personal Care";
         else if (context.includes("Domestic Assistance")) serviceName = "Domestic Assistance";
         else if (context.includes("Allied Health")) serviceName = "Allied Health Therapy";
         else if (context.includes("Social Support")) serviceName = "Social Support";

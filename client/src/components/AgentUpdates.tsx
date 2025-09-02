@@ -51,8 +51,7 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
         try {
           const update: AgentUpdate = JSON.parse(event.data);
           
-          // Debug logging for deployment issues
-          console.log('SSE Event received:', update);
+          // SSE event processing
           
           if (update.type === 'ping' || (update as any).type === 'connected') {
             return;
@@ -73,7 +72,7 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
             onComplete(update.result);
           }
         } catch (error) {
-          console.error('Error parsing SSE data:', error, 'Raw data:', event.data);
+          console.error('Error parsing SSE data:', error);
         }
       };
 
