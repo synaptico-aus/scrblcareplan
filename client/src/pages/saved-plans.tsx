@@ -3,11 +3,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Edit, Save, X } from "lucide-react";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts } from "@shared/schema";
@@ -16,20 +14,6 @@ import scrblLogo from "@/assets/scrbl-logo.png";
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<SavedCarePlan | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedSections, setEditedSections] = useState({
-    clientName: "",
-    safetyAlerts: "",
-    personalAlarm: "",
-    mobilityEquipment: "",
-    smokingRisk: "",
-    drivingStatus: "",
-    livingSituation: "",
-    careObjectives: "",
-    preferredWorker: "",
-    fullName: "",
-    additionalInfo: ""
-  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -62,35 +46,6 @@ export default function SavedPlans() {
     },
   });
 
-  const saveAsNewMutation = useMutation({
-    mutationFn: async ({ originalPlan, editedHtml }: { originalPlan: SavedCarePlan; editedHtml: string }) => {
-      const newPlan = {
-        name: `${originalPlan.name} (Revised ${new Date().toLocaleDateString()})`,
-        clientName: originalPlan.clientName,
-        html: editedHtml,
-        extractedFacts: originalPlan.extractedFacts,
-        saveDate: new Date()
-      };
-      const response = await apiRequest("POST", "/api/saved-care-plans", newPlan);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/saved-care-plans"] });
-      setIsEditing(false);
-      toast({
-        title: "Care Plan Saved",
-        description: "The revised care plan has been saved as a new version.",
-      });
-    },
-    onError: (error) => {
-      toast({
-        title: "Save Failed",
-        description: error.message || "Failed to save revised care plan",
-        variant: "destructive",
-      });
-    },
-  });
-
   const filteredPlans = savedPlans.filter(plan =>
     plan.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     plan.clientName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -98,92 +53,6 @@ export default function SavedPlans() {
 
   const handleViewPlan = (plan: SavedCarePlan) => {
     setSelectedPlan(plan);
-    setIsEditing(false);
-  };
-
-  const parseHtmlToSections = (html: string) => {
-    // Extract key sections from HTML using regex patterns
-    const sections = {
-      clientName: extractSection(html, /<h1>Care Plan<\/h1>[\s\S]*?<p><strong>Client:<\/strong>\s*([^<]+)/),
-      safetyAlerts: extractSection(html, /<p><strong>Key safety and health alerts:<\/strong>([\s\S]*?)<\/p>/),
-      personalAlarm: extractSection(html, /<p><strong>Personal alarm:<\/strong>([\s\S]*?)<\/p>/),
-      mobilityEquipment: extractSection(html, /<p><strong>Mobility and equipment:<\/strong>([\s\S]*?)<\/p>/),
-      smokingRisk: extractSection(html, /<p><strong>Smoking risk:<\/strong>([\s\S]*?)<\/p>/),
-      drivingStatus: extractSection(html, /<p><strong>Driving:<\/strong>([\s\S]*?)<\/p>/),
-      livingSituation: extractSection(html, /<p><strong>Living situation and psychosocial factors:<\/strong>([\s\S]*?)<\/p>/),
-      careObjectives: extractSection(html, /<h2>My Care Plan<\/h2>([\s\S]*?)<p><strong>Date of this Care Plan:<\/strong>/),
-      preferredWorker: extractSection(html, /<p><strong>Preferred Worker:<\/strong>([\s\S]*?)<\/p>/),
-      fullName: extractSection(html, /<p><strong>Full Name:<\/strong>([\s\S]*?)<\/p>/),
-      additionalInfo: extractSection(html, /<p><strong>Purpose of this Care Plan:<\/strong>([\s\S]*?)<\/p>/)
-    };
-    return sections;
-  };
-
-  const extractSection = (html: string, pattern: RegExp): string => {
-    const match = html.match(pattern);
-    return match ? match[1].trim().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : "";
-  };
-
-  const reconstructHtml = (sections: typeof editedSections) => {
-    return `
-      <h1>Care Plan</h1>
-      <hr/>
-      <p><strong>Client:</strong> ${sections.clientName}</p>
-      <p><strong>Key safety and health alerts:</strong> ${sections.safetyAlerts}</p>
-      <p><strong>Personal alarm:</strong> ${sections.personalAlarm}</p>
-      <p><strong>Mobility and equipment:</strong> ${sections.mobilityEquipment}</p>
-      <p><strong>Smoking risk:</strong> ${sections.smokingRisk}</p>
-      <p><strong>Driving:</strong> ${sections.drivingStatus}</p>
-      <p><strong>Living situation and psychosocial factors:</strong> ${sections.livingSituation}</p>
-      <h2>My Care Plan</h2>
-      ${sections.careObjectives}
-      <p><strong>Date of this Care Plan:</strong> ${new Date().toLocaleDateString()}</p>
-      <p><strong>Preferred Worker:</strong> ${sections.preferredWorker}</p>
-      <p><strong>Full Name:</strong> ${sections.fullName}</p>
-      <p><strong>Purpose of this Care Plan:</strong> ${sections.additionalInfo}</p>
-    `;
-  };
-
-  const handleEditPlan = () => {
-    if (selectedPlan) {
-      setIsEditing(true);
-      const parsedSections = parseHtmlToSections(selectedPlan.html as string);
-      setEditedSections(parsedSections);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setIsEditing(false);
-    setEditedSections({
-      clientName: "",
-      safetyAlerts: "",
-      personalAlarm: "",
-      mobilityEquipment: "",
-      smokingRisk: "",
-      drivingStatus: "",
-      livingSituation: "",
-      careObjectives: "",
-      preferredWorker: "",
-      fullName: "",
-      additionalInfo: ""
-    });
-  };
-
-  const handleSaveAsNew = () => {
-    if (selectedPlan) {
-      const reconstructedHtml = reconstructHtml(editedSections);
-      saveAsNewMutation.mutate({ 
-        originalPlan: selectedPlan, 
-        editedHtml: reconstructedHtml 
-      });
-    }
-  };
-
-  const updateSection = (section: keyof typeof editedSections, value: string) => {
-    setEditedSections(prev => ({
-      ...prev,
-      [section]: value
-    }));
   };
 
   const handleDeletePlan = (id: string, planName: string) => {
@@ -246,83 +115,43 @@ export default function SavedPlans() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {isEditing ? (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    data-testid="button-cancel-edit"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleSaveAsNew}
-                    disabled={saveAsNewMutation.isPending}
-                    data-testid="button-save-as-new"
-                  >
-                    {saveAsNewMutation.isPending ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Save as New
-                      </>
-                    )}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={handleEditPlan}
-                    data-testid="button-edit-plan"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const printWindow = window.open('', '_blank');
-                      if (printWindow) {
-                        const facts = selectedPlan.extractedFacts as ExtractedFacts;
-                        const factsSectionHtml = facts ? generateFactsHtml(facts) : '';
-                        
-                        printWindow.document.write(`
-                          <html>
-                            <head>
-                              <title>Care Plan - ${selectedPlan.clientName}</title>
-                              <style>
-                                body { font-family: 'Inter', sans-serif; margin: 40px; line-height: 1.6; }
-                                h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
-                                h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-                                h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
-                                p { margin-bottom: 6pt; }
-                                table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-                                th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
-                                th { background-color: #f0f0f0; }
-                              </style>
-                            </head>
-                            <body>
-                              ${factsSectionHtml}
-                              ${selectedPlan.html}
-                            </body>
-                          </html>
-                        `);
-                        printWindow.document.close();
-                        printWindow.print();
-                      }
-                    }}
-                    data-testid="button-print-plan"
-                  >
-                    Print
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const printWindow = window.open('', '_blank');
+                  if (printWindow) {
+                    const facts = selectedPlan.extractedFacts as ExtractedFacts;
+                    const factsSectionHtml = facts ? generateFactsHtml(facts) : '';
+                    
+                    printWindow.document.write(`
+                      <html>
+                        <head>
+                          <title>Care Plan - ${selectedPlan.clientName}</title>
+                          <style>
+                            body { font-family: 'Inter', sans-serif; margin: 40px; line-height: 1.6; }
+                            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
+                            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
+                            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
+                            p { margin-bottom: 6pt; }
+                            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
+                            th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
+                            th { background-color: #f0f0f0; }
+                          </style>
+                        </head>
+                        <body>
+                          ${factsSectionHtml}
+                          ${selectedPlan.html}
+                        </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                    printWindow.print();
+                  }
+                }}
+                data-testid="button-print-plan"
+              >
+                Print
+              </Button>
             </div>
           </div>
         </header>
@@ -468,157 +297,9 @@ export default function SavedPlans() {
               />
             </div>
             
-            {isEditing ? (
-              <div className="space-y-6">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Edit Mode:</strong> Edit the care plan sections below. Changes will be saved as a new version to preserve the original.
-                  </p>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="clientName" className="text-sm font-medium">Client Name</Label>
-                      <Input
-                        id="clientName"
-                        value={editedSections.clientName}
-                        onChange={(e) => updateSection('clientName', e.target.value)}
-                        placeholder="Client full name"
-                        className="mt-1"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="safetyAlerts" className="text-sm font-medium">Key Safety and Health Alerts</Label>
-                      <Textarea
-                        id="safetyAlerts"
-                        value={editedSections.safetyAlerts}
-                        onChange={(e) => updateSection('safetyAlerts', e.target.value)}
-                        placeholder="Describe any safety concerns, health alerts, or medical conditions"
-                        className="mt-1 min-h-[100px]"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="personalAlarm" className="text-sm font-medium">Personal Alarm Information</Label>
-                      <Textarea
-                        id="personalAlarm"
-                        value={editedSections.personalAlarm}
-                        onChange={(e) => updateSection('personalAlarm', e.target.value)}
-                        placeholder="Personal alarm details and emergency procedures"
-                        className="mt-1 min-h-[80px]"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="mobilityEquipment" className="text-sm font-medium">Mobility and Equipment</Label>
-                      <Textarea
-                        id="mobilityEquipment"
-                        value={editedSections.mobilityEquipment}
-                        onChange={(e) => updateSection('mobilityEquipment', e.target.value)}
-                        placeholder="Mobility aids, equipment, and accessibility information"
-                        className="mt-1 min-h-[80px]"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="smokingRisk" className="text-sm font-medium">Smoking Risk Assessment</Label>
-                      <Textarea
-                        id="smokingRisk"
-                        value={editedSections.smokingRisk}
-                        onChange={(e) => updateSection('smokingRisk', e.target.value)}
-                        placeholder="Smoking habits and associated risks"
-                        className="mt-1 min-h-[80px]"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="drivingStatus" className="text-sm font-medium">Driving Status</Label>
-                      <Textarea
-                        id="drivingStatus"
-                        value={editedSections.drivingStatus}
-                        onChange={(e) => updateSection('drivingStatus', e.target.value)}
-                        placeholder="Driving ability and transportation needs"
-                        className="mt-1 min-h-[80px]"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="livingSituation" className="text-sm font-medium">Living Situation & Psychosocial Factors</Label>
-                      <Textarea
-                        id="livingSituation"
-                        value={editedSections.livingSituation}
-                        onChange={(e) => updateSection('livingSituation', e.target.value)}
-                        placeholder="Living arrangements, social support, and psychosocial considerations"
-                        className="mt-1 min-h-[120px]"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="careObjectives" className="text-sm font-medium">Care Plan Objectives</Label>
-                      <Textarea
-                        id="careObjectives"
-                        value={editedSections.careObjectives}
-                        onChange={(e) => updateSection('careObjectives', e.target.value)}
-                        placeholder="Main care objectives, goals, and planned interventions"
-                        className="mt-1 min-h-[120px]"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="preferredWorker" className="text-sm font-medium">Preferred Worker</Label>
-                      <Input
-                        id="preferredWorker"
-                        value={editedSections.preferredWorker}
-                        onChange={(e) => updateSection('preferredWorker', e.target.value)}
-                        placeholder="Preferred care worker name or characteristics"
-                        className="mt-1"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="fullName" className="text-sm font-medium">Full Legal Name</Label>
-                      <Input
-                        id="fullName"
-                        value={editedSections.fullName}
-                        onChange={(e) => updateSection('fullName', e.target.value)}
-                        placeholder="Client's full legal name"
-                        className="mt-1"
-                      />
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="additionalInfo" className="text-sm font-medium">Additional Information</Label>
-                      <Textarea
-                        id="additionalInfo"
-                        value={editedSections.additionalInfo}
-                        onChange={(e) => updateSection('additionalInfo', e.target.value)}
-                        placeholder="Any additional information or special considerations"
-                        className="mt-1 min-h-[100px]"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800 mb-3">
-                    <strong>Preview:</strong> The content below shows how your edits will look when saved.
-                  </p>
-                  <div className="border rounded-lg p-4 bg-white max-h-[400px] overflow-y-auto">
-                    <div 
-                      dangerouslySetInnerHTML={{ __html: reconstructHtml(editedSections) }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div 
-                dangerouslySetInnerHTML={{ __html: selectedPlan.html as string }}
-              />
-            )}
+            <div 
+              dangerouslySetInnerHTML={{ __html: selectedPlan.html as string }}
+            />
           </div>
         </div>
       </div>
