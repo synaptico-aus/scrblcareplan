@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Edit, Save, X } from "lucide-react";
@@ -16,7 +17,19 @@ export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<SavedCarePlan | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedContent, setEditedContent] = useState("");
+  const [editedSections, setEditedSections] = useState({
+    clientName: "",
+    safetyAlerts: "",
+    personalAlarm: "",
+    mobilityEquipment: "",
+    smokingRisk: "",
+    drivingStatus: "",
+    livingSituation: "",
+    careObjectives: "",
+    preferredWorker: "",
+    fullName: "",
+    additionalInfo: ""
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -64,7 +77,6 @@ export default function SavedPlans() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-care-plans"] });
       setIsEditing(false);
-      setEditedContent("");
       toast({
         title: "Care Plan Saved",
         description: "The revised care plan has been saved as a new version.",
@@ -87,28 +99,91 @@ export default function SavedPlans() {
   const handleViewPlan = (plan: SavedCarePlan) => {
     setSelectedPlan(plan);
     setIsEditing(false);
-    setEditedContent("");
+  };
+
+  const parseHtmlToSections = (html: string) => {
+    // Extract key sections from HTML using regex patterns
+    const sections = {
+      clientName: extractSection(html, /<h1>Care Plan<\/h1>[\s\S]*?<p><strong>Client:<\/strong>\s*([^<]+)/),
+      safetyAlerts: extractSection(html, /<p><strong>Key safety and health alerts:<\/strong>([\s\S]*?)<\/p>/),
+      personalAlarm: extractSection(html, /<p><strong>Personal alarm:<\/strong>([\s\S]*?)<\/p>/),
+      mobilityEquipment: extractSection(html, /<p><strong>Mobility and equipment:<\/strong>([\s\S]*?)<\/p>/),
+      smokingRisk: extractSection(html, /<p><strong>Smoking risk:<\/strong>([\s\S]*?)<\/p>/),
+      drivingStatus: extractSection(html, /<p><strong>Driving:<\/strong>([\s\S]*?)<\/p>/),
+      livingSituation: extractSection(html, /<p><strong>Living situation and psychosocial factors:<\/strong>([\s\S]*?)<\/p>/),
+      careObjectives: extractSection(html, /<h2>My Care Plan<\/h2>([\s\S]*?)<p><strong>Date of this Care Plan:<\/strong>/),
+      preferredWorker: extractSection(html, /<p><strong>Preferred Worker:<\/strong>([\s\S]*?)<\/p>/),
+      fullName: extractSection(html, /<p><strong>Full Name:<\/strong>([\s\S]*?)<\/p>/),
+      additionalInfo: extractSection(html, /<p><strong>Purpose of this Care Plan:<\/strong>([\s\S]*?)<\/p>/)
+    };
+    return sections;
+  };
+
+  const extractSection = (html: string, pattern: RegExp): string => {
+    const match = html.match(pattern);
+    return match ? match[1].trim().replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() : "";
+  };
+
+  const reconstructHtml = (sections: typeof editedSections) => {
+    return `
+      <h1>Care Plan</h1>
+      <hr/>
+      <p><strong>Client:</strong> ${sections.clientName}</p>
+      <p><strong>Key safety and health alerts:</strong> ${sections.safetyAlerts}</p>
+      <p><strong>Personal alarm:</strong> ${sections.personalAlarm}</p>
+      <p><strong>Mobility and equipment:</strong> ${sections.mobilityEquipment}</p>
+      <p><strong>Smoking risk:</strong> ${sections.smokingRisk}</p>
+      <p><strong>Driving:</strong> ${sections.drivingStatus}</p>
+      <p><strong>Living situation and psychosocial factors:</strong> ${sections.livingSituation}</p>
+      <h2>My Care Plan</h2>
+      ${sections.careObjectives}
+      <p><strong>Date of this Care Plan:</strong> ${new Date().toLocaleDateString()}</p>
+      <p><strong>Preferred Worker:</strong> ${sections.preferredWorker}</p>
+      <p><strong>Full Name:</strong> ${sections.fullName}</p>
+      <p><strong>Purpose of this Care Plan:</strong> ${sections.additionalInfo}</p>
+    `;
   };
 
   const handleEditPlan = () => {
     if (selectedPlan) {
       setIsEditing(true);
-      setEditedContent(selectedPlan.html as string);
+      const parsedSections = parseHtmlToSections(selectedPlan.html as string);
+      setEditedSections(parsedSections);
     }
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
-    setEditedContent("");
+    setEditedSections({
+      clientName: "",
+      safetyAlerts: "",
+      personalAlarm: "",
+      mobilityEquipment: "",
+      smokingRisk: "",
+      drivingStatus: "",
+      livingSituation: "",
+      careObjectives: "",
+      preferredWorker: "",
+      fullName: "",
+      additionalInfo: ""
+    });
   };
 
   const handleSaveAsNew = () => {
-    if (selectedPlan && editedContent.trim()) {
+    if (selectedPlan) {
+      const reconstructedHtml = reconstructHtml(editedSections);
       saveAsNewMutation.mutate({ 
         originalPlan: selectedPlan, 
-        editedHtml: editedContent 
+        editedHtml: reconstructedHtml 
       });
     }
+  };
+
+  const updateSection = (section: keyof typeof editedSections, value: string) => {
+    setEditedSections(prev => ({
+      ...prev,
+      [section]: value
+    }));
   };
 
   const handleDeletePlan = (id: string, planName: string) => {
@@ -183,7 +258,7 @@ export default function SavedPlans() {
                   </Button>
                   <Button
                     onClick={handleSaveAsNew}
-                    disabled={saveAsNewMutation.isPending || !editedContent.trim()}
+                    disabled={saveAsNewMutation.isPending}
                     data-testid="button-save-as-new"
                   >
                     {saveAsNewMutation.isPending ? (
@@ -394,28 +469,149 @@ export default function SavedPlans() {
             </div>
             
             {isEditing ? (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <p className="text-sm text-yellow-800">
-                    <strong>Edit Mode:</strong> You're editing the care plan content. Changes will be saved as a new version to preserve the original.
+                    <strong>Edit Mode:</strong> Edit the care plan sections below. Changes will be saved as a new version to preserve the original.
                   </p>
                 </div>
-                <Textarea
-                  value={editedContent}
-                  onChange={(e) => setEditedContent(e.target.value)}
-                  className="min-h-[600px] font-mono text-sm"
-                  placeholder="Edit the care plan HTML content..."
-                  data-testid="textarea-edit-content"
-                />
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="clientName" className="text-sm font-medium">Client Name</Label>
+                      <Input
+                        id="clientName"
+                        value={editedSections.clientName}
+                        onChange={(e) => updateSection('clientName', e.target.value)}
+                        placeholder="Client full name"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="safetyAlerts" className="text-sm font-medium">Key Safety and Health Alerts</Label>
+                      <Textarea
+                        id="safetyAlerts"
+                        value={editedSections.safetyAlerts}
+                        onChange={(e) => updateSection('safetyAlerts', e.target.value)}
+                        placeholder="Describe any safety concerns, health alerts, or medical conditions"
+                        className="mt-1 min-h-[100px]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="personalAlarm" className="text-sm font-medium">Personal Alarm Information</Label>
+                      <Textarea
+                        id="personalAlarm"
+                        value={editedSections.personalAlarm}
+                        onChange={(e) => updateSection('personalAlarm', e.target.value)}
+                        placeholder="Personal alarm details and emergency procedures"
+                        className="mt-1 min-h-[80px]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="mobilityEquipment" className="text-sm font-medium">Mobility and Equipment</Label>
+                      <Textarea
+                        id="mobilityEquipment"
+                        value={editedSections.mobilityEquipment}
+                        onChange={(e) => updateSection('mobilityEquipment', e.target.value)}
+                        placeholder="Mobility aids, equipment, and accessibility information"
+                        className="mt-1 min-h-[80px]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="smokingRisk" className="text-sm font-medium">Smoking Risk Assessment</Label>
+                      <Textarea
+                        id="smokingRisk"
+                        value={editedSections.smokingRisk}
+                        onChange={(e) => updateSection('smokingRisk', e.target.value)}
+                        placeholder="Smoking habits and associated risks"
+                        className="mt-1 min-h-[80px]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="drivingStatus" className="text-sm font-medium">Driving Status</Label>
+                      <Textarea
+                        id="drivingStatus"
+                        value={editedSections.drivingStatus}
+                        onChange={(e) => updateSection('drivingStatus', e.target.value)}
+                        placeholder="Driving ability and transportation needs"
+                        className="mt-1 min-h-[80px]"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="livingSituation" className="text-sm font-medium">Living Situation & Psychosocial Factors</Label>
+                      <Textarea
+                        id="livingSituation"
+                        value={editedSections.livingSituation}
+                        onChange={(e) => updateSection('livingSituation', e.target.value)}
+                        placeholder="Living arrangements, social support, and psychosocial considerations"
+                        className="mt-1 min-h-[120px]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="careObjectives" className="text-sm font-medium">Care Plan Objectives</Label>
+                      <Textarea
+                        id="careObjectives"
+                        value={editedSections.careObjectives}
+                        onChange={(e) => updateSection('careObjectives', e.target.value)}
+                        placeholder="Main care objectives, goals, and planned interventions"
+                        className="mt-1 min-h-[120px]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="preferredWorker" className="text-sm font-medium">Preferred Worker</Label>
+                      <Input
+                        id="preferredWorker"
+                        value={editedSections.preferredWorker}
+                        onChange={(e) => updateSection('preferredWorker', e.target.value)}
+                        placeholder="Preferred care worker name or characteristics"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="fullName" className="text-sm font-medium">Full Legal Name</Label>
+                      <Input
+                        id="fullName"
+                        value={editedSections.fullName}
+                        onChange={(e) => updateSection('fullName', e.target.value)}
+                        placeholder="Client's full legal name"
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="additionalInfo" className="text-sm font-medium">Additional Information</Label>
+                      <Textarea
+                        id="additionalInfo"
+                        value={editedSections.additionalInfo}
+                        onChange={(e) => updateSection('additionalInfo', e.target.value)}
+                        placeholder="Any additional information or special considerations"
+                        className="mt-1 min-h-[100px]"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
+                  <p className="text-sm text-blue-800 mb-3">
                     <strong>Preview:</strong> The content below shows how your edits will look when saved.
                   </p>
-                </div>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
-                  <div 
-                    dangerouslySetInnerHTML={{ __html: editedContent || "" }}
-                  />
+                  <div className="border rounded-lg p-4 bg-white max-h-[400px] overflow-y-auto">
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: reconstructHtml(editedSections) }}
+                    />
+                  </div>
                 </div>
               </div>
             ) : (
