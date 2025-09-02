@@ -8,6 +8,15 @@ interface CarePlanSection {
 }
 
 export class PDFGeneratorService {
+  private cleanTextForPDF(text: string): string {
+    return text
+      .replace(/[\u2010-\u2015]/g, '-') // Replace various dashes with hyphen
+      .replace(/[\u2018-\u2019]/g, "'") // Replace smart quotes with straight quotes
+      .replace(/[\u201C-\u201D]/g, '"') // Replace smart double quotes
+      .replace(/[\u2026]/g, '...') // Replace ellipsis
+      .replace(/[^\x00-\x7F]/g, '') // Remove other non-ASCII characters
+      .trim();
+  }
   private async parseHTMLToSections(html: string): Promise<CarePlanSection[]> {
     const sections: CarePlanSection[] = [];
     
@@ -74,6 +83,9 @@ export class PDFGeneratorService {
     const pdfDoc = await PDFDocument.create();
     const form = pdfDoc.getForm();
     
+    // Enable automatic appearance generation
+    form.markFieldsDirty();
+    
     const page = pdfDoc.addPage([595, 842]); // A4 size
     
     // Add logo to the PDF
@@ -87,7 +99,8 @@ export class PDFGeneratorService {
     const contentWidth = pageWidth - (margin * 2);
     
     // Add title
-    page.drawText(`Care Plan - ${clientName}`, {
+    const cleanClientName = this.cleanTextForPDF(clientName);
+    page.drawText(`Care Plan - ${cleanClientName}`, {
       x: margin,
       y: yPosition,
       size: 16,
@@ -107,7 +120,8 @@ export class PDFGeneratorService {
       }
       
       // Draw section heading
-      page.drawText(section.heading, {
+      const cleanHeading = this.cleanTextForPDF(section.heading);
+      page.drawText(cleanHeading, {
         x: margin,
         y: yPosition,
         size: 12,
@@ -117,9 +131,15 @@ export class PDFGeneratorService {
       yPosition -= 25;
       
       // Create editable text field for this section
-      const textField = form.createTextField(`section_${section.heading.replace(/[^a-zA-Z0-9]/g, '_')}`);
-      textField.setText(section.content);
+      const fieldName = `section_${section.heading.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const textField = form.createTextField(fieldName);
+      
+      // Set font size and appearance to avoid /DA entry error
       textField.setFontSize(10);
+      
+      // Clean and set text content
+      const cleanContent = this.cleanTextForPDF(section.content);
+      textField.setText(cleanContent);
       
       // Calculate text field height based on content
       const lines = Math.max(3, Math.ceil(section.content.length / 80));
@@ -162,7 +182,8 @@ export class PDFGeneratorService {
     const margin = 50;
     
     // Add title
-    page.drawText(`Care Plan - ${clientName}`, {
+    const cleanClientName2 = this.cleanTextForPDF(clientName);
+    page.drawText(`Care Plan - ${cleanClientName2}`, {
       x: margin,
       y: yPosition,
       size: 16,
@@ -181,7 +202,8 @@ export class PDFGeneratorService {
       }
       
       // Draw heading
-      page.drawText(section.heading, {
+      const cleanHeading2 = this.cleanTextForPDF(section.heading);
+      page.drawText(cleanHeading2, {
         x: margin,
         y: yPosition,
         size: 12,
@@ -191,7 +213,8 @@ export class PDFGeneratorService {
       yPosition -= 20;
       
       // Draw content
-      const words = section.content.split(' ');
+      const cleanContent = this.cleanTextForPDF(section.content);
+      const words = cleanContent.split(' ');
       let currentLine = '';
       const lineHeight = 12;
       
@@ -199,7 +222,8 @@ export class PDFGeneratorService {
         const testLine = currentLine ? `${currentLine} ${word}` : word;
         if (testLine.length > 80) {
           if (currentLine) {
-            page.drawText(currentLine, {
+            const cleanLine = this.cleanTextForPDF(currentLine);
+            page.drawText(cleanLine, {
               x: margin,
               y: yPosition,
               size: 10,
@@ -217,7 +241,8 @@ export class PDFGeneratorService {
       }
       
       if (currentLine) {
-        page.drawText(currentLine, {
+        const cleanLine = this.cleanTextForPDF(currentLine);
+        page.drawText(cleanLine, {
           x: margin,
           y: yPosition,
           size: 10,
