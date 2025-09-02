@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus, Edit } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { SavedCarePlan, ExtractedFacts, ClientDocument } from "@shared/schema";
+import { SavedCarePlan, ExtractedFacts, ClientDocument, ClientFolderAlias } from "@shared/schema";
 import scrblLogo from "@/assets/scrbl-logo.png";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
@@ -18,6 +19,9 @@ export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<SavedCarePlan | null>(null);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renamingClient, setRenamingClient] = useState<string | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -45,6 +49,14 @@ export default function SavedPlans() {
       return response.json() as Promise<ClientDocument[]>;
     },
     enabled: !!selectedClient,
+  });
+  
+  const { data: clientFolderAliases = [] } = useQuery({
+    queryKey: ["/api/client-folder-aliases"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/client-folder-aliases");
+      return response.json() as Promise<ClientFolderAlias[]>;
+    },
   });
 
   const deleteMutation = useMutation({
@@ -91,6 +103,32 @@ export default function SavedPlans() {
       });
     },
   });
+  
+  const renameFolderMutation = useMutation({
+    mutationFn: async ({ originalClientName, displayName }: { originalClientName: string; displayName: string }) => {
+      const response = await apiRequest("PUT", `/api/client-folder-aliases/${encodeURIComponent(originalClientName)}`, {
+        displayName
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/client-folder-aliases"] });
+      setRenameDialogOpen(false);
+      setRenamingClient(null);
+      setNewFolderName("");
+      toast({
+        title: "Folder Renamed",
+        description: "The folder has been successfully renamed.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Rename Failed",
+        description: error.message || "Failed to rename folder",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Group saved plans by client name
   const clientGroups = savedPlans.reduce((groups, plan) => {
@@ -102,12 +140,20 @@ export default function SavedPlans() {
     return groups;
   }, {} as Record<string, SavedCarePlan[]>);
   
+  // Create alias map for quick lookup
+  const aliasMap = clientFolderAliases.reduce((map, alias) => {
+    map[alias.originalClientName] = alias.displayName;
+    return map;
+  }, {} as Record<string, string>);
+  
   // Get client folders with latest dates and document counts
   const clientFolders = Object.entries(clientGroups).map(([clientName, plans]) => {
     const latestPlan = plans.sort((a, b) => new Date(b.saveDate).getTime() - new Date(a.saveDate).getTime())[0];
     const documentCount = clientDocuments.filter(doc => doc.clientName === clientName).length;
+    const displayName = aliasMap[clientName] || clientName;
     return {
       clientName,
+      displayName,
       planCount: plans.length,
       documentCount,
       latestDate: latestPlan.saveDate,
@@ -115,13 +161,33 @@ export default function SavedPlans() {
     };
   }).sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime());
   
-  // Filter client folders based on search
+  // Filter client folders based on search (search both original and display names)
   const filteredClientFolders = clientFolders.filter(folder =>
-    folder.clientName.toLowerCase().includes(searchQuery.toLowerCase())
+    folder.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    folder.displayName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleViewPlan = (plan: SavedCarePlan) => {
     setSelectedPlan(plan);
+  };
+  
+  const handleRenameFolder = (clientName: string, currentDisplayName: string) => {
+    setRenamingClient(clientName);
+    setNewFolderName(currentDisplayName);
+    setRenameDialogOpen(true);
+  };
+  
+  const handleRenameSubmit = () => {
+    if (!renamingClient || !newFolderName.trim()) return;
+    
+    renameFolderMutation.mutate({
+      originalClientName: renamingClient,
+      displayName: newFolderName.trim()
+    });
+  };
+  
+  const getDisplayName = (clientName: string) => {
+    return aliasMap[clientName] || clientName;
   };
   
   const handleSelectClient = (clientName: string) => {
@@ -520,7 +586,7 @@ export default function SavedPlans() {
                 <Folder className="w-6 h-6" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">{selectedClient}</h1>
+                <h1 className="text-xl font-semibold text-foreground">{getDisplayName(selectedClient)}</h1>
                 <p className="text-sm text-muted-foreground">
                   {clientPlans.length} care plan{clientPlans.length !== 1 ? 's' : ''} • {selectedClientDocuments.length} document{selectedClientDocuments.length !== 1 ? 's' : ''}
                 </p>
@@ -713,7 +779,7 @@ export default function SavedPlans() {
             {filteredClientFolders.map((folder) => (
               <Card 
                 key={folder.clientName} 
-                className="hover:shadow-md transition-shadow cursor-pointer"
+                className="group hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => handleSelectClient(folder.clientName)}
                 data-testid={`folder-${folder.clientName.replace(/\s+/g, '-').toLowerCase()}`}
               >
@@ -724,12 +790,24 @@ export default function SavedPlans() {
                         <Folder className="w-8 h-8" />
                       </div>
                       <div className="flex-1">
-                        <CardTitle className="text-lg">{folder.clientName}</CardTitle>
+                        <CardTitle className="text-lg">{folder.displayName}</CardTitle>
                         <CardDescription className="flex items-center mt-1">
                           <Calendar className="h-4 w-4 mr-1" />
                           Last updated: {formatDate(folder.latestDate)}
                         </CardDescription>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRenameFolder(folder.clientName, folder.displayName);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        data-testid={`button-rename-${folder.clientName.replace(/\s+/g, '-').toLowerCase()}`}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
@@ -752,6 +830,47 @@ export default function SavedPlans() {
           </div>
         )}
       </div>
+      
+      {/* Rename Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Folder Name</label>
+              <Input
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Enter new folder name"
+                data-testid="input-rename-folder"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRenameSubmit();
+                  }
+                }}
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setRenameDialogOpen(false)}
+                data-testid="button-cancel-rename"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleRenameSubmit}
+                disabled={!newFolderName.trim() || renameFolderMutation.isPending}
+                data-testid="button-confirm-rename"
+              >
+                {renameFolderMutation.isPending ? "Renaming..." : "Rename"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

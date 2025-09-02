@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema } from "@shared/schema";
+import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
@@ -369,6 +369,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting client document:", error);
       res.status(500).json({ error: "Failed to delete document" });
+    }
+  });
+  
+  // Client folder alias routes
+  app.post("/api/client-folder-aliases", async (req, res) => {
+    try {
+      const validatedData = insertClientFolderAliasSchema.parse(req.body);
+      
+      // Check if alias already exists
+      const existing = await storage.getClientFolderAlias(validatedData.originalClientName);
+      if (existing) {
+        return res.status(409).json({ error: "Folder alias already exists for this client" });
+      }
+      
+      const alias = await storage.createClientFolderAlias(validatedData);
+      res.status(201).json(alias);
+    } catch (error) {
+      console.error("Error creating client folder alias:", error);
+      res.status(500).json({ error: "Failed to create folder alias" });
+    }
+  });
+  
+  app.get("/api/client-folder-aliases/:originalClientName", async (req, res) => {
+    try {
+      const { originalClientName } = req.params;
+      const alias = await storage.getClientFolderAlias(decodeURIComponent(originalClientName));
+      
+      if (alias) {
+        res.json(alias);
+      } else {
+        res.status(404).json({ error: "Folder alias not found" });
+      }
+    } catch (error) {
+      console.error("Error fetching client folder alias:", error);
+      res.status(500).json({ error: "Failed to fetch folder alias" });
+    }
+  });
+  
+  app.get("/api/client-folder-aliases", async (req, res) => {
+    try {
+      const aliases = await storage.getAllClientFolderAliases();
+      res.json(aliases);
+    } catch (error) {
+      console.error("Error fetching all client folder aliases:", error);
+      res.status(500).json({ error: "Failed to fetch folder aliases" });
+    }
+  });
+  
+  app.put("/api/client-folder-aliases/:originalClientName", async (req, res) => {
+    try {
+      const { originalClientName } = req.params;
+      const validatedData = updateClientFolderAliasSchema.parse(req.body);
+      
+      // Check if alias exists first, if not create it
+      const existing = await storage.getClientFolderAlias(decodeURIComponent(originalClientName));
+      
+      if (!existing) {
+        // Create new alias
+        const newAlias = await storage.createClientFolderAlias({
+          originalClientName: decodeURIComponent(originalClientName),
+          displayName: validatedData.displayName
+        });
+        return res.status(201).json(newAlias);
+      }
+      
+      // Update existing alias
+      const updated = await storage.updateClientFolderAlias(decodeURIComponent(originalClientName), validatedData);
+      
+      if (updated) {
+        res.json(updated);
+      } else {
+        res.status(404).json({ error: "Folder alias not found" });
+      }
+    } catch (error) {
+      console.error("Error updating client folder alias:", error);
+      res.status(500).json({ error: "Failed to update folder alias" });
+    }
+  });
+  
+  app.delete("/api/client-folder-aliases/:originalClientName", async (req, res) => {
+    try {
+      const { originalClientName } = req.params;
+      const success = await storage.deleteClientFolderAlias(decodeURIComponent(originalClientName));
+      
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Folder alias not found" });
+      }
+    } catch (error) {
+      console.error("Error deleting client folder alias:", error);
+      res.status(500).json({ error: "Failed to delete folder alias" });
     }
   });
 

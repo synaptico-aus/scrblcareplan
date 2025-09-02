@@ -40,6 +40,14 @@ export const clientDocuments = pgTable("client_documents", {
   description: text("description"),
 });
 
+export const clientFolderAliases = pgTable("client_folder_aliases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  originalClientName: text("original_client_name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -94,6 +102,15 @@ export const insertClientDocumentSchema = createInsertSchema(clientDocuments).pi
   description: true,
 });
 
+export const insertClientFolderAliasSchema = createInsertSchema(clientFolderAliases).pick({
+  originalClientName: true,
+  displayName: true,
+});
+
+export const updateClientFolderAliasSchema = insertClientFolderAliasSchema.pick({
+  displayName: true,
+});
+
 export const factsSchema = z.object({
   clientDetails: z.object({
     name: z.string(),
@@ -140,5 +157,8 @@ export type SavedCarePlan = typeof savedCarePlans.$inferSelect;
 export type InsertSavedCarePlan = z.infer<typeof insertSavedCarePlanSchema>;
 export type ClientDocument = typeof clientDocuments.$inferSelect;
 export type InsertClientDocument = z.infer<typeof insertClientDocumentSchema>;
+export type ClientFolderAlias = typeof clientFolderAliases.$inferSelect;
+export type InsertClientFolderAlias = z.infer<typeof insertClientFolderAliasSchema>;
+export type UpdateClientFolderAlias = z.infer<typeof updateClientFolderAliasSchema>;
 export type ExtractedFacts = z.infer<typeof factsSchema>;
 export type ChatParityRequest = z.infer<typeof chatParityRequestSchema>;

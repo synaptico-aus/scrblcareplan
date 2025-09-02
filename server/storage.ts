@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, users, careAnalyses, savedCarePlans, clientDocuments } from "@shared/schema";
+import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, users, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
@@ -18,6 +18,11 @@ export interface IStorage {
   getClientDocuments(clientName: string): Promise<ClientDocument[]>;
   getAllClientDocuments(): Promise<ClientDocument[]>;
   deleteClientDocument(id: string): Promise<boolean>;
+  createClientFolderAlias(alias: InsertClientFolderAlias): Promise<ClientFolderAlias>;
+  getClientFolderAlias(originalClientName: string): Promise<ClientFolderAlias | undefined>;
+  getAllClientFolderAliases(): Promise<ClientFolderAlias[]>;
+  updateClientFolderAlias(originalClientName: string, update: UpdateClientFolderAlias): Promise<ClientFolderAlias | undefined>;
+  deleteClientFolderAlias(originalClientName: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -25,12 +30,14 @@ export class MemStorage implements IStorage {
   private careAnalyses: Map<string, CareAnalysis>;
   private savedCarePlans: Map<string, SavedCarePlan>;
   private clientDocuments: Map<string, ClientDocument>;
+  private clientFolderAliases: Map<string, ClientFolderAlias>;
 
   constructor() {
     this.users = new Map();
     this.careAnalyses = new Map();
     this.savedCarePlans = new Map();
     this.clientDocuments = new Map();
+    this.clientFolderAliases = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -127,6 +134,43 @@ export class MemStorage implements IStorage {
   
   async deleteClientDocument(id: string): Promise<boolean> {
     return this.clientDocuments.delete(id);
+  }
+
+  async createClientFolderAlias(alias: InsertClientFolderAlias): Promise<ClientFolderAlias> {
+    const id = randomUUID();
+    const newAlias: ClientFolderAlias = {
+      id,
+      ...alias,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.clientFolderAliases.set(alias.originalClientName, newAlias);
+    return newAlias;
+  }
+
+  async getClientFolderAlias(originalClientName: string): Promise<ClientFolderAlias | undefined> {
+    return this.clientFolderAliases.get(originalClientName);
+  }
+
+  async getAllClientFolderAliases(): Promise<ClientFolderAlias[]> {
+    return Array.from(this.clientFolderAliases.values());
+  }
+
+  async updateClientFolderAlias(originalClientName: string, update: UpdateClientFolderAlias): Promise<ClientFolderAlias | undefined> {
+    const existing = this.clientFolderAliases.get(originalClientName);
+    if (!existing) return undefined;
+    
+    const updated: ClientFolderAlias = {
+      ...existing,
+      ...update,
+      updatedAt: new Date(),
+    };
+    this.clientFolderAliases.set(originalClientName, updated);
+    return updated;
+  }
+
+  async deleteClientFolderAlias(originalClientName: string): Promise<boolean> {
+    return this.clientFolderAliases.delete(originalClientName);
   }
 }
 
@@ -228,6 +272,46 @@ export class DatabaseStorage implements IStorage {
   
   async deleteClientDocument(id: string): Promise<boolean> {
     const result = await db.delete(clientDocuments).where(eq(clientDocuments.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async createClientFolderAlias(alias: InsertClientFolderAlias): Promise<ClientFolderAlias> {
+    const [clientFolderAlias] = await db
+      .insert(clientFolderAliases)
+      .values({
+        originalClientName: alias.originalClientName,
+        displayName: alias.displayName,
+      })
+      .returning();
+    return clientFolderAlias;
+  }
+
+  async getClientFolderAlias(originalClientName: string): Promise<ClientFolderAlias | undefined> {
+    const [alias] = await db.select().from(clientFolderAliases)
+      .where(eq(clientFolderAliases.originalClientName, originalClientName));
+    return alias || undefined;
+  }
+
+  async getAllClientFolderAliases(): Promise<ClientFolderAlias[]> {
+    return await db.select().from(clientFolderAliases)
+      .orderBy(sql`${clientFolderAliases.createdAt} DESC`);
+  }
+
+  async updateClientFolderAlias(originalClientName: string, update: UpdateClientFolderAlias): Promise<ClientFolderAlias | undefined> {
+    const [updated] = await db
+      .update(clientFolderAliases)
+      .set({
+        displayName: update.displayName,
+        updatedAt: new Date(),
+      })
+      .where(eq(clientFolderAliases.originalClientName, originalClientName))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteClientFolderAlias(originalClientName: string): Promise<boolean> {
+    const result = await db.delete(clientFolderAliases)
+      .where(eq(clientFolderAliases.originalClientName, originalClientName));
     return (result.rowCount ?? 0) > 0;
   }
 }
