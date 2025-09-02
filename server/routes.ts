@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { chatParityRequestSchema, insertSavedCarePlanSchema } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
+import { pdfGenerator } from "./services/pdf-generator";
 import { z } from "zod";
 import puppeteer from "puppeteer";
 
@@ -294,6 +295,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error deleting saved care plan:", error);
       res.status(500).json({ 
         message: "Failed to delete saved care plan" 
+      });
+    }
+  });
+
+  // PDF Export endpoints
+  app.get("/api/saved-care-plans/:id/export-pdf", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { type = 'editable' } = req.query;
+      
+      const savedCarePlan = await storage.getSavedCarePlan(id);
+      
+      if (!savedCarePlan) {
+        return res.status(404).json({ 
+          message: "Saved care plan not found" 
+        });
+      }
+
+      let pdfBytes: Uint8Array;
+      
+      if (type === 'editable') {
+        pdfBytes = await pdfGenerator.generateEditablePDF(savedCarePlan.html, savedCarePlan.clientName);
+      } else {
+        pdfBytes = await pdfGenerator.generateStandardPDF(savedCarePlan.html, savedCarePlan.clientName);
+      }
+      
+      const filename = `care-plan-${savedCarePlan.clientName.replace(/[^a-zA-Z0-9]/g, '-')}-${type}.pdf`;
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', pdfBytes.length);
+      
+      res.send(Buffer.from(pdfBytes));
+      
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      res.status(500).json({ 
+        message: "Failed to export PDF" 
       });
     }
   });
