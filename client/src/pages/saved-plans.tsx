@@ -190,6 +190,16 @@ export default function SavedPlans() {
     return aliasMap[clientName] || clientName;
   };
   
+  const handleDownloadDocument = (doc: ClientDocument) => {
+    const link = document.createElement('a');
+    link.href = doc.objectPath;
+    link.download = doc.fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
   const handleSelectClient = (clientName: string) => {
     setSelectedClient(clientName);
   };
@@ -686,11 +696,11 @@ export default function SavedPlans() {
                       <div className="flex items-center justify-between">
                         <Button 
                           size="sm"
-                          onClick={() => window.open(document.objectPath, '_blank')}
-                          data-testid={`button-view-document-${document.id}`}
+                          onClick={() => handleDownloadDocument(document)}
+                          data-testid={`button-download-document-${document.id}`}
                         >
-                          <Eye className="h-4 w-4 mr-2" />
-                          View
+                          <Download className="h-4 w-4 mr-2" />
+                          Download
                         </Button>
                         <Button
                           variant="outline"
