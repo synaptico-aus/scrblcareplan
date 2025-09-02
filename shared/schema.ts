@@ -147,6 +147,7 @@ export const chatParityRequestSchema = z.object({
   template: z.literal("gold-standard"),
   fundingType: z.enum(["hcp", "sah"]).optional(),
   fundingLevel: z.enum(["level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "restorative", "endoflife"]).optional(),
+  sessionId: z.string().optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

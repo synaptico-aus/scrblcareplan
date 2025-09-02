@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { CarePlanForm } from "@/components/CarePlanForm";
 import { FactsPanel } from "@/components/FactsPanel";
 import { CarePlanPreview } from "@/components/CarePlanPreview";
+import { AgentUpdates } from "@/components/AgentUpdates";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -24,6 +25,7 @@ export default function CarePlanner() {
   const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [isFetchingNotta, setIsFetchingNotta] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -179,13 +181,19 @@ export default function CarePlanner() {
       const startTime = Date.now();
       setGenerationStartTime(startTime);
       
-      const endpoint = mode === "ai" ? "/api/chat-parity" : "/api/offline-analysis";
+      // Generate a unique session ID for streaming updates
+      const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setSessionId(newSessionId);
+      
+      // Use streaming endpoint for AI mode, regular endpoint for offline
+      const endpoint = mode === "ai" ? "/api/chat-parity-stream" : "/api/offline-analysis";
       const response = await apiRequest("POST", endpoint, {
         clientName,
         transcript,
         template: "gold-standard",
         fundingType: fundingType || undefined,
-        fundingLevel: fundingLevel || undefined
+        fundingLevel: fundingLevel || undefined,
+        sessionId: mode === "ai" ? newSessionId : undefined
       });
       
       const endTime = Date.now();
@@ -225,6 +233,26 @@ export default function CarePlanner() {
       });
     },
   });
+
+  // Handle completion from streaming agent updates
+  const handleAgentCompletion = (result: any) => {
+    if (result.html && result.facts) {
+      setFacts(result.facts);
+      
+      // Add budget estimate to the HTML before saving and displaying
+      const htmlWithBudget = generateBudgetEstimateHTML(result.html, fundingType, fundingLevel);
+      setHtml(htmlWithBudget);
+      
+      // Auto-save the generated care plan with budget estimate
+      const autoSaveName = `${clientName} - ${new Date().toLocaleDateString('en-AU')}`;
+      autoSaveMutation.mutate({
+        name: autoSaveName,
+        clientName,
+        html: htmlWithBudget,
+        extractedFacts: result.facts,
+      });
+    }
+  };
 
   const handleFetchFromNotta = async () => {
     if (!nottaUrl.trim()) {
@@ -367,6 +395,17 @@ export default function CarePlanner() {
           isLoading={generateMutation.isPending}
           isFetchingNotta={isFetchingNotta}
         />
+
+        {/* Agent Updates - Show only when generating with AI */}
+        {generateMutation.isPending && processingMode === "ai" && (
+          <div className="w-full lg:w-80 p-4 border-r border-border bg-card/50 lg:min-h-0 lg:max-h-full lg:overflow-y-auto">
+            <AgentUpdates
+              sessionId={sessionId}
+              isGenerating={generateMutation.isPending}
+              onComplete={handleAgentCompletion}
+            />
+          </div>
+        )}
 
         <FactsPanel
           facts={facts}

@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { EventEmitter } from "events";
 import { storage } from "./storage";
 import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
@@ -7,6 +8,9 @@ import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./servi
 import { z } from "zod";
 import puppeteer from "puppeteer";
 import { ObjectStorageService } from "./objectStorage";
+
+// Event emitter for real-time updates
+const eventEmitter = new EventEmitter();
 
 const nottaUrlSchema = z.object({
   url: z.string().url()
@@ -160,6 +164,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error("Error in chat-parity endpoint:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to process care plan" 
+      });
+    }
+  });
+
+  // Server-Sent Events endpoint for real-time generation updates
+  app.get("/api/generation-stream/:sessionId", (req, res) => {
+    const sessionId = req.params.sessionId;
+    
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+
+    // Keep connection alive
+    const keepAlive = setInterval(() => {
+      res.write('data: {"type":"ping"}\n\n');
+    }, 30000);
+
+    // Listen for updates for this session
+    const updateHandler = (update: any) => {
+      if (update.sessionId === sessionId) {
+        res.write(`data: ${JSON.stringify(update)}\n\n`);
+      }
+    };
+
+    // Add listener
+    eventEmitter.on('generation-update', updateHandler);
+
+    // Clean up on client disconnect
+    req.on('close', () => {
+      clearInterval(keepAlive);
+      eventEmitter.removeListener('generation-update', updateHandler);
+    });
+  });
+
+  // New streaming generation endpoint
+  app.post("/api/chat-parity-stream", async (req, res) => {
+    try {
+      const validatedData = chatParityRequestSchema.parse(req.body);
+      const { clientName, transcript, template, sessionId } = validatedData;
+
+      if (template !== "gold-standard") {
+        return res.status(400).json({ 
+          message: "Only 'gold-standard' template is supported" 
+        });
+      }
+
+      if (!sessionId) {
+        return res.status(400).json({
+          message: "sessionId is required for streaming generation"
+        });
+      }
+
+      // Send initial update
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'status',
+        message: 'Starting care plan generation...',
+        step: 1,
+        totalSteps: 4
+      });
+
+      // Step 1: Extract facts
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'status', 
+        message: 'Analyzing transcript and extracting key facts...',
+        step: 2,
+        totalSteps: 4
+      });
+
+      const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+
+      // Step 2: Generate care plan
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'status',
+        message: 'Generating Gold Standard Care Plan using Australian standards...',
+        step: 3,
+        totalSteps: 4
+      });
+
+      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
+
+      // Step 3: Store analysis
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'status',
+        message: 'Saving care plan and finalizing...',
+        step: 4,
+        totalSteps: 4
+      });
+
+      const analysis = await storage.createCareAnalysis({
+        clientName,
+        transcript,
+        processingMode: "ai",
+        extractedFacts,
+        generatedHtml,
+      });
+
+      // Send completion
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'complete',
+        message: 'Care plan generation complete!',
+        step: 4,
+        totalSteps: 4,
+        result: {
+          html: generatedHtml,
+          facts: extractedFacts,
+          analysisId: analysis.id
+        }
+      });
+
+      res.json({
+        html: generatedHtml,
+        facts: extractedFacts,
+        analysisId: analysis.id
+      });
+
+    } catch (error) {
+      const sessionId = req.body.sessionId;
+      if (sessionId) {
+        eventEmitter.emit('generation-update', {
+          sessionId,
+          type: 'error',
+          message: error instanceof Error ? error.message : "Failed to process care plan"
+        });
+      }
+      
+      console.error("Error in streaming chat-parity endpoint:", error);
       res.status(500).json({ 
         message: error instanceof Error ? error.message : "Failed to process care plan" 
       });
