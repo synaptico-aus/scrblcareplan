@@ -66,17 +66,42 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 3000 for better autoscale compatibility.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '3000', 10);
+  // For autoscale deployment compatibility, force port 3000
+  // Override any environment PORT setting for better deployment compatibility
+  const port = 3000;
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+  }).on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      log(`Port ${port} is already in use. Trying alternative ports...`);
+      // Try ports 3001, 3002, etc. for development fallback
+      const tryPort = (portToTry: number) => {
+        if (portToTry > 3010) {
+          log('Could not find an available port. Exiting.');
+          process.exit(1);
+        }
+        server.listen({
+          port: portToTry,
+          host: "0.0.0.0",
+          reusePort: true,
+        }, () => {
+          log(`serving on port ${portToTry}`);
+        }).on('error', (retryErr: any) => {
+          if (retryErr.code === 'EADDRINUSE') {
+            tryPort(portToTry + 1);
+          } else {
+            throw retryErr;
+          }
+        });
+      };
+      tryPort(3001);
+    } else {
+      throw err;
+    }
   });
   
   // Graceful shutdown for autoscale environment
