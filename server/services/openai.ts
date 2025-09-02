@@ -9,13 +9,8 @@ const openai = new OpenAI({
 
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
   try {
-    // Add timeout wrapper for deployment environment
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('OpenAI fact extraction timeout')), 90000)
-    );
-    
-    const response = await Promise.race([
-      openai.chat.completions.create({
+    // For very long transcripts (up to 4 hours), we rely on OpenAI's built-in 120s timeout only
+    const response = await openai.chat.completions.create({
         model: "gpt-5",
       messages: [
         {
@@ -74,9 +69,7 @@ Build comprehensive facts from the information discussed, not just isolated deta
         }
       ],
       response_format: { type: "json_object" },
-    }),
-    timeoutPromise
-  ]);
+    });
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
@@ -89,13 +82,8 @@ Build comprehensive facts from the information discussed, not just isolated deta
 
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
   try {
-    // Add timeout wrapper for deployment environment 
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('OpenAI care plan generation timeout')), 90000)
-    );
-    
-    const response = await Promise.race([
-      openai.chat.completions.create({
+    // For very long transcripts (up to 4 hours), we rely on OpenAI's built-in 120s timeout only
+    const response = await openai.chat.completions.create({
         model: "gpt-5",
       messages: [
         {
@@ -272,9 +260,7 @@ Examples of properly formatted goals:
 Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame using BOTH SMARTA principles AND specific Salveo service alignment. Only use the fallback sentence for sections where no relevant information was discussed.`
         }
       ],
-    }),
-    timeoutPromise
-  ]) as any;
+    });
 
     return response.choices[0].message.content || "";
   } catch (error) {
