@@ -74,7 +74,6 @@ Build comprehensive facts from the information discussed, not just isolated deta
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.1, // Lower temperature for faster, more consistent responses
     }),
     timeoutPromise
   ]);
@@ -273,7 +272,6 @@ Examples of properly formatted goals:
 Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame using BOTH SMARTA principles AND specific Salveo service alignment. Only use the fallback sentence for sections where no relevant information was discussed.`
         }
       ],
-      temperature: 0.1, // Lower temperature for faster responses
     }),
     timeoutPromise
   ]) as any;
