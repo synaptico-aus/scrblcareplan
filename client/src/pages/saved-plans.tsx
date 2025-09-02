@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info } from "lucide-react";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Edit, Save, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts } from "@shared/schema";
@@ -14,6 +15,8 @@ import scrblLogo from "@/assets/scrbl-logo.png";
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<SavedCarePlan | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -46,6 +49,36 @@ export default function SavedPlans() {
     },
   });
 
+  const saveAsNewMutation = useMutation({
+    mutationFn: async ({ originalPlan, editedHtml }: { originalPlan: SavedCarePlan; editedHtml: string }) => {
+      const newPlan = {
+        name: `${originalPlan.name} (Revised ${new Date().toLocaleDateString()})`,
+        clientName: originalPlan.clientName,
+        html: editedHtml,
+        extractedFacts: originalPlan.extractedFacts,
+        saveDate: new Date()
+      };
+      const response = await apiRequest("POST", "/api/saved-care-plans", newPlan);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-care-plans"] });
+      setIsEditing(false);
+      setEditedContent("");
+      toast({
+        title: "Care Plan Saved",
+        description: "The revised care plan has been saved as a new version.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Save Failed",
+        description: error.message || "Failed to save revised care plan",
+        variant: "destructive",
+      });
+    },
+  });
+
   const filteredPlans = savedPlans.filter(plan =>
     plan.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     plan.clientName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -53,6 +86,29 @@ export default function SavedPlans() {
 
   const handleViewPlan = (plan: SavedCarePlan) => {
     setSelectedPlan(plan);
+    setIsEditing(false);
+    setEditedContent("");
+  };
+
+  const handleEditPlan = () => {
+    if (selectedPlan) {
+      setIsEditing(true);
+      setEditedContent(selectedPlan.html as string);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedContent("");
+  };
+
+  const handleSaveAsNew = () => {
+    if (selectedPlan && editedContent.trim()) {
+      saveAsNewMutation.mutate({ 
+        originalPlan: selectedPlan, 
+        editedHtml: editedContent 
+      });
+    }
   };
 
   const handleDeletePlan = (id: string, planName: string) => {
@@ -115,43 +171,83 @@ export default function SavedPlans() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  const printWindow = window.open('', '_blank');
-                  if (printWindow) {
-                    const facts = selectedPlan.extractedFacts as ExtractedFacts;
-                    const factsSectionHtml = facts ? generateFactsHtml(facts) : '';
-                    
-                    printWindow.document.write(`
-                      <html>
-                        <head>
-                          <title>Care Plan - ${selectedPlan.clientName}</title>
-                          <style>
-                            body { font-family: 'Inter', sans-serif; margin: 40px; line-height: 1.6; }
-                            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
-                            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-                            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
-                            p { margin-bottom: 6pt; }
-                            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-                            th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
-                            th { background-color: #f0f0f0; }
-                          </style>
-                        </head>
-                        <body>
-                          ${factsSectionHtml}
-                          ${selectedPlan.html}
-                        </body>
-                      </html>
-                    `);
-                    printWindow.document.close();
-                    printWindow.print();
-                  }
-                }}
-                data-testid="button-print-plan"
-              >
-                Print
-              </Button>
+              {isEditing ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    data-testid="button-cancel-edit"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSaveAsNew}
+                    disabled={saveAsNewMutation.isPending || !editedContent.trim()}
+                    data-testid="button-save-as-new"
+                  >
+                    {saveAsNewMutation.isPending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save as New
+                      </>
+                    )}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleEditPlan}
+                    data-testid="button-edit-plan"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const printWindow = window.open('', '_blank');
+                      if (printWindow) {
+                        const facts = selectedPlan.extractedFacts as ExtractedFacts;
+                        const factsSectionHtml = facts ? generateFactsHtml(facts) : '';
+                        
+                        printWindow.document.write(`
+                          <html>
+                            <head>
+                              <title>Care Plan - ${selectedPlan.clientName}</title>
+                              <style>
+                                body { font-family: 'Inter', sans-serif; margin: 40px; line-height: 1.6; }
+                                h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
+                                h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
+                                h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
+                                p { margin-bottom: 6pt; }
+                                table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
+                                th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
+                                th { background-color: #f0f0f0; }
+                              </style>
+                            </head>
+                            <body>
+                              ${factsSectionHtml}
+                              ${selectedPlan.html}
+                            </body>
+                          </html>
+                        `);
+                        printWindow.document.close();
+                        printWindow.print();
+                      }
+                    }}
+                    data-testid="button-print-plan"
+                  >
+                    Print
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </header>
@@ -297,9 +393,36 @@ export default function SavedPlans() {
               />
             </div>
             
-            <div 
-              dangerouslySetInnerHTML={{ __html: selectedPlan.html as string }}
-            />
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Edit Mode:</strong> You're editing the care plan content. Changes will be saved as a new version to preserve the original.
+                  </p>
+                </div>
+                <Textarea
+                  value={editedContent}
+                  onChange={(e) => setEditedContent(e.target.value)}
+                  className="min-h-[600px] font-mono text-sm"
+                  placeholder="Edit the care plan HTML content..."
+                  data-testid="textarea-edit-content"
+                />
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Preview:</strong> The content below shows how your edits will look when saved.
+                  </p>
+                </div>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 bg-gray-50">
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: editedContent || "" }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div 
+                dangerouslySetInnerHTML={{ __html: selectedPlan.html as string }}
+              />
+            )}
           </div>
         </div>
       </div>
