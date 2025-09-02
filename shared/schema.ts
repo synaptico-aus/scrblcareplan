@@ -29,6 +29,17 @@ export const savedCarePlans = pgTable("saved_care_plans", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const clientDocuments = pgTable("client_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientName: text("client_name").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(),
+  fileSize: text("file_size"),
+  objectPath: text("object_path").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+  description: text("description"),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -72,6 +83,15 @@ export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick
   saveDate: z.string().or(z.date()).transform((val) => 
     typeof val === 'string' ? new Date(val) : val
   ),
+});
+
+export const insertClientDocumentSchema = createInsertSchema(clientDocuments).pick({
+  clientName: true,
+  fileName: true,
+  fileType: true,
+  fileSize: true,
+  objectPath: true,
+  description: true,
 });
 
 export const factsSchema = z.object({
@@ -118,5 +138,7 @@ export type CareAnalysis = typeof careAnalyses.$inferSelect;
 export type InsertCareAnalysis = z.infer<typeof insertCareAnalysisSchema>;
 export type SavedCarePlan = typeof savedCarePlans.$inferSelect;
 export type InsertSavedCarePlan = z.infer<typeof insertSavedCarePlanSchema>;
+export type ClientDocument = typeof clientDocuments.$inferSelect;
+export type InsertClientDocument = z.infer<typeof insertClientDocumentSchema>;
 export type ExtractedFacts = z.infer<typeof factsSchema>;
 export type ChatParityRequest = z.infer<typeof chatParityRequestSchema>;

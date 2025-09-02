@@ -1,11 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { chatParityRequestSchema, insertSavedCarePlanSchema } from "@shared/schema";
+import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
 import puppeteer from "puppeteer";
+import { ObjectStorageService } from "./objectStorage";
 
 const nottaUrlSchema = z.object({
   url: z.string().url()
@@ -295,6 +296,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         message: "Failed to delete saved care plan" 
       });
+    }
+  });
+
+  // Object storage routes for document uploads
+  app.post("/api/objects/upload", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+  
+  // Serve uploaded documents
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error downloading object:", error);
+      res.status(404).json({ error: "File not found" });
+    }
+  });
+  
+  // Client document routes
+  app.post("/api/client-documents", async (req, res) => {
+    try {
+      const validatedData = insertClientDocumentSchema.parse(req.body);
+      const document = await storage.createClientDocument(validatedData);
+      res.status(201).json(document);
+    } catch (error) {
+      console.error("Error creating client document:", error);
+      res.status(500).json({ error: "Failed to create document record" });
+    }
+  });
+  
+  app.get("/api/client-documents/:clientName", async (req, res) => {
+    try {
+      const { clientName } = req.params;
+      const documents = await storage.getClientDocuments(decodeURIComponent(clientName));
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching client documents:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+  
+  app.get("/api/client-documents", async (req, res) => {
+    try {
+      const documents = await storage.getAllClientDocuments();
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching all client documents:", error);
+      res.status(500).json({ error: "Failed to fetch documents" });
+    }
+  });
+  
+  app.delete("/api/client-documents/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteClientDocument(id);
+      
+      if (success) {
+        res.json({ message: "Document deleted successfully" });
+      } else {
+        res.status(404).json({ error: "Document not found" });
+      }
+    } catch (error) {
+      console.error("Error deleting client document:", error);
+      res.status(500).json({ error: "Failed to delete document" });
     }
   });
 

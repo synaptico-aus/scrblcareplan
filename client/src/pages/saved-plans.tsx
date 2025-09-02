@@ -5,17 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType } from "lucide-react";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { SavedCarePlan, ExtractedFacts } from "@shared/schema";
+import { SavedCarePlan, ExtractedFacts, ClientDocument } from "@shared/schema";
 import scrblLogo from "@/assets/scrbl-logo.png";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
+import { ObjectUploader } from "@/components/ObjectUploader";
 
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<SavedCarePlan | null>(null);
+  const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -25,6 +27,24 @@ export default function SavedPlans() {
       const response = await apiRequest("GET", "/api/saved-care-plans");
       return response.json() as Promise<SavedCarePlan[]>;
     },
+  });
+  
+  const { data: clientDocuments = [] } = useQuery({
+    queryKey: ["/api/client-documents"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/client-documents");
+      return response.json() as Promise<ClientDocument[]>;
+    },
+  });
+  
+  const { data: selectedClientDocuments = [] } = useQuery({
+    queryKey: ["/api/client-documents", selectedClient],
+    queryFn: async () => {
+      if (!selectedClient) return [];
+      const response = await apiRequest("GET", `/api/client-documents/${encodeURIComponent(selectedClient)}`);
+      return response.json() as Promise<ClientDocument[]>;
+    },
+    enabled: !!selectedClient,
   });
 
   const deleteMutation = useMutation({
@@ -47,14 +67,77 @@ export default function SavedPlans() {
       });
     },
   });
+  
+  const deleteDocumentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("DELETE", `/api/client-documents/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/client-documents"] });
+      if (selectedClient) {
+        queryClient.invalidateQueries({ queryKey: ["/api/client-documents", selectedClient] });
+      }
+      toast({
+        title: "Document Deleted",
+        description: "The document has been successfully deleted.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete document",
+        variant: "destructive",
+      });
+    },
+  });
 
-  const filteredPlans = savedPlans.filter(plan =>
-    plan.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    plan.clientName.toLowerCase().includes(searchQuery.toLowerCase())
+  // Group saved plans by client name
+  const clientGroups = savedPlans.reduce((groups, plan) => {
+    const client = plan.clientName;
+    if (!groups[client]) {
+      groups[client] = [];
+    }
+    groups[client].push(plan);
+    return groups;
+  }, {} as Record<string, SavedCarePlan[]>);
+  
+  // Get client folders with latest dates and document counts
+  const clientFolders = Object.entries(clientGroups).map(([clientName, plans]) => {
+    const latestPlan = plans.sort((a, b) => new Date(b.saveDate).getTime() - new Date(a.saveDate).getTime())[0];
+    const documentCount = clientDocuments.filter(doc => doc.clientName === clientName).length;
+    return {
+      clientName,
+      planCount: plans.length,
+      documentCount,
+      latestDate: latestPlan.saveDate,
+      plans
+    };
+  }).sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime());
+  
+  // Filter client folders based on search
+  const filteredClientFolders = clientFolders.filter(folder =>
+    folder.clientName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleViewPlan = (plan: SavedCarePlan) => {
     setSelectedPlan(plan);
+  };
+  
+  const handleSelectClient = (clientName: string) => {
+    setSelectedClient(clientName);
+  };
+  
+  const handleBackToFolders = () => {
+    setSelectedClient(null);
+    setSelectedPlan(null);
+  };
+  
+  const handleUploadComplete = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/client-documents"] });
+    if (selectedClient) {
+      queryClient.invalidateQueries({ queryKey: ["/api/client-documents", selectedClient] });
+    }
   };
 
   const handleDeletePlan = (id: string, planName: string) => {
@@ -188,6 +271,7 @@ export default function SavedPlans() {
     `;
   };
 
+  // Show plan detail view
   if (selectedPlan) {
     return (
       <div className="min-h-screen bg-background">
@@ -198,9 +282,9 @@ export default function SavedPlans() {
               <Button 
                 variant="outline" 
                 onClick={() => setSelectedPlan(null)}
-                data-testid="button-back-to-list"
+                data-testid="button-back-to-client"
               >
-                ← Back to Saved Plans
+                ← Back to {selectedPlan.clientName}
               </Button>
               <div>
                 <h1 className="text-xl font-semibold text-foreground">{selectedPlan.name}</h1>
@@ -415,6 +499,154 @@ export default function SavedPlans() {
     );
   }
 
+  // Show client detail view
+  if (selectedClient) {
+    const clientPlans = clientGroups[selectedClient] || [];
+    
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <header className="bg-card border-b border-border px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Button 
+                variant="outline" 
+                onClick={handleBackToFolders}
+                data-testid="button-back-to-folders"
+              >
+                ← Back to Client Folders
+              </Button>
+              <div className="bg-primary text-primary-foreground p-2 rounded-lg">
+                <Folder className="w-6 h-6" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-foreground">{selectedClient}</h1>
+                <p className="text-sm text-muted-foreground">
+                  {clientPlans.length} care plan{clientPlans.length !== 1 ? 's' : ''} • {selectedClientDocuments.length} document{selectedClientDocuments.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <ObjectUploader
+                clientName={selectedClient}
+                onUploadComplete={handleUploadComplete}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Document
+              </ObjectUploader>
+            </div>
+          </div>
+        </header>
+
+        <div className="p-6 space-y-8">
+          {/* Care Plans Section */}
+          <div>
+            <h2 className="text-lg font-semibold mb-4 flex items-center">
+              <FileText className="h-5 w-5 mr-2" />
+              Care Plans ({clientPlans.length})
+            </h2>
+            {clientPlans.length === 0 ? (
+              <div className="text-center py-8 bg-muted/50 rounded-lg">
+                <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">No care plans for this client</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {clientPlans.map((plan) => (
+                  <Card key={plan.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-lg">{plan.name}</CardTitle>
+                      <CardDescription className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-1" />
+                        {formatDate(plan.saveDate)}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <Button 
+                          onClick={() => handleViewPlan(plan)}
+                          size="sm"
+                          data-testid={`button-view-plan-${plan.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Plan
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeletePlan(plan.id, plan.name)}
+                          data-testid={`button-delete-plan-${plan.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Documents Section */}
+          <div>
+            <h2 className="text-lg font-semibold mb-4 flex items-center">
+              <File className="h-5 w-5 mr-2" />
+              Documents ({selectedClientDocuments.length})
+            </h2>
+            {selectedClientDocuments.length === 0 ? (
+              <div className="text-center py-8 bg-muted/50 rounded-lg">
+                <File className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-muted-foreground">No documents uploaded for this client</p>
+                <p className="text-sm text-muted-foreground mt-1">Use the "Upload Document" button to add files</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {selectedClientDocuments.map((document) => (
+                  <Card key={document.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-sm truncate">{document.fileName}</CardTitle>
+                      <CardDescription>
+                        <div className="flex items-center justify-between text-xs">
+                          <span>{document.fileSize}</span>
+                          <span>{formatDate(document.uploadedAt!)}</span>
+                        </div>
+                        {document.description && (
+                          <p className="mt-1 text-xs">{document.description}</p>
+                        )}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between">
+                        <Button 
+                          size="sm"
+                          onClick={() => window.open(document.objectPath, '_blank')}
+                          data-testid={`button-view-document-${document.id}`}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => deleteDocumentMutation.mutate(document.id)}
+                          data-testid={`button-delete-document-${document.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show client folders view
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -422,11 +654,11 @@ export default function SavedPlans() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="bg-primary text-primary-foreground p-2 rounded-lg">
-              <FileText className="w-6 h-6" />
+              <Folder className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-foreground">Saved Care Plans</h1>
-              <p className="text-sm text-muted-foreground">View and manage your saved care plans</p>
+              <h1 className="text-xl font-semibold text-foreground">Client Folders</h1>
+              <p className="text-sm text-muted-foreground">Organize care plans and documents by client</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -446,78 +678,72 @@ export default function SavedPlans() {
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search care plans..."
+              placeholder="Search clients..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
-              data-testid="input-search-plans"
+              data-testid="input-search-clients"
             />
           </div>
         </div>
 
-        {/* Plans Grid */}
+        {/* Client Folders Grid */}
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading saved care plans...</p>
+              <p className="text-muted-foreground">Loading client folders...</p>
             </div>
           </div>
-        ) : filteredPlans.length === 0 ? (
+        ) : filteredClientFolders.length === 0 ? (
           <div className="text-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              {searchQuery ? "No plans found" : "No saved care plans"}
+              {searchQuery ? "No clients found" : "No client folders"}
             </h3>
             <p className="text-muted-foreground">
               {searchQuery 
                 ? "Try adjusting your search terms" 
-                : "Save care plans from the main planner to see them here"
+                : "Save care plans from the main planner to create client folders"
               }
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredPlans.map((plan) => (
-              <Card key={plan.id} className="hover:shadow-md transition-shadow">
+            {filteredClientFolders.map((folder) => (
+              <Card 
+                key={folder.clientName} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => handleSelectClient(folder.clientName)}
+                data-testid={`folder-${folder.clientName.replace(/\s+/g, '-').toLowerCase()}`}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg">{plan.name}</CardTitle>
-                      <CardDescription className="flex items-center mt-1">
-                        <User className="h-4 w-4 mr-1" />
-                        {plan.clientName}
-                      </CardDescription>
+                    <div className="flex items-center space-x-3">
+                      <div className="bg-primary/10 text-primary p-3 rounded-lg">
+                        <Folder className="w-8 h-8" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{folder.clientName}</CardTitle>
+                        <CardDescription className="flex items-center mt-1">
+                          <Calendar className="h-4 w-4 mr-1" />
+                          Last updated: {formatDate(folder.latestDate)}
+                        </CardDescription>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      Saved: {formatDate(plan.saveDate)}
-                    </div>
-                    
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewPlan(plan)}
-                        className="flex-1"
-                        data-testid={`button-view-plan-${plan.id}`}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeletePlan(plan.id, plan.name)}
-                        className="text-destructive hover:text-destructive"
-                        data-testid={`button-delete-plan-${plan.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center">
+                        <FileText className="h-4 w-4 mr-1" />
+                        {folder.planCount} care plan{folder.planCount !== 1 ? 's' : ''}
+                      </span>
+                      <span className="flex items-center">
+                        <File className="h-4 w-4 mr-1" />
+                        {folder.documentCount} document{folder.documentCount !== 1 ? 's' : ''}
+                      </span>
                     </div>
                   </div>
                 </CardContent>

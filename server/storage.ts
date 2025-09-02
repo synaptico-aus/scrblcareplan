@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, users, careAnalyses, savedCarePlans } from "@shared/schema";
+import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, users, careAnalyses, savedCarePlans, clientDocuments } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
@@ -14,17 +14,23 @@ export interface IStorage {
   getSavedCarePlans(): Promise<SavedCarePlan[]>;
   getSavedCarePlan(id: string): Promise<SavedCarePlan | undefined>;
   deleteSavedCarePlan(id: string): Promise<boolean>;
+  createClientDocument(document: InsertClientDocument): Promise<ClientDocument>;
+  getClientDocuments(clientName: string): Promise<ClientDocument[]>;
+  getAllClientDocuments(): Promise<ClientDocument[]>;
+  deleteClientDocument(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<string, User>;
   private careAnalyses: Map<string, CareAnalysis>;
   private savedCarePlans: Map<string, SavedCarePlan>;
+  private clientDocuments: Map<string, ClientDocument>;
 
   constructor() {
     this.users = new Map();
     this.careAnalyses = new Map();
     this.savedCarePlans = new Map();
+    this.clientDocuments = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -96,6 +102,32 @@ export class MemStorage implements IStorage {
   async deleteSavedCarePlan(id: string): Promise<boolean> {
     return this.savedCarePlans.delete(id);
   }
+  
+  async createClientDocument(document: InsertClientDocument): Promise<ClientDocument> {
+    const id = randomUUID();
+    const newDocument: ClientDocument = {
+      id,
+      ...document,
+      uploadedAt: new Date(),
+    };
+    this.clientDocuments.set(id, newDocument);
+    return newDocument;
+  }
+  
+  async getClientDocuments(clientName: string): Promise<ClientDocument[]> {
+    return Array.from(this.clientDocuments.values())
+      .filter(doc => doc.clientName === clientName)
+      .sort((a, b) => new Date(b.uploadedAt!).getTime() - new Date(a.uploadedAt!).getTime());
+  }
+  
+  async getAllClientDocuments(): Promise<ClientDocument[]> {
+    return Array.from(this.clientDocuments.values())
+      .sort((a, b) => new Date(b.uploadedAt!).getTime() - new Date(a.uploadedAt!).getTime());
+  }
+  
+  async deleteClientDocument(id: string): Promise<boolean> {
+    return this.clientDocuments.delete(id);
+  }
 }
 
 export class DatabaseStorage implements IStorage {
@@ -165,6 +197,37 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSavedCarePlan(id: string): Promise<boolean> {
     const result = await db.delete(savedCarePlans).where(eq(savedCarePlans.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+  
+  async createClientDocument(document: InsertClientDocument): Promise<ClientDocument> {
+    const [clientDocument] = await db
+      .insert(clientDocuments)
+      .values({
+        clientName: document.clientName,
+        fileName: document.fileName,
+        fileType: document.fileType,
+        fileSize: document.fileSize,
+        objectPath: document.objectPath,
+        description: document.description,
+      })
+      .returning();
+    return clientDocument;
+  }
+  
+  async getClientDocuments(clientName: string): Promise<ClientDocument[]> {
+    return await db.select().from(clientDocuments)
+      .where(eq(clientDocuments.clientName, clientName))
+      .orderBy(sql`${clientDocuments.uploadedAt} DESC`);
+  }
+  
+  async getAllClientDocuments(): Promise<ClientDocument[]> {
+    return await db.select().from(clientDocuments)
+      .orderBy(sql`${clientDocuments.uploadedAt} DESC`);
+  }
+  
+  async deleteClientDocument(id: string): Promise<boolean> {
+    const result = await db.delete(clientDocuments).where(eq(clientDocuments.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 }
