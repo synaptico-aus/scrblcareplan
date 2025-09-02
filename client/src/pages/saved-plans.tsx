@@ -232,7 +232,22 @@ export default function SavedPlans() {
   };
 
   const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString();
+    return new Date(date).toLocaleDateString('en-AU', {
+      day: '2-digit',
+      month: '2-digit', 
+      year: 'numeric'
+    });
+  };
+
+  const formatDateTime = (date: string | Date) => {
+    return new Date(date).toLocaleString('en-AU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   const handleExportToPDF = (plan: SavedCarePlan) => {
@@ -650,7 +665,7 @@ export default function SavedPlans() {
                       <CardTitle className="text-base sm:text-lg">{plan.name}</CardTitle>
                       <CardDescription className="flex items-center">
                         <Calendar className="h-4 w-4 mr-1" />
-                        {formatDate(plan.saveDate)}
+                        {formatDateTime(plan.saveDate)}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="pt-0">
@@ -702,7 +717,7 @@ export default function SavedPlans() {
                       <CardDescription>
                         <div className="flex items-center justify-between text-xs">
                           <span>{document.fileSize}</span>
-                          <span>{formatDate(document.uploadedAt!)}</span>
+                          <span>{formatDateTime(document.uploadedAt!)}</span>
                         </div>
                         {document.description && (
                           <p className="mt-1 text-xs">{document.description}</p>
@@ -823,7 +838,7 @@ export default function SavedPlans() {
                         <CardTitle className="text-lg">{folder.displayName}</CardTitle>
                         <CardDescription className="flex items-center mt-1">
                           <Calendar className="h-4 w-4 mr-1" />
-                          Last updated: {formatDate(folder.latestDate)}
+                          Last updated: {formatDateTime(folder.latestDate)}
                         </CardDescription>
                       </div>
                       <Button
