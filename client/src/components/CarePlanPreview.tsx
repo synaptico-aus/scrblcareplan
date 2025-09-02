@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Download, FileText, Printer, Clock, DollarSign, ChevronDown, ChevronUp, FileType } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useToast } from "@/hooks/use-toast";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
@@ -24,6 +25,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const [elapsedTime, setElapsedTime] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isBudgetOpen, setIsBudgetOpen] = useState(false);
+  const { toast } = useToast();
 
   // Budget calculation function
   const calculateBudgetEstimate = () => {

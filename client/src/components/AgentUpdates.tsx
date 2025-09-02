@@ -200,7 +200,7 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
         {actions.length > 1 && (
           <div className="space-y-2" data-testid="actions-history">
             <h4 className="text-sm font-medium text-muted-foreground">Completed Actions:</h4>
-            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            <div className="space-y-1.5">
               {actions.slice(0, -1).map((action, index) => (
                 <div key={index} className="flex items-start gap-2 text-xs">
                   <div className="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0 mt-1.5"></div>
