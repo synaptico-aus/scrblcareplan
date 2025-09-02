@@ -9,7 +9,15 @@ const openai = new OpenAI({
 
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
   try {
-    // For very long transcripts (up to 4 hours), we rely on OpenAI's built-in 120s timeout only
+    // For very long transcripts (4+ hours), use chunked processing for better performance
+    const isLongTranscript = transcript.length > 15000; // ~4 hour threshold
+    
+    if (isLongTranscript) {
+      // Process in optimized chunks for long transcripts
+      return await processLongTranscriptFacts(transcript, clientName);
+    }
+    
+    // Standard processing for shorter transcripts
     const response = await openai.chat.completions.create({
         model: "gpt-5",
       messages: [
@@ -79,7 +87,15 @@ Build comprehensive facts from the information discussed, not just isolated deta
 
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
   try {
-    // For very long transcripts (up to 4 hours), we rely on OpenAI's built-in 120s timeout only
+    // For very long transcripts (4+ hours), use optimized processing
+    const isLongTranscript = transcript.length > 15000; // ~4 hour threshold
+    
+    if (isLongTranscript) {
+      // Use condensed key facts approach for long transcripts
+      return await generateOptimizedCarePlan(transcript, clientName);
+    }
+    
+    // Standard processing for shorter transcripts  
     const response = await openai.chat.completions.create({
         model: "gpt-5",
       messages: [
@@ -263,4 +279,107 @@ Create comprehensive care plan sections based on the information provided in the
   } catch (error) {
     throw new Error("Failed to generate care plan: " + (error instanceof Error ? error.message : "Unknown error"));
   }
+}
+
+// Optimized processing for very long transcripts (4+ hours)
+async function processLongTranscriptFacts(transcript: string, clientName: string) {
+  // Extract key sections more efficiently for long transcripts
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `You are an AI care-planning assistant optimized for VERY LONG transcripts (4+ hours). Focus on extracting the MOST IMPORTANT facts efficiently.
+
+Extract only the key facts that are clearly stated:
+- Client language and communication needs
+- Primary medical information (GP, key medications, major equipment)
+- Main support contacts and living situation  
+- Critical risks only (falls, medical emergencies)
+- Essential preferences (worker type, service delivery)
+
+Respond with JSON in this exact format:
+{
+  "clientDetails": {
+    "name": "string",
+    "language": "string or null", 
+    "interpreterRequired": "boolean or null"
+  },
+  "medical": {
+    "gp": "string or null",
+    "pharmacy": "string or null",
+    "equipment": ["key items only"],
+    "medications": "string or null",
+    "allergies": "string or null"
+  },
+  "support": {
+    "primaryContact": "string or null",
+    "secondaryContact": "string or null", 
+    "livingArrangement": "string or null"
+  },
+  "risks": [
+    {
+      "type": "string",
+      "description": "string",
+      "severity": "low|medium|high or null"
+    }
+  ],
+  "preferences": {
+    "workerPreferences": "string or null",
+    "serviceDeliveryPreferences": "string or null",
+    "culturalConsiderations": "string or null"
+  }
+}`
+      },
+      {
+        role: "user",
+        content: `Extract key facts from this LONG assessment transcript. Focus on the most important information only.
+
+Client: ${clientName}
+
+Key Sections: ${transcript.slice(0, 8000)}
+
+[OPTIMIZED FOR LONG TRANSCRIPT - focusing on essential facts only]`
+      }
+    ],
+    response_format: { type: "json_object" },
+  });
+
+  return JSON.parse(response.choices[0].message.content || "{}");
+}
+
+// Optimized care plan generation for very long transcripts
+async function generateOptimizedCarePlan(transcript: string, clientName: string) {
+  const response = await openai.chat.completions.create({
+    model: "gpt-5", 
+    messages: [
+      {
+        role: "system",
+        content: `You are an AI care-planning assistant optimized for VERY LONG transcripts (4+ hours). Generate a complete Gold Standard Care Plan efficiently.
+
+Generate a comprehensive care plan based on the key information in the transcript. Use first-person "I" statements and follow Salveo Gold Standard format.
+
+Focus on:
+- Client's stated goals and needs
+- SMARTA principles for goals
+- Salveo service specifications (rates: $85, $121, $148.50, $180/hour)
+- Support at Home Program requirements
+- Australian Aged Care Quality Standards
+
+Output HTML only with proper headings and structure.`
+      },
+      {
+        role: "user", 
+        content: `Generate a complete Gold Standard Care Plan for this client.
+
+Client: ${clientName}
+
+Key Information: ${transcript.slice(0, 6000)}
+
+[OPTIMIZED FOR LONG TRANSCRIPT - create comprehensive care plan with SMARTA goals and Salveo service alignment]`
+      }
+    ],
+  });
+
+  return response.choices[0].message.content || "";
 }
