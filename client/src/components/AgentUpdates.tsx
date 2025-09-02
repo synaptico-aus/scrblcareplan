@@ -25,54 +25,80 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
   const [currentStep, setCurrentStep] = useState(0);
   const [totalSteps, setTotalSteps] = useState(8);
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
 
   useEffect(() => {
     if (!sessionId || !isGenerating) {
       return;
     }
 
-    const eventSource = new EventSource(`/api/generation-stream/${sessionId}`);
-    
-    eventSource.onopen = () => {
-      setIsConnected(true);
-    };
+    let eventSource: EventSource | null = null;
+    let retryTimeout: NodeJS.Timeout | null = null;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const update: AgentUpdate = JSON.parse(event.data);
-        
-        if (update.type === 'ping') {
-          return;
-        }
-
-        setUpdates(prev => [...prev, update]);
-
-        if (update.step && update.totalSteps) {
-          setCurrentStep(update.step);
-          setTotalSteps(update.totalSteps);
-        }
-
-        if (update.type === 'action' && update.action) {
-          setActions(prev => [...prev, update.action]);
-        }
-
-        if (update.type === 'complete' && update.result && onComplete) {
-          onComplete(update.result);
-        }
-      } catch (error) {
-        console.error('Error parsing SSE data:', error);
+    const connectToStream = () => {
+      if (eventSource) {
+        eventSource.close();
       }
+
+      eventSource = new EventSource(`/api/generation-stream/${sessionId}`);
+      
+      eventSource.onopen = () => {
+        setIsConnected(true);
+        setConnectionAttempts(0);
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const update: AgentUpdate = JSON.parse(event.data);
+          
+          if (update.type === 'ping' || (update as any).type === 'connected') {
+            return;
+          }
+
+          setUpdates(prev => [...prev, update]);
+
+          if (update.step && update.totalSteps) {
+            setCurrentStep(update.step);
+            setTotalSteps(update.totalSteps);
+          }
+
+          if (update.type === 'action' && update.action) {
+            setActions(prev => [...prev, update.action as string]);
+          }
+
+          if (update.type === 'complete' && update.result && onComplete) {
+            onComplete(update.result);
+          }
+        } catch (error) {
+          console.error('Error parsing SSE data:', error);
+        }
+      };
+
+      eventSource.onerror = () => {
+        setIsConnected(false);
+        
+        // Retry connection for deployment environments
+        if (connectionAttempts < 5) {
+          setConnectionAttempts(prev => prev + 1);
+          retryTimeout = setTimeout(() => {
+            connectToStream();
+          }, Math.min(1000 * Math.pow(2, connectionAttempts), 10000)); // Exponential backoff, max 10s
+        }
+      };
     };
 
-    eventSource.onerror = () => {
-      setIsConnected(false);
-    };
+    connectToStream();
 
     return () => {
-      eventSource.close();
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
       setIsConnected(false);
     };
-  }, [sessionId, isGenerating, onComplete]);
+  }, [sessionId, isGenerating, onComplete, connectionAttempts]);
 
   // Reset updates when starting a new generation
   useEffect(() => {

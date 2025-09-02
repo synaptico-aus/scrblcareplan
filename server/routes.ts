@@ -174,22 +174,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/generation-stream/:sessionId", (req, res) => {
     const sessionId = req.params.sessionId;
     
-    // Set headers for SSE
+    // Set headers for SSE - Enhanced for deployment environments
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    
+    // Send initial connection confirmation
+    res.write('data: {"type":"connected","sessionId":"' + sessionId + '"}\n\n');
+    
+    // Force flush to ensure immediate delivery
+    if ('flush' in res && typeof (res as any).flush === 'function') {
+      (res as any).flush();
+    }
 
-    // Keep connection alive
+    // Keep connection alive with more frequent pings for deployment
     const keepAlive = setInterval(() => {
-      res.write('data: {"type":"ping"}\n\n');
-    }, 30000);
+      try {
+        res.write('data: {"type":"ping"}\n\n');
+        if ('flush' in res && typeof (res as any).flush === 'function') {
+          (res as any).flush();
+        }
+      } catch (error) {
+        console.error('Error sending ping:', error);
+      }
+    }, 15000); // Reduced from 30s to 15s for better deployment compatibility
 
     // Listen for updates for this session
     const updateHandler = (update: any) => {
       if (update.sessionId === sessionId) {
-        res.write(`data: ${JSON.stringify(update)}\n\n`);
+        try {
+          res.write(`data: ${JSON.stringify(update)}\n\n`);
+          if ('flush' in res && typeof (res as any).flush === 'function') {
+            (res as any).flush();
+          }
+        } catch (error) {
+          console.error('Error sending update:', error);
+        }
       }
     };
 
@@ -198,6 +223,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Clean up on client disconnect
     req.on('close', () => {
+      clearInterval(keepAlive);
+      eventEmitter.removeListener('generation-update', updateHandler);
+    });
+
+    // Handle connection errors
+    req.on('error', () => {
       clearInterval(keepAlive);
       eventEmitter.removeListener('generation-update', updateHandler);
     });
