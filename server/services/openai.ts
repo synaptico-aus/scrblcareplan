@@ -73,9 +73,6 @@ Build comprehensive facts from the information discussed, not just isolated deta
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
-    if (error instanceof Error && error.message.includes('timeout')) {
-      throw new Error("AI processing took too long. Please try with a shorter transcript.");
-    }
     throw new Error("Failed to extract facts from transcript: " + (error instanceof Error ? error.message : "Unknown error"));
   }
 }
@@ -264,9 +261,6 @@ Create comprehensive care plan sections based on the information provided in the
 
     return response.choices[0].message.content || "";
   } catch (error) {
-    if (error instanceof Error && error.message.includes('timeout')) {
-      throw new Error("AI processing took too long. Please try with a shorter transcript.");
-    }
     throw new Error("Failed to generate care plan: " + (error instanceof Error ? error.message : "Unknown error"));
   }
 }
