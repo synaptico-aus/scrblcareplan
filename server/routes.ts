@@ -25,7 +25,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Attempting to extract transcript from Notta.AI URL: ${url}`);
       
-      // Launch headless browser with additional Chrome args for server environments
+      // Launch headless browser with optimized settings for faster loading
+      console.log("Launching browser...");
       browser = await puppeteer.launch({
         headless: true,
         args: [
@@ -45,38 +46,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
           '--metrics-recording-only',
           '--mute-audio',
           '--no-default-browser-check',
-          '--no-sandbox',
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
           '--disable-renderer-backgrounding',
-          '--disable-features=TranslateUI'
+          '--disable-features=TranslateUI',
+          '--disable-images', // Skip images for faster loading
+          '--disable-javascript-harmony-shipping',
+          '--aggressive-cache-discard',
+          '--memory-pressure-off'
         ],
+        timeout: 60000, // Browser launch timeout
         executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium-browser'
       });
       
       const page = await browser.newPage();
+      
+      // Set timeout for all page operations
+      page.setDefaultTimeout(60000);
+      page.setDefaultNavigationTimeout(60000);
+      
+      // Block unnecessary resources for faster loading
+      await page.setRequestInterception(true);
+      page.on('request', (req) => {
+        const resourceType = req.resourceType();
+        if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
+          req.abort(); // Skip non-essential resources
+        } else {
+          req.continue();
+        }
+      });
+      
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       
-      // Navigate to the page
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+      // Navigate to the page with increased timeout and better wait strategy
+      console.log("Navigating to Notta.ai page...");
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
       
-      // Wait for content to load and try multiple selectors
-      await page.waitForFunction(() => document.readyState === 'complete');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Wait for content to load with intelligent waiting
+      console.log("Waiting for page content to load...");
+      try {
+        // Wait for either transcript content or a reasonable time limit
+        await Promise.race([
+          page.waitForSelector('[data-testid*="transcript"], .transcript-content, .transcript-text, [class*="transcript"], pre', { timeout: 45000 }),
+          new Promise(resolve => setTimeout(resolve, 10000)) // Max 10 seconds for initial content
+        ]);
+      } catch (e) {
+        console.log("No transcript elements found immediately, proceeding with extraction...");
+      }
+      
+      // Additional wait for dynamic content
+      await page.waitForFunction(() => document.readyState === 'complete', { timeout: 30000 });
+      await new Promise(resolve => setTimeout(resolve, 3000)); // Reduced from 5 to 3 seconds
       
       // Try to extract transcript using various selectors
+      console.log("Extracting transcript content...");
       const transcript = await page.evaluate(() => {
-        // Try multiple possible selectors for transcript content
+        // Try multiple possible selectors for transcript content (updated for 2025)
         const selectors = [
           '[data-testid*="transcript"]',
+          '[data-testid="transcript-content"]',
           '.transcript-content',
           '.transcript-text',
+          '.transcript-container',
           '[class*="transcript"]',
+          '.notta-transcript',
+          '.meeting-content',
+          '.content-wrapper',
           'pre',
           '.content-text',
           '[data-transcript]',
           '.meeting-transcript',
-          'div[contenteditable="true"]'
+          'div[contenteditable="true"]',
+          '.shared-content',
+          '.text-content',
+          '#transcript-content',
+          '[role="main"] div',
+          'main div'
         ];
         
         for (const selector of selectors) {
@@ -110,8 +155,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       if (!transcript) {
+        console.log("Failed to extract transcript content");
         return res.status(400).json({ 
-          message: "Could not extract transcript content from Notta.AI page. The page may still be loading or the share link may not contain transcript text." 
+          message: "Could not extract transcript content from Notta.AI page. Please ensure the share link is valid and contains transcript text. If the page is still loading, please try again in a moment." 
+        });
+      }
+      
+      if (transcript.length < 50) {
+        console.log(`Transcript too short: ${transcript.length} characters`);
+        return res.status(400).json({
+          message: "The extracted content appears too short to be a valid transcript. Please check the Notta.AI share link."
         });
       }
       
@@ -120,12 +173,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
     } catch (error) {
       console.error("Error extracting Notta.AI transcript:", error);
-      res.status(500).json({ 
-        message: error instanceof Error ? error.message : "Failed to extract transcript from Notta.AI" 
-      });
+      
+      // Provide more specific error messages
+      let errorMessage = "Failed to extract transcript from Notta.AI";
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          errorMessage = "The Notta.AI page took too long to load. Please try again or check if the share link is working properly.";
+        } else if (error.message.includes('net::ERR')) {
+          errorMessage = "Unable to connect to the Notta.AI page. Please check the URL and try again.";
+        } else if (error.message.includes('navigation')) {
+          errorMessage = "Unable to navigate to the Notta.AI page. Please verify the share link is correct.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      res.status(500).json({ message: errorMessage });
     } finally {
       if (browser) {
-        await browser.close();
+        try {
+          await browser.close();
+          console.log("Browser closed successfully");
+        } catch (closeError) {
+          console.error("Error closing browser:", closeError);
+        }
       }
     }
   });
