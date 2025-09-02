@@ -457,7 +457,7 @@ export default function SavedPlans() {
         {/* Care Plan Content */}
         <div className="p-4 sm:p-6 max-w-6xl mx-auto">
           {/* Extracted Facts Section */}
-          {selectedPlan.extractedFacts && (
+          {selectedPlan.extractedFacts && typeof selectedPlan.extractedFacts === 'object' && selectedPlan.extractedFacts !== null && (
             <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
               <div className="flex items-center space-x-2 mb-6">
                 <Info className="h-5 w-5 text-primary" />

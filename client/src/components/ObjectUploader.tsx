@@ -16,6 +16,7 @@ interface ObjectUploaderProps {
     description?: string;
   }) => void;
   buttonClassName?: string;
+  className?: string;
   children: ReactNode;
 }
 
@@ -33,6 +34,7 @@ export function ObjectUploader({
   clientName,
   onUploadComplete,
   buttonClassName,
+  className,
   children,
 }: ObjectUploaderProps) {
   const [showModal, setShowModal] = useState(false);
