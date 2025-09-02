@@ -175,17 +175,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const sessionId = req.params.sessionId;
     
     // Set headers for SSE - Enhanced for deployment environments
-    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
     
-    // Send initial connection confirmation
+    // Critical headers to prevent buffering in production
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    res.setHeader('X-Buffer', 'off'); // Disable other proxy buffering
+    res.setHeader('Transfer-Encoding', 'chunked'); // Force chunked encoding
+    res.setHeader('X-Content-Type-Options', 'nosniff'); // Prevent content sniffing delays
+    
+    // Send initial connection confirmation with padding to force immediate delivery
     res.write('data: {"type":"connected","sessionId":"' + sessionId + '"}\n\n');
+    
+    // Add padding to force proxy to send immediately (some proxies buffer until certain size)
+    res.write(': ' + ' '.repeat(2048) + '\n\n');
     
     // Force flush to ensure immediate delivery
     if ('flush' in res && typeof (res as any).flush === 'function') {
@@ -209,7 +217,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (update.sessionId === sessionId) {
         try {
           console.log('Sending SSE update to session:', sessionId, update);
+          
+          // Write the data with padding to force immediate delivery
           res.write(`data: ${JSON.stringify(update)}\n\n`);
+          res.write(': padding\n\n'); // Add padding comment to force proxy delivery
+          
           if ('flush' in res && typeof (res as any).flush === 'function') {
             (res as any).flush();
           }
