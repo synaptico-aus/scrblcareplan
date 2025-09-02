@@ -1,4 +1,4 @@
-import { PDFDocument, PDFForm, PDFTextField, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, PDFForm, PDFTextField, PDFPage, rgb, StandardFonts } from 'pdf-lib';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -15,20 +15,18 @@ export class PDFGeneratorService {
     const headingRegex = /<h([1-6])[^>]*>(.*?)<\/h[1-6]>/gi;
     const cleanTextRegex = /<[^>]*>/g;
     
-    let lastIndex = 0;
-    let match;
+    const matches = Array.from(html.matchAll(headingRegex));
     
-    while ((match = headingRegex.exec(html)) !== null) {
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i];
       const heading = match[2].replace(cleanTextRegex, '').trim();
-      const nextMatch = headingRegex.exec(html);
       
       let content = '';
+      const nextMatch = matches[i + 1];
       if (nextMatch) {
-        content = html.substring(match.index + match[0].length, nextMatch.index);
-        // Reset regex for next iteration
-        headingRegex.lastIndex = nextMatch.index;
+        content = html.substring(match.index! + match[0].length, nextMatch.index!);
       } else {
-        content = html.substring(match.index + match[0].length);
+        content = html.substring(match.index! + match[0].length);
       }
       
       // Clean HTML from content
@@ -42,23 +40,28 @@ export class PDFGeneratorService {
     return sections;
   }
 
-  private async addLogoToPDF(pdfDoc: PDFDocument): Promise<void> {
+  private async addLogoToPDF(pdfDoc: PDFDocument, page?: PDFPage): Promise<void> {
     try {
       const logoPath = path.join(process.cwd(), 'attached_assets', 'scrbl-logo.png');
       const logoBytes = await fs.readFile(logoPath);
       const logoImage = await pdfDoc.embedPng(logoBytes);
       
-      const pages = pdfDoc.getPages();
-      const firstPage = pages[0];
-      const { width } = firstPage.getSize();
+      // Use provided page or get first page
+      const targetPage = page || pdfDoc.getPages()[0];
+      if (!targetPage) {
+        console.warn('No page available for logo');
+        return;
+      }
       
-      // Add logo to top center of first page
+      const { width, height } = targetPage.getSize();
+      
+      // Add logo to top center of page
       const logoWidth = 150;
       const logoHeight = (logoImage.height / logoImage.width) * logoWidth;
       
-      firstPage.drawImage(logoImage, {
+      targetPage.drawImage(logoImage, {
         x: (width - logoWidth) / 2,
-        y: firstPage.getSize().height - 80,
+        y: height - 80,
         width: logoWidth,
         height: logoHeight,
       });
@@ -71,10 +74,10 @@ export class PDFGeneratorService {
     const pdfDoc = await PDFDocument.create();
     const form = pdfDoc.getForm();
     
-    // Add logo to the PDF
-    await this.addLogoToPDF(pdfDoc);
-    
     const page = pdfDoc.addPage([595, 842]); // A4 size
+    
+    // Add logo to the PDF
+    await this.addLogoToPDF(pdfDoc, page);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
@@ -148,10 +151,10 @@ export class PDFGeneratorService {
   async generateStandardPDF(html: string, clientName: string): Promise<Uint8Array> {
     const pdfDoc = await PDFDocument.create();
     
-    // Add logo to the PDF
-    await this.addLogoToPDF(pdfDoc);
-    
     const page = pdfDoc.addPage([595, 842]); // A4 size
+    
+    // Add logo to the PDF
+    await this.addLogoToPDF(pdfDoc, page);
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
