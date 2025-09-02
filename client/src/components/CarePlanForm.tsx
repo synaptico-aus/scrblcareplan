@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Settings, Link2, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, Settings, Link2, ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { fundingLevels } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useToast } from "@/hooks/use-toast";
 
 interface CarePlanFormProps {
   clientName: string;
@@ -46,6 +47,80 @@ export function CarePlanForm({
   isFetchingNotta
 }: CarePlanFormProps) {
   const [isNottaOpen, setIsNottaOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+
+    try {
+      let textContent = '';
+
+      if (file.type === 'text/plain') {
+        // Handle plain text files
+        textContent = await file.text();
+      } else if (file.type === 'application/pdf') {
+        // Handle PDF files - for now, show a message that PDF support is coming
+        toast({
+          title: "PDF Upload",
+          description: "PDF upload support is coming soon. Please convert to text file for now.",
+          variant: "destructive",
+        });
+        return;
+      } else if (file.type.startsWith('audio/')) {
+        // Handle audio files - for now, show a message that audio support is coming
+        toast({
+          title: "Audio Upload",
+          description: "Audio transcription support is coming soon. Please use a text transcript for now.",
+          variant: "destructive",
+        });
+        return;
+      } else {
+        // Unsupported file type
+        toast({
+          title: "Unsupported File Type",
+          description: "Please upload a .txt file. PDF and audio support coming soon.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (textContent.trim()) {
+        setTranscript(textContent);
+        toast({
+          title: "File Uploaded Successfully",
+          description: `Loaded transcript from "${file.name}"`,
+        });
+      } else {
+        toast({
+          title: "Empty File",
+          description: "The uploaded file appears to be empty.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Upload Failed",
+        description: "Failed to read the uploaded file. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
   
   return (
     <div className="w-full lg:w-1/3 bg-card lg:border-r border-border flex flex-col lg:min-h-0">
@@ -156,6 +231,55 @@ export function CarePlanForm({
           </p>
         </div>
         
+        {/* File Upload - Collapsible */}
+        <Collapsible open={isUploadOpen} onOpenChange={setIsUploadOpen} className="mb-4">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full justify-between p-0 h-auto">
+              <Label className="text-sm font-medium text-foreground cursor-pointer">
+                Upload Transcript File (Optional)
+              </Label>
+              {isUploadOpen ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-2 mt-2">
+            <div className="flex flex-col space-y-2">
+              <Button
+                data-testid="button-upload-transcript"
+                variant="outline"
+                onClick={triggerFileUpload}
+                disabled={isUploading || isLoading}
+                className="w-full justify-center"
+              >
+                {isUploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Choose Transcript File
+                  </>
+                )}
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.pdf,audio/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Upload a .txt file containing the assessment transcript. PDF and audio support coming soon.
+            </p>
+          </CollapsibleContent>
+        </Collapsible>
+
         {/* Notta URL Input - Collapsible */}
         <Collapsible open={isNottaOpen} onOpenChange={setIsNottaOpen} className="mb-4">
           <CollapsibleTrigger asChild>
@@ -230,7 +354,7 @@ I can't find out. I think the words are in the end...`}
             data-testid="button-generate-care-plan"
             className="flex-1"
             onClick={onGenerate}
-            disabled={isLoading || isFetchingNotta || !clientName.trim() || !transcript.trim()}
+            disabled={isLoading || isFetchingNotta || isUploading || !clientName.trim() || !transcript.trim()}
             size="lg"
           >
             {isLoading ? (
@@ -252,8 +376,15 @@ I can't find out. I think the words are in the end...`}
             variant="outline"
             size="icon"
             className="px-4"
+            onClick={triggerFileUpload}
+            disabled={isUploading || isLoading}
+            title="Upload transcript file"
           >
-            <Upload className="h-4 w-4" />
+            {isUploading ? (
+              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
