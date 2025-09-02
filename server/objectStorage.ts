@@ -102,10 +102,28 @@ export class ObjectStorageService {
       // Get the ACL policy for the object.
       const aclPolicy = await getObjectAclPolicy(file);
       const isPublic = aclPolicy?.visibility === "public";
+      
+      // Determine proper content type based on file extension
+      let contentType = metadata.contentType || "application/octet-stream";
+      const fileName = file.name.toLowerCase();
+      
+      if (fileName.endsWith('.docx')) {
+        contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+      } else if (fileName.endsWith('.doc')) {
+        contentType = "application/msword";
+      } else if (fileName.endsWith('.pdf')) {
+        contentType = "application/pdf";
+      } else if (fileName.endsWith('.xlsx')) {
+        contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      } else if (fileName.endsWith('.xls')) {
+        contentType = "application/vnd.ms-excel";
+      }
+      
       // Set appropriate headers
       res.set({
-        "Content-Type": metadata.contentType || "application/octet-stream",
+        "Content-Type": contentType,
         "Content-Length": metadata.size,
+        "Content-Disposition": `attachment; filename="${file.name}"`,
         "Cache-Control": `${
           isPublic ? "public" : "private"
         }, max-age=${cacheTtlSec}`,
