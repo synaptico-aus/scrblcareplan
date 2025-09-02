@@ -1,13 +1,8 @@
 import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Download, FileText, Printer, Save, Clock, DollarSign, ChevronDown, ChevronUp, FileType } from "lucide-react";
+import { Download, FileText, Printer, Clock, DollarSign, ChevronDown, ChevronUp, FileType } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
@@ -26,13 +21,9 @@ interface CarePlanPreviewProps {
 }
 
 export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, generationStartTime, generationTime, fundingType, fundingLevel, onPrint }: CarePlanPreviewProps) {
-  const [saveName, setSaveName] = useState("");
-  const [saveDate, setSaveDate] = useState(new Date().toISOString().split('T')[0]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isBudgetOpen, setIsBudgetOpen] = useState(false);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // Budget calculation function
   const calculateBudgetEstimate = () => {
@@ -125,13 +116,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
 
   const budgetEstimate = calculateBudgetEstimate();
 
-  // Set default save name to client name when care plan is generated
-  useEffect(() => {
-    if (html && clientName && !saveName) {
-      setSaveName(clientName);
-    }
-  }, [html, clientName, saveName]);
-
   // Timer for elapsed time during generation
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -155,58 +139,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
     };
   }, [isLoading, generationStartTime]);
 
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!html) throw new Error("No care plan to save");
-      
-      const response = await apiRequest("POST", "/api/saved-care-plans", {
-        name: saveName.trim(),
-        clientName,
-        html,
-        extractedFacts,
-        saveDate: new Date(saveDate),
-      });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/saved-care-plans"] });
-      toast({
-        title: "Care Plan Saved",
-        description: `"${saveName}" has been saved successfully.`,
-      });
-      setSaveName("");
-      setSaveDate(new Date().toISOString().split('T')[0]);
-    },
-    onError: (error) => {
-      toast({
-        title: "Save Failed",
-        description: error.message || "Failed to save care plan",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSaveCarePlan = () => {
-    if (!saveName.trim()) {
-      toast({
-        title: "Name Required",
-        description: "Please enter a name for the care plan",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (!html) {
-      toast({
-        title: "No Care Plan",
-        description: "Generate a care plan first before saving",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    saveMutation.mutate();
-  };
 
   const handleExportToPDF = () => {
     if (!html) return;
@@ -347,63 +279,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
         </div>
       </div>
 
-      {/* Save Care Plan Section */}
-      {html && (
-        <div className="p-4 border-b border-border bg-muted/30">
-          <h3 className="text-md font-semibold mb-3 flex items-center">
-            <Save className="text-primary mr-2 h-4 w-4" />
-            Save Care Plan
-          </h3>
-          <div className="flex flex-col sm:flex-row sm:items-end space-y-3 sm:space-y-0 sm:space-x-4">
-            <div className="flex-1">
-              <Label htmlFor="save-name" className="block text-sm font-medium mb-1">
-                Name
-              </Label>
-              <Input
-                id="save-name"
-                data-testid="input-save-name"
-                type="text"
-                placeholder="Enter care plan name"
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div className="sm:w-40">
-              <Label htmlFor="save-date" className="block text-sm font-medium mb-1">
-                Date
-              </Label>
-              <Input
-                id="save-date"
-                data-testid="input-save-date"
-                type="date"
-                value={saveDate}
-                onChange={(e) => setSaveDate(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <Button
-              onClick={handleSaveCarePlan}
-              disabled={!saveName.trim() || !html || saveMutation.isPending}
-              data-testid="button-save-care-plan"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 w-full sm:w-auto"
-              size="lg"
-            >
-              {saveMutation.isPending ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin mr-2" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Budget Estimation Section */}
       {html && budgetEstimate && (
