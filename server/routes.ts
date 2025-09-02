@@ -252,7 +252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Send initial update
+      // Send initial update with proper delays for visibility
       eventEmitter.emit('generation-update', {
         sessionId,
         type: 'action',
@@ -260,6 +260,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         step: 1,
         totalSteps: 8
       });
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -269,6 +271,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
       // Step 1: Extract facts
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -277,6 +281,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         step: 3,
         totalSteps: 8
       });
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       eventEmitter.emit('generation-update', {
         sessionId,
