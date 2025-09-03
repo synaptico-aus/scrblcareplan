@@ -1,9 +1,10 @@
 import multer from 'multer';
-// Use dynamic import to avoid startup issues with pdf-parse
-// import pdfParse from 'pdf-parse';
 import mammoth from 'mammoth';
 import tesseract from 'node-tesseract-ocr';
+import puppeteer from 'puppeteer';
 import { Request } from 'express';
+import fs from 'fs';
+import path from 'path';
 
 // Configure multer for file uploads
 const storage = multer.memoryStorage();
@@ -46,9 +47,7 @@ export async function extractTextFromFile(file: Express.Multer.File): Promise<Ex
     
     if (mimetype === 'application/pdf') {
       try {
-        const pdfParse = await import('pdf-parse');
-        const pdfData = await pdfParse.default(buffer);
-        content = pdfData.text;
+        content = await extractTextFromPDFWithPuppeteer(buffer, originalname);
       } catch (error) {
         console.warn(`PDF parsing failed for ${originalname}:`, error);
         content = `[PDF file: ${originalname} - Text extraction failed. Please convert to Word document or image for processing.]`;
@@ -81,6 +80,62 @@ export async function extractTextFromFile(file: Express.Multer.File): Promise<Ex
   } catch (error) {
     console.error(`Error extracting text from ${originalname}:`, error);
     throw new Error(`Failed to extract text from ${originalname}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+async function extractTextFromPDFWithPuppeteer(buffer: Buffer, filename: string): Promise<string> {
+  let browser;
+  let tempFilePath;
+  
+  try {
+    // Create a temporary file for the PDF
+    const tempDir = path.join(process.cwd(), 'temp');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    tempFilePath = path.join(tempDir, `${Date.now()}_${filename}`);
+    fs.writeFileSync(tempFilePath, buffer);
+    
+    // Launch puppeteer to extract text from PDF
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    const page = await browser.newPage();
+    
+    // Load the PDF file
+    await page.goto(`file://${tempFilePath}`, { 
+      waitUntil: 'networkidle0',
+      timeout: 30000 
+    });
+    
+    // Wait a bit for PDF to render
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Extract text from the page
+    const textContent = await page.evaluate(() => {
+      return document.body.innerText || document.body.textContent || '';
+    });
+    
+    return textContent.trim();
+    
+  } catch (error) {
+    console.error(`Puppeteer PDF extraction failed for ${filename}:`, error);
+    throw error;
+  } finally {
+    // Clean up
+    if (browser) {
+      await browser.close();
+    }
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch (cleanupError) {
+        console.warn(`Failed to clean up temp file ${tempFilePath}:`, cleanupError);
+      }
+    }
   }
 }
 
