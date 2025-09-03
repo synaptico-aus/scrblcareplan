@@ -779,6 +779,13 @@ export default function SavedPlans() {
                 <span className="sm:hidden">Planner</span>
               </Button>
             </Link>
+            <Link href="/document-analysis">
+              <Button variant="outline" data-testid="button-document-analysis" size="sm" className="w-full sm:w-auto">
+                <FileText className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Document Analysis</span>
+                <span className="sm:hidden">Docs</span>
+              </Button>
+            </Link>
           </div>
         </div>
       </header>

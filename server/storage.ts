@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, users, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases } from "@shared/schema";
+import { type User, type InsertUser, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, type DocumentAnalysis, type InsertDocumentAnalysis, type UpdateDocumentAnalysis, users, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases, documentAnalyses } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
@@ -23,6 +23,11 @@ export interface IStorage {
   getAllClientFolderAliases(): Promise<ClientFolderAlias[]>;
   updateClientFolderAlias(originalClientName: string, update: UpdateClientFolderAlias): Promise<ClientFolderAlias | undefined>;
   deleteClientFolderAlias(originalClientName: string): Promise<boolean>;
+  createDocumentAnalysis(analysis: InsertDocumentAnalysis): Promise<DocumentAnalysis>;
+  getDocumentAnalysis(id: string): Promise<DocumentAnalysis | undefined>;
+  getAllDocumentAnalyses(): Promise<DocumentAnalysis[]>;
+  updateDocumentAnalysis(id: string, update: UpdateDocumentAnalysis): Promise<DocumentAnalysis | undefined>;
+  deleteDocumentAnalysis(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -31,6 +36,7 @@ export class MemStorage implements IStorage {
   private savedCarePlans: Map<string, SavedCarePlan>;
   private clientDocuments: Map<string, ClientDocument>;
   private clientFolderAliases: Map<string, ClientFolderAlias>;
+  private documentAnalyses: Map<string, DocumentAnalysis>;
 
   constructor() {
     this.users = new Map();
@@ -38,6 +44,7 @@ export class MemStorage implements IStorage {
     this.savedCarePlans = new Map();
     this.clientDocuments = new Map();
     this.clientFolderAliases = new Map();
+    this.documentAnalyses = new Map();
   }
 
   async getUser(id: string): Promise<User | undefined> {
@@ -114,7 +121,12 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const newDocument: ClientDocument = {
       id,
-      ...document,
+      clientName: document.clientName,
+      fileName: document.fileName,
+      fileType: document.fileType,
+      fileSize: document.fileSize || null,
+      objectPath: document.objectPath,
+      description: document.description || null,
       uploadedAt: new Date(),
     };
     this.clientDocuments.set(id, newDocument);
@@ -171,6 +183,52 @@ export class MemStorage implements IStorage {
 
   async deleteClientFolderAlias(originalClientName: string): Promise<boolean> {
     return this.clientFolderAliases.delete(originalClientName);
+  }
+
+  async createDocumentAnalysis(analysis: InsertDocumentAnalysis): Promise<DocumentAnalysis> {
+    const id = randomUUID();
+    const newAnalysis: DocumentAnalysis = {
+      id,
+      fileName: analysis.fileName,
+      fileType: analysis.fileType,
+      fileSize: analysis.fileSize || null,
+      extractedText: analysis.extractedText || null,
+      analysisResult: analysis.analysisResult || null,
+      analysisSummary: analysis.analysisSummary || null,
+      processingStatus: analysis.processingStatus || "pending",
+      errorMessage: analysis.errorMessage || null,
+      objectPath: analysis.objectPath || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.documentAnalyses.set(id, newAnalysis);
+    return newAnalysis;
+  }
+
+  async getDocumentAnalysis(id: string): Promise<DocumentAnalysis | undefined> {
+    return this.documentAnalyses.get(id);
+  }
+
+  async getAllDocumentAnalyses(): Promise<DocumentAnalysis[]> {
+    return Array.from(this.documentAnalyses.values())
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+
+  async updateDocumentAnalysis(id: string, update: UpdateDocumentAnalysis): Promise<DocumentAnalysis | undefined> {
+    const existing = this.documentAnalyses.get(id);
+    if (!existing) return undefined;
+    
+    const updated: DocumentAnalysis = {
+      ...existing,
+      ...update,
+      updatedAt: new Date(),
+    };
+    this.documentAnalyses.set(id, updated);
+    return updated;
+  }
+
+  async deleteDocumentAnalysis(id: string): Promise<boolean> {
+    return this.documentAnalyses.delete(id);
   }
 }
 
@@ -312,6 +370,55 @@ export class DatabaseStorage implements IStorage {
   async deleteClientFolderAlias(originalClientName: string): Promise<boolean> {
     const result = await db.delete(clientFolderAliases)
       .where(eq(clientFolderAliases.originalClientName, originalClientName));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async createDocumentAnalysis(analysis: InsertDocumentAnalysis): Promise<DocumentAnalysis> {
+    const [documentAnalysis] = await db
+      .insert(documentAnalyses)
+      .values({
+        fileName: analysis.fileName,
+        fileType: analysis.fileType,
+        fileSize: analysis.fileSize,
+        extractedText: analysis.extractedText,
+        analysisResult: analysis.analysisResult,
+        analysisSummary: analysis.analysisSummary,
+        processingStatus: analysis.processingStatus || "pending",
+        errorMessage: analysis.errorMessage,
+        objectPath: analysis.objectPath,
+      })
+      .returning();
+    return documentAnalysis;
+  }
+
+  async getDocumentAnalysis(id: string): Promise<DocumentAnalysis | undefined> {
+    const [analysis] = await db.select().from(documentAnalyses).where(eq(documentAnalyses.id, id));
+    return analysis || undefined;
+  }
+
+  async getAllDocumentAnalyses(): Promise<DocumentAnalysis[]> {
+    return await db.select().from(documentAnalyses)
+      .orderBy(sql`${documentAnalyses.createdAt} DESC`);
+  }
+
+  async updateDocumentAnalysis(id: string, update: UpdateDocumentAnalysis): Promise<DocumentAnalysis | undefined> {
+    const [updated] = await db
+      .update(documentAnalyses)
+      .set({
+        extractedText: update.extractedText,
+        analysisResult: update.analysisResult,
+        analysisSummary: update.analysisSummary,
+        processingStatus: update.processingStatus,
+        errorMessage: update.errorMessage,
+        updatedAt: new Date(),
+      })
+      .where(eq(documentAnalyses.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteDocumentAnalysis(id: string): Promise<boolean> {
+    const result = await db.delete(documentAnalyses).where(eq(documentAnalyses.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 }
