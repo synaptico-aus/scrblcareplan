@@ -11,6 +11,10 @@ interface AgentUpdate {
   step?: number;
   totalSteps?: number;
   result?: any;
+  chunkProgress?: {
+    current: number;
+    total: number;
+  };
 }
 
 interface AgentUpdatesProps {
@@ -26,6 +30,7 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
   const [totalSteps, setTotalSteps] = useState(8);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [chunkProgress, setChunkProgress] = useState<{current: number; total: number} | null>(null);
 
   useEffect(() => {
     if (!sessionId || !isGenerating) {
@@ -62,6 +67,13 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
           if (update.step && update.totalSteps) {
             setCurrentStep(update.step);
             setTotalSteps(update.totalSteps);
+          }
+
+          // Handle chunk progress updates
+          if (update.chunkProgress) {
+            setChunkProgress(update.chunkProgress);
+          } else {
+            setChunkProgress(null); // Clear chunk progress when not chunking
           }
 
           if (update.type === 'action' && update.action) {
@@ -109,6 +121,7 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
       setActions([]);
       setCurrentStep(0);
       setTotalSteps(8);
+      setChunkProgress(null);
     }
   }, [isGenerating, sessionId]);
 
@@ -146,9 +159,26 @@ export function AgentUpdates({ sessionId, isGenerating, onComplete }: AgentUpdat
         <div className="space-y-2">
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>Progress</span>
-            <span>{currentStep} of {totalSteps}</span>
+            <span>{Math.floor(currentStep)} of {totalSteps}</span>
           </div>
           <Progress value={progressPercentage} className="h-2" />
+          
+          {/* Chunk Progress Indicator */}
+          {chunkProgress && chunkProgress.total > 1 && (
+            <div className="space-y-1 pt-2 border-t border-border/50">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Processing Sections</span>
+                <span>{chunkProgress.current} of {chunkProgress.total}</span>
+              </div>
+              <Progress 
+                value={(chunkProgress.current / chunkProgress.total) * 100} 
+                className="h-1.5" 
+              />
+              <p className="text-xs text-muted-foreground">
+                Large transcript detected - processing in sections for better reliability
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Current Action */}

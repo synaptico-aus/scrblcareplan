@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { EventEmitter } from "events";
 import { storage } from "./storage";
 import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema } from "@shared/schema";
-import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
+import { extractFactsFromTranscript, extractFactsFromTranscriptChunked, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
 import puppeteer from "puppeteer";
@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Step 1: Extract facts
+      // Step 1: Extract facts with chunked processing
       eventEmitter.emit('generation-update', {
         sessionId,
         type: 'action',
@@ -284,17 +284,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      eventEmitter.emit('generation-update', {
-        sessionId,
-        type: 'action',
-        action: 'Extracting medical history, support networks, and risk factors',
-        step: 4,
-        totalSteps: 8
-      });
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+      // Use chunked extraction with progress tracking
+      const extractedFacts = await extractFactsFromTranscriptChunked(
+        transcript, 
+        clientName,
+        (current, total, action) => {
+          // Emit progress updates for each chunk
+          eventEmitter.emit('generation-update', {
+            sessionId,
+            type: 'action',
+            action: action,
+            step: 3 + (current / total), // Gradual progress from step 3 to 4
+            totalSteps: 8,
+            chunkProgress: { current, total }
+          });
+        }
+      );
 
       eventEmitter.emit('generation-update', {
         sessionId,

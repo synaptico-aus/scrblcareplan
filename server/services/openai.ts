@@ -5,6 +5,265 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// Chunking configuration
+const CHUNK_SIZE = 2500; // Words per chunk
+const OVERLAP_SIZE = 150; // Words to overlap between chunks for context
+
+// Utility function to split text into words and create chunks
+function splitIntoChunks(text: string): string[] {
+  const words = text.split(/\s+/);
+  
+  if (words.length <= CHUNK_SIZE) {
+    return [text]; // Return original if small enough
+  }
+
+  const chunks: string[] = [];
+  let currentIndex = 0;
+
+  while (currentIndex < words.length) {
+    const endIndex = Math.min(currentIndex + CHUNK_SIZE, words.length);
+    const chunk = words.slice(currentIndex, endIndex).join(' ');
+    chunks.push(chunk);
+    
+    // Move forward by chunk size minus overlap
+    currentIndex += CHUNK_SIZE - OVERLAP_SIZE;
+    
+    // Ensure we don't exceed the text length
+    if (currentIndex >= words.length) break;
+  }
+
+  return chunks;
+}
+
+// Enhanced fact extraction with progress tracking and retry logic
+export async function extractFactsFromTranscriptChunked(
+  transcript: string, 
+  clientName: string,
+  onProgress?: (current: number, total: number, action: string) => void
+) {
+  const chunks = splitIntoChunks(transcript);
+  
+  if (chunks.length === 1) {
+    // For small transcripts, use original method
+    onProgress?.(1, 1, 'Processing transcript for key information');
+    return await extractFactsFromTranscript(transcript, clientName);
+  }
+
+  const allFacts: any[] = [];
+  const maxRetries = 2;
+  
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const chunkNumber = i + 1;
+    let retryCount = 0;
+    let chunkFacts = null;
+    
+    onProgress?.(chunkNumber, chunks.length, `Analyzing section ${chunkNumber} of ${chunks.length} for key client information`);
+    
+    // Retry logic for each chunk
+    while (retryCount <= maxRetries && !chunkFacts) {
+      try {
+        chunkFacts = await extractFactsFromChunk(chunk, clientName, chunkNumber, chunks.length);
+        allFacts.push(chunkFacts);
+        break; // Success, exit retry loop
+      } catch (error) {
+        retryCount++;
+        console.error(`Error processing chunk ${chunkNumber}, attempt ${retryCount}:`, error);
+        
+        if (retryCount <= maxRetries) {
+          onProgress?.(chunkNumber, chunks.length, `Section ${chunkNumber} failed, retrying... (attempt ${retryCount})`);
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, retryCount - 1), 5000)));
+        } else {
+          // All retries failed, continue with other chunks
+          onProgress?.(chunkNumber, chunks.length, `Section ${chunkNumber} failed after ${maxRetries} attempts - continuing with remaining sections`);
+          console.error(`Failed to process chunk ${chunkNumber} after ${maxRetries} retries`);
+        }
+      }
+    }
+  }
+
+  // Check if we got any facts at all
+  if (allFacts.length === 0) {
+    throw new Error('Failed to extract facts from any transcript sections. Please try again or use offline mode.');
+  }
+
+  // Combine all facts from chunks
+  onProgress?.(chunks.length, chunks.length, `Successfully processed ${allFacts.length} of ${chunks.length} sections - combining information`);
+  return combineFacts(allFacts);
+}
+
+// Extract facts from a single chunk
+async function extractFactsFromChunk(chunk: string, clientName: string, chunkNumber: number, totalChunks: number) {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        {
+          role: "system",
+          content: `You are an AI care-planning assistant analyzing section ${chunkNumber} of ${totalChunks} from an assessment transcript.
+
+Extract facts that are clearly mentioned or strongly implied in this section. This is part of a larger transcript, so focus on:
+- Any client details (language, communication needs)
+- Medical information (GP, pharmacy, equipment, medications, allergies)
+- Support networks (contacts, living arrangements)
+- Risk factors or safety concerns
+- Preferences (worker, service delivery, cultural considerations)
+
+If information is not present in this section, use null values. The sections will be combined later.
+
+Respond with JSON in this exact format:
+{
+  "clientDetails": {
+    "name": "string",
+    "language": "string or null",
+    "interpreterRequired": "boolean or null"
+  },
+  "medical": {
+    "gp": "string or null",
+    "pharmacy": "string or null", 
+    "equipment": ["array of strings or empty"],
+    "medications": "string or null",
+    "allergies": "string or null"
+  },
+  "support": {
+    "primaryContact": "string or null",
+    "secondaryContact": "string or null",
+    "livingArrangement": "string or null"
+  },
+  "risks": [
+    {
+      "type": "string",
+      "description": "string",
+      "severity": "low|medium|high or null"
+    }
+  ],
+  "preferences": {
+    "workerPreferences": "string or null",
+    "serviceDeliveryPreferences": "string or null",
+    "culturalConsiderations": "string or null"
+  }
+}`
+        },
+        {
+          role: "user", 
+          content: `Extract key facts from this section (${chunkNumber} of ${totalChunks}) of the assessment transcript.
+
+Client Name: ${clientName}
+
+Transcript Section:
+${chunk}
+
+Focus on information clearly stated in this section. Use null for missing information.`
+        }
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    return JSON.parse(response.choices[0].message.content || "{}");
+  } catch (error) {
+    throw new Error("Failed to extract facts from chunk: " + (error instanceof Error ? error.message : "Unknown error"));
+  }
+}
+
+// Combine facts from multiple chunks
+function combineFacts(factsList: any[]): any {
+  const combined = {
+    clientDetails: {
+      name: "",
+      language: null,
+      interpreterRequired: null
+    },
+    medical: {
+      gp: null,
+      pharmacy: null,
+      equipment: [] as string[],
+      medications: null,
+      allergies: null
+    },
+    support: {
+      primaryContact: null,
+      secondaryContact: null,
+      livingArrangement: null
+    },
+    risks: [] as any[],
+    preferences: {
+      workerPreferences: null,
+      serviceDeliveryPreferences: null,
+      culturalConsiderations: null
+    }
+  };
+
+  for (const facts of factsList) {
+    if (!facts) continue;
+
+    // Combine client details (use first non-null value)
+    if (facts.clientDetails?.name && !combined.clientDetails.name) {
+      combined.clientDetails.name = facts.clientDetails.name;
+    }
+    if (facts.clientDetails?.language && !combined.clientDetails.language) {
+      combined.clientDetails.language = facts.clientDetails.language;
+    }
+    if (facts.clientDetails?.interpreterRequired !== null && combined.clientDetails.interpreterRequired === null) {
+      combined.clientDetails.interpreterRequired = facts.clientDetails.interpreterRequired;
+    }
+
+    // Combine medical info (use first non-null value)
+    if (facts.medical?.gp && !combined.medical.gp) {
+      combined.medical.gp = facts.medical.gp;
+    }
+    if (facts.medical?.pharmacy && !combined.medical.pharmacy) {
+      combined.medical.pharmacy = facts.medical.pharmacy;
+    }
+    if (facts.medical?.medications && !combined.medical.medications) {
+      combined.medical.medications = facts.medical.medications;
+    }
+    if (facts.medical?.allergies && !combined.medical.allergies) {
+      combined.medical.allergies = facts.medical.allergies;
+    }
+    
+    // Combine equipment arrays
+    if (facts.medical?.equipment && Array.isArray(facts.medical.equipment)) {
+      const allEquipment = combined.medical.equipment.concat(facts.medical.equipment);
+      combined.medical.equipment = Array.from(new Set(allEquipment));
+    }
+
+    // Combine support info (use first non-null value)
+    if (facts.support?.primaryContact && !combined.support.primaryContact) {
+      combined.support.primaryContact = facts.support.primaryContact;
+    }
+    if (facts.support?.secondaryContact && !combined.support.secondaryContact) {
+      combined.support.secondaryContact = facts.support.secondaryContact;
+    }
+    if (facts.support?.livingArrangement && !combined.support.livingArrangement) {
+      combined.support.livingArrangement = facts.support.livingArrangement;
+    }
+
+    // Combine risks (deduplicate by type)
+    if (facts.risks && Array.isArray(facts.risks)) {
+      for (const risk of facts.risks) {
+        const existingRisk = combined.risks.find(r => r.type === risk.type);
+        if (!existingRisk) {
+          combined.risks.push(risk);
+        }
+      }
+    }
+
+    // Combine preferences (use first non-null value)
+    if (facts.preferences?.workerPreferences && !combined.preferences.workerPreferences) {
+      combined.preferences.workerPreferences = facts.preferences.workerPreferences;
+    }
+    if (facts.preferences?.serviceDeliveryPreferences && !combined.preferences.serviceDeliveryPreferences) {
+      combined.preferences.serviceDeliveryPreferences = facts.preferences.serviceDeliveryPreferences;
+    }
+    if (facts.preferences?.culturalConsiderations && !combined.preferences.culturalConsiderations) {
+      combined.preferences.culturalConsiderations = facts.preferences.culturalConsiderations;
+    }
+  }
+
+  return combined;
+}
+
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
   try {
     const response = await openai.chat.completions.create({
