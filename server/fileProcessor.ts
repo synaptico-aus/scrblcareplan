@@ -86,39 +86,15 @@ async function extractTextFromPDFAlternative(buffer: Buffer, filename: string): 
   console.log(`Attempting to extract text from PDF: ${filename}`);
   
   try {
-    // Create a workaround for the pdf-parse library bug
-    const originalExistsSync = fs.existsSync;
-    const originalReadFileSync = fs.readFileSync;
+    const pdfParse = await import('pdf-parse');
+    const data = await pdfParse.default(buffer);
     
-    // Override fs functions to handle the problematic test file
-    fs.existsSync = function(filePath: any): boolean {
-      if (typeof filePath === 'string' && filePath.includes('test/data/05-versions-space.pdf')) {
-        return false; // Pretend the problematic file doesn't exist
-      }
-      return originalExistsSync.call(fs, filePath);
-    };
-    
-    fs.readFileSync = function(filePath: any, options?: any): any {
-      if (typeof filePath === 'string' && filePath.includes('test/data/05-versions-space.pdf')) {
-        return Buffer.alloc(0); // Return empty buffer for problematic file
-      }
-      return originalReadFileSync.call(fs, filePath, options);
-    };
-    
-    try {
-      const pdfParse = await import('pdf-parse');
-      const data = await pdfParse.default(buffer);
-      
-      if (data.text && data.text.trim().length > 0) {
-        console.log(`Successfully extracted ${data.text.length} characters from ${filename} using pdf-parse`);
-        return data.text.trim();
-      } else {
-        throw new Error('PDF parsing returned empty text');
-      }
-    } finally {
-      // Restore original functions
-      fs.existsSync = originalExistsSync;
-      fs.readFileSync = originalReadFileSync;
+    if (data.text && data.text.trim().length > 0) {
+      console.log(`Successfully extracted ${data.text.length} characters from ${filename} using pdf-parse`);
+      return data.text.trim();
+    } else {
+      console.warn(`PDF parsing returned empty text for ${filename}`);
+      throw new Error('PDF parsing returned empty text');
     }
     
   } catch (parseError) {
