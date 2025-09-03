@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { EventEmitter } from "events";
 import { storage } from "./storage";
 import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema } from "@shared/schema";
-import { extractFactsFromTranscript, extractFactsFromTranscriptChunked, generateCarePlanHtml } from "./services/openai";
+import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
 import puppeteer from "puppeteer";
@@ -184,10 +184,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
     res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
     
-    // Additional deployment-specific headers
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Transfer-Encoding', 'chunked');
-    
     // Send initial connection confirmation
     res.write('data: {"type":"connected","sessionId":"' + sessionId + '"}\n\n');
     
@@ -199,46 +195,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Keep connection alive with more frequent pings for deployment
     const keepAlive = setInterval(() => {
       try {
-        // Check connection health before sending ping
-        if (res.destroyed || res.writableEnded) {
-          console.log(`[DEPLOYMENT] Connection closed during ping for session ${sessionId}, clearing interval`);
-          clearInterval(keepAlive);
-          eventEmitter.removeListener('generation-update', updateHandler);
-          return;
-        }
-        
         res.write('data: {"type":"ping"}\n\n');
         if ('flush' in res && typeof (res as any).flush === 'function') {
           (res as any).flush();
         }
       } catch (error) {
-        console.error(`[DEPLOYMENT] Error sending ping to session ${sessionId}:`, error);
-        clearInterval(keepAlive);
-        eventEmitter.removeListener('generation-update', updateHandler);
+        console.error('Error sending ping:', error);
       }
-    }, 10000); // Reduced to 10s for more aggressive keep-alive in deployment
+    }, 15000); // Reduced from 30s to 15s for better deployment compatibility
 
     // Listen for updates for this session
     const updateHandler = (update: any) => {
       if (update.sessionId === sessionId) {
         try {
-          // Check if connection is still alive before writing
-          if (res.destroyed || res.writableEnded) {
-            console.log(`[DEPLOYMENT] Connection closed for session ${sessionId}, removing handler`);
-            eventEmitter.removeListener('generation-update', updateHandler);
-            return;
-          }
-          
-          const message = `data: ${JSON.stringify(update)}\n\n`;
-          res.write(message);
-          
+          res.write(`data: ${JSON.stringify(update)}\n\n`);
           if ('flush' in res && typeof (res as any).flush === 'function') {
             (res as any).flush();
           }
         } catch (error) {
-          console.error(`[DEPLOYMENT] Error sending update to session ${sessionId}:`, error);
-          // Remove handler if connection is broken
-          eventEmitter.removeListener('generation-update', updateHandler);
+          console.error('Error sending update:', error);
         }
       }
     };
@@ -298,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Step 1: Extract facts with chunked processing
+      // Step 1: Extract facts
       eventEmitter.emit('generation-update', {
         sessionId,
         type: 'action',
@@ -309,90 +284,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Use chunked extraction with aggressive deployment timeout handling
-      let extractedFacts;
-      const wordCount = transcript.split(/\s+/).length;
-      const isLargeTranscript = wordCount > 2500;
-      const deploymentTimeout = isLargeTranscript ? 180000 : 120000; // 3 min or 2 min
-      
-      console.log(`[DEPLOYMENT] Processing transcript: ${wordCount} words, timeout: ${deploymentTimeout/1000}s`);
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Extracting medical history, support networks, and risk factors',
+        step: 4,
+        totalSteps: 8
+      });
 
-      try {
-        if (isLargeTranscript) {
-          // For large transcripts, use chunked processing with aggressive timeout
-          extractedFacts = await Promise.race([
-            extractFactsFromTranscriptChunked(
-              transcript, 
-              clientName,
-              (current, total, action) => {
-                // Emit progress updates for each chunk
-                try {
-                  eventEmitter.emit('generation-update', {
-                    sessionId,
-                    type: 'action',
-                    action: action,
-                    step: 3 + (current / total), // Gradual progress from step 3 to 4
-                    totalSteps: 8,
-                    chunkProgress: { current, total }
-                  });
-                } catch (emitError) {
-                  console.error('SSE emit error (continuing processing):', emitError);
-                }
-              }
-            ),
-            // Aggressive timeout to prevent upstream timeouts
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Chunked processing timeout - avoiding upstream timeout')), deploymentTimeout)
-            )
-          ]);
-        } else {
-          // For smaller transcripts, use standard processing with timeout
-          eventEmitter.emit('generation-update', {
-            sessionId,
-            type: 'action',
-            action: 'Processing transcript using optimized method for deployment',
-            step: 4,
-            totalSteps: 8
-          });
-          
-          extractedFacts = await Promise.race([
-            extractFactsFromTranscript(transcript, clientName),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Standard processing timeout')), 120000) // 2 minute timeout for deployment
-            )
-          ]);
-        }
-      } catch (processingError) {
-        console.error('Primary processing failed, attempting emergency fallback:', processingError);
-        
-        // Emergency fallback to standard processing (no timeout protection)
-        eventEmitter.emit('generation-update', {
-          sessionId,
-          type: 'action',
-          action: 'Using emergency fallback processing to avoid timeout',
-          step: 4,
-          totalSteps: 8
-        });
-        
-        try {
-          extractedFacts = await extractFactsFromTranscript(transcript, clientName);
-        } catch (fallbackError) {
-          console.error('All AI processing methods failed, using offline fallback:', fallbackError);
-          
-          // Ultimate fallback to offline processing
-          eventEmitter.emit('generation-update', {
-            sessionId,
-            type: 'action',
-            action: 'AI processing unavailable - switching to offline mode',
-            step: 4,
-            totalSteps: 8
-          });
-          
-          // Import offline fallback here to avoid circular imports
-          const { generateOfflineFactsExtraction } = await import('./services/carePlanGenerator');
-          extractedFacts = generateOfflineFactsExtraction(transcript, clientName);
-        }
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -425,30 +327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Generate care plan with deployment timeout protection
-      let generatedHtml;
-      try {
-        generatedHtml = await Promise.race([
-          generateCarePlanHtml(transcript, clientName),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Care plan generation timeout in deployment')), 180000) // 3 minute timeout
-          )
-        ]) as string;
-      } catch (carePlanError) {
-        console.error('AI care plan generation failed, using offline fallback:', carePlanError);
-        
-        eventEmitter.emit('generation-update', {
-          sessionId,
-          type: 'action',
-          action: 'AI care plan generation failed - using offline template',
-          step: 7,
-          totalSteps: 8
-        });
-        
-        // Import offline fallback here
-        const { generateOfflineCarePlan } = await import('./services/carePlanGenerator');
-        generatedHtml = generateOfflineCarePlan(extractedFacts, clientName, "gold-standard");
-      }
+      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
 
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {
