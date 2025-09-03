@@ -5,9 +5,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Chunking configuration
-const CHUNK_SIZE = 2500; // Words per chunk
-const OVERLAP_SIZE = 150; // Words to overlap between chunks for context
+// Chunking configuration - Optimized for deployment
+const CHUNK_SIZE = 1500; // Reduced words per chunk for faster processing
+const OVERLAP_SIZE = 100; // Reduced overlap for faster processing
+const DEPLOYMENT_TIMEOUT = 45000; // 45 seconds per OpenAI request in deployment
 
 // Utility function to split text into words and create chunks
 function splitIntoChunks(text: string): string[] {
@@ -97,11 +98,12 @@ export async function extractFactsFromTranscriptChunked(
   return combineFacts(allFacts);
 }
 
-// Extract facts from a single chunk
+// Extract facts from a single chunk with deployment timeout
 async function extractFactsFromChunk(chunk: string, clientName: string, chunkNumber: number, totalChunks: number) {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: "gpt-5",
       messages: [
         {
           role: "system",
@@ -162,7 +164,12 @@ Focus on information clearly stated in this section. Use null for missing inform
         }
       ],
       response_format: { type: "json_object" },
-    });
+      }),
+      // Deployment timeout for individual chunk processing
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Chunk ${chunkNumber} timeout after ${DEPLOYMENT_TIMEOUT/1000}s`)), DEPLOYMENT_TIMEOUT)
+      )
+    ]) as any;
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
@@ -270,8 +277,9 @@ function combineFacts(factsList: any[]): any {
 
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: "gpt-5",
       messages: [
         {
           role: "system",
@@ -328,8 +336,13 @@ ${transcript}
 Build comprehensive facts from the information discussed, not just isolated details.`
         }
       ],
-      response_format: { type: "json_object" },
-    });
+        response_format: { type: "json_object" },
+      }),
+      // Deployment timeout for standard processing
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Standard facts extraction timeout after ${DEPLOYMENT_TIMEOUT/1000}s`)), DEPLOYMENT_TIMEOUT)
+      )
+    ]) as any;
 
     return JSON.parse(response.choices[0].message.content || "{}");
   } catch (error) {
@@ -339,8 +352,9 @@ Build comprehensive facts from the information discussed, not just isolated deta
 
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: "gpt-5",
       messages: [
         {
           role: "system",
@@ -516,7 +530,12 @@ Examples of properly formatted goals:
 Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame using BOTH SMARTA principles AND specific Salveo service alignment. Only use the fallback sentence for sections where no relevant information was discussed.`
         }
       ],
-    });
+      }),
+      // Deployment timeout for care plan generation (longer timeout as it's more complex)
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error(`Care plan generation timeout after ${DEPLOYMENT_TIMEOUT * 2 / 1000}s`)), DEPLOYMENT_TIMEOUT * 2)
+      )
+    ]) as any;
 
     return response.choices[0].message.content || "";
   } catch (error) {

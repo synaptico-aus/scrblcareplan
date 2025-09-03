@@ -309,47 +309,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Use chunked extraction with progress tracking and deployment fallback
+      // Use chunked extraction with aggressive deployment timeout handling
       let extractedFacts;
+      const wordCount = transcript.split(/\s+/).length;
+      const isLargeTranscript = wordCount > 3000;
+      const deploymentTimeout = isLargeTranscript ? 120000 : 90000; // 2 min or 1.5 min
+      
+      console.log(`[DEPLOYMENT] Processing transcript: ${wordCount} words, timeout: ${deploymentTimeout/1000}s`);
+
       try {
-        extractedFacts = await Promise.race([
-          extractFactsFromTranscriptChunked(
-            transcript, 
-            clientName,
-            (current, total, action) => {
-              // Emit progress updates for each chunk
-              try {
-                eventEmitter.emit('generation-update', {
-                  sessionId,
-                  type: 'action',
-                  action: action,
-                  step: 3 + (current / total), // Gradual progress from step 3 to 4
-                  totalSteps: 8,
-                  chunkProgress: { current, total }
-                });
-              } catch (emitError) {
-                console.error('SSE emit error (continuing processing):', emitError);
+        if (isLargeTranscript) {
+          // For large transcripts, use chunked processing with aggressive timeout
+          extractedFacts = await Promise.race([
+            extractFactsFromTranscriptChunked(
+              transcript, 
+              clientName,
+              (current, total, action) => {
+                // Emit progress updates for each chunk
+                try {
+                  eventEmitter.emit('generation-update', {
+                    sessionId,
+                    type: 'action',
+                    action: action,
+                    step: 3 + (current / total), // Gradual progress from step 3 to 4
+                    totalSteps: 8,
+                    chunkProgress: { current, total }
+                  });
+                } catch (emitError) {
+                  console.error('SSE emit error (continuing processing):', emitError);
+                }
               }
-            }
-          ),
-          // Fallback timeout for deployment environments (10 minutes)
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Chunked processing timeout in deployment')), 600000)
-          )
-        ]);
-      } catch (chunkError) {
-        console.error('Chunked processing failed, falling back to standard processing:', chunkError);
+            ),
+            // Aggressive timeout to prevent upstream timeouts
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Chunked processing timeout - avoiding upstream timeout')), deploymentTimeout)
+            )
+          ]);
+        } else {
+          // For smaller transcripts, use standard processing with timeout
+          eventEmitter.emit('generation-update', {
+            sessionId,
+            type: 'action',
+            action: 'Processing transcript using optimized method for deployment',
+            step: 4,
+            totalSteps: 8
+          });
+          
+          extractedFacts = await Promise.race([
+            extractFactsFromTranscript(transcript, clientName),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Standard processing timeout')), 60000) // 1 minute timeout
+            )
+          ]);
+        }
+      } catch (processingError) {
+        console.error('Primary processing failed, attempting emergency fallback:', processingError);
         
-        // Fallback to standard processing
+        // Emergency fallback to standard processing (no timeout protection)
         eventEmitter.emit('generation-update', {
           sessionId,
           type: 'action',
-          action: 'Chunked processing failed - using standard method for reliability',
+          action: 'Using emergency fallback processing to avoid timeout',
           step: 4,
           totalSteps: 8
         });
         
-        extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+        try {
+          extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+        } catch (fallbackError) {
+          console.error('All processing methods failed:', fallbackError);
+          throw new Error('Processing failed: ' + (fallbackError instanceof Error ? fallbackError.message : 'Unknown error'));
+        }
       }
 
       eventEmitter.emit('generation-update', {
@@ -383,7 +413,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
+      // Generate care plan with deployment timeout protection
+      const generatedHtml = await Promise.race([
+        generateCarePlanHtml(transcript, clientName),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Care plan generation timeout in deployment')), 120000) // 2 minute timeout
+        )
+      ]) as string;
 
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {
