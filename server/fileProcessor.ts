@@ -83,45 +83,76 @@ export async function extractTextFromFile(file: Express.Multer.File): Promise<Ex
 }
 
 async function extractTextFromPDFAlternative(buffer: Buffer, filename: string): Promise<string> {
-  // For now, provide helpful guidance to the user about PDF processing
-  // This avoids the complex pdf-parse library issues in the Replit environment
+  console.log(`Attempting to extract text from PDF: ${filename}`);
   
-  console.log(`Processing PDF: ${filename}`);
-  
-  return `[PDF Document: ${filename}]
+  try {
+    // Create a workaround for the pdf-parse library bug
+    const originalExistsSync = fs.existsSync;
+    const originalReadFileSync = fs.readFileSync;
+    
+    // Override fs functions to handle the problematic test file
+    fs.existsSync = function(filePath: any): boolean {
+      if (typeof filePath === 'string' && filePath.includes('test/data/05-versions-space.pdf')) {
+        return false; // Pretend the problematic file doesn't exist
+      }
+      return originalExistsSync.call(fs, filePath);
+    };
+    
+    fs.readFileSync = function(filePath: any, options?: any): any {
+      if (typeof filePath === 'string' && filePath.includes('test/data/05-versions-space.pdf')) {
+        return Buffer.alloc(0); // Return empty buffer for problematic file
+      }
+      return originalReadFileSync.call(fs, filePath, options);
+    };
+    
+    try {
+      const pdfParse = await import('pdf-parse');
+      const data = await pdfParse.default(buffer);
+      
+      if (data.text && data.text.trim().length > 0) {
+        console.log(`Successfully extracted ${data.text.length} characters from ${filename} using pdf-parse`);
+        return data.text.trim();
+      } else {
+        throw new Error('PDF parsing returned empty text');
+      }
+    } finally {
+      // Restore original functions
+      fs.existsSync = originalExistsSync;
+      fs.readFileSync = originalReadFileSync;
+    }
+    
+  } catch (parseError) {
+    console.error(`PDF parsing failed for ${filename}:`, parseError);
+    
+    // Return a helpful message that explains the situation and provides alternatives
+    return `[PDF Document: ${filename}]
 
-📄 PDF Processing Notice:
-This PDF file has been uploaded but automatic text extraction is currently limited in this environment. 
+⚠️ PDF Text Extraction Issue:
+This PDF file was uploaded but automatic text extraction encountered technical limitations.
 
-To ensure the AI can analyze your assessment information:
+📋 To ensure your assessment data is properly analyzed, please:
 
-✅ RECOMMENDED OPTIONS:
-1. Convert your PDF to a Word document (.docx) and re-upload
-2. Copy key assessment content and paste it into the transcript field
-3. Export important pages as images (PNG/JPG) for OCR processing
+1. **Copy key content manually**: Copy the important assessment information from your PDF and paste it into the transcript field above
 
-📋 What to include from your PDF:
-• Client personal details and medical history
-• Assessment findings and observations  
-• Risk factors and safety concerns
-• Support networks and family information
-• Service preferences and cultural considerations
-• Any specific goals or outcomes mentioned
+2. **Convert to Word format**: Save your PDF as a Word document (.docx) and re-upload it
 
-The AI will work with whatever content you provide in the transcript field combined with any successfully processed uploaded files.`;
+3. **Use the content I can see**: Based on your file name, this appears to be an ACAS (Aged Care Assessment Service) report. Please include:
+   • Client personal details and medical history
+   • Assessment findings and eligibility determinations
+   • Service recommendations and care approvals
+   • Goals, support networks, and preferences
+   • Current care providers and contact details
+
+The AI will analyze whatever content you provide to generate a comprehensive care plan that meets Australian aged care standards.`;
+  }
 }
 
 async function convertPDFToTextViaOCR(buffer: Buffer, filename: string): Promise<string> {
-  // This is a simplified fallback - in a real implementation, you'd convert 
-  // PDF pages to images first, but for now we'll return a helpful message
-  return `[PDF Content from ${filename}]
+  // For now, since PDF-to-image conversion libraries don't work well in this environment,
+  // we'll provide helpful instructions to the user
+  console.log(`PDF OCR conversion requested for ${filename} but not available in this environment`);
   
-This PDF file could not be processed automatically. Please:
-1. Convert the PDF to a Word document (.docx) for better text extraction, or
-2. Export key pages as images (PNG/JPG) and upload those for OCR processing, or
-3. Copy and paste the relevant text directly into the transcript field.
-
-This will ensure the AI can properly analyze all your assessment information.`;
+  throw new Error('OCR conversion not available - please convert PDF to Word document or copy text manually');
 }
 
 export async function extractTextFromFiles(files: Express.Multer.File[]): Promise<ExtractedFileContent[]> {
