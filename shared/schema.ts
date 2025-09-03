@@ -48,21 +48,6 @@ export const clientFolderAliases = pgTable("client_folder_aliases", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const documentAnalyses = pgTable("document_analyses", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  fileName: text("file_name").notNull(),
-  fileType: text("file_type").notNull(),
-  fileSize: text("file_size"),
-  extractedText: text("extracted_text"),
-  analysisResult: jsonb("analysis_result"),
-  analysisSummary: text("analysis_summary"),
-  processingStatus: text("processing_status").notNull().default("pending"), // pending, processing, completed, failed
-  errorMessage: text("error_message"),
-  objectPath: text("object_path"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -126,26 +111,6 @@ export const updateClientFolderAliasSchema = insertClientFolderAliasSchema.pick(
   displayName: true,
 });
 
-export const insertDocumentAnalysisSchema = createInsertSchema(documentAnalyses).pick({
-  fileName: true,
-  fileType: true,
-  fileSize: true,
-  extractedText: true,
-  analysisResult: true,
-  analysisSummary: true,
-  processingStatus: true,
-  errorMessage: true,
-  objectPath: true,
-});
-
-export const updateDocumentAnalysisSchema = insertDocumentAnalysisSchema.pick({
-  extractedText: true,
-  analysisResult: true,
-  analysisSummary: true,
-  processingStatus: true,
-  errorMessage: true,
-});
-
 export const factsSchema = z.object({
   clientDetails: z.object({
     name: z.string(),
@@ -196,8 +161,5 @@ export type InsertClientDocument = z.infer<typeof insertClientDocumentSchema>;
 export type ClientFolderAlias = typeof clientFolderAliases.$inferSelect;
 export type InsertClientFolderAlias = z.infer<typeof insertClientFolderAliasSchema>;
 export type UpdateClientFolderAlias = z.infer<typeof updateClientFolderAliasSchema>;
-export type DocumentAnalysis = typeof documentAnalyses.$inferSelect;
-export type InsertDocumentAnalysis = z.infer<typeof insertDocumentAnalysisSchema>;
-export type UpdateDocumentAnalysis = z.infer<typeof updateDocumentAnalysisSchema>;
 export type ExtractedFacts = z.infer<typeof factsSchema>;
 export type ChatParityRequest = z.infer<typeof chatParityRequestSchema>;

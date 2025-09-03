@@ -2,11 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { EventEmitter } from "events";
 import { storage } from "./storage";
-import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, insertDocumentAnalysisSchema, updateDocumentAnalysisSchema } from "@shared/schema";
+import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
-import { DocumentProcessor } from "./services/documentProcessor";
-import { analyzeDocumentWithAI, generateAnalysisSummary } from "./services/documentAnalysis";
 import { z } from "zod";
 import puppeteer from "puppeteer";
 import { ObjectStorageService } from "./objectStorage";
@@ -714,130 +712,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting client folder alias:", error);
       res.status(500).json({ error: "Failed to delete folder alias" });
-    }
-  });
-
-  // Document Analysis routes
-  app.post("/api/document-analysis", async (req, res) => {
-    try {
-      const validatedData = insertDocumentAnalysisSchema.parse(req.body);
-      const analysis = await storage.createDocumentAnalysis(validatedData);
-      res.status(201).json(analysis);
-    } catch (error) {
-      console.error("Error creating document analysis:", error);
-      res.status(500).json({ error: "Failed to create document analysis" });
-    }
-  });
-
-  app.get("/api/document-analysis/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const analysis = await storage.getDocumentAnalysis(id);
-      
-      if (analysis) {
-        res.json(analysis);
-      } else {
-        res.status(404).json({ error: "Document analysis not found" });
-      }
-    } catch (error) {
-      console.error("Error fetching document analysis:", error);
-      res.status(500).json({ error: "Failed to fetch document analysis" });
-    }
-  });
-
-  app.get("/api/document-analysis", async (req, res) => {
-    try {
-      const analyses = await storage.getAllDocumentAnalyses();
-      res.json(analyses);
-    } catch (error) {
-      console.error("Error fetching document analyses:", error);
-      res.status(500).json({ error: "Failed to fetch document analyses" });
-    }
-  });
-
-  app.put("/api/document-analysis/:id/process", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const analysis = await storage.getDocumentAnalysis(id);
-      
-      if (!analysis) {
-        return res.status(404).json({ error: "Document analysis not found" });
-      }
-
-      // Update status to processing
-      await storage.updateDocumentAnalysis(id, {
-        processingStatus: "processing"
-      });
-
-      const documentProcessor = new DocumentProcessor();
-      const objectStorageService = new ObjectStorageService();
-
-      try {
-        // Download file from object storage
-        const objectFile = await objectStorageService.getObjectEntityFile(analysis.objectPath!);
-        const [fileBuffer] = await objectFile.download();
-
-        // Extract text from document
-        const extractionResult = await documentProcessor.extractTextFromBuffer(
-          fileBuffer,
-          analysis.fileType,
-          analysis.fileName
-        );
-
-        // Analyze document with AI
-        const analysisResult = await analyzeDocumentWithAI(
-          extractionResult.text,
-          analysis.fileName,
-          analysis.fileType
-        );
-
-        // Generate human-readable summary
-        const summary = generateAnalysisSummary(analysisResult);
-
-        // Update document analysis with results
-        const updatedAnalysis = await storage.updateDocumentAnalysis(id, {
-          extractedText: extractionResult.text,
-          analysisResult: analysisResult,
-          analysisSummary: summary,
-          processingStatus: "completed"
-        });
-
-        res.json(updatedAnalysis);
-
-      } catch (processingError) {
-        console.error("Error processing document:", processingError);
-        
-        // Update status to failed
-        await storage.updateDocumentAnalysis(id, {
-          processingStatus: "failed",
-          errorMessage: processingError instanceof Error ? processingError.message : "Unknown processing error"
-        });
-
-        res.status(500).json({ 
-          error: "Failed to process document",
-          details: processingError instanceof Error ? processingError.message : "Unknown error"
-        });
-      }
-
-    } catch (error) {
-      console.error("Error processing document analysis:", error);
-      res.status(500).json({ error: "Failed to process document analysis" });
-    }
-  });
-
-  app.delete("/api/document-analysis/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const success = await storage.deleteDocumentAnalysis(id);
-      
-      if (success) {
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: "Document analysis not found" });
-      }
-    } catch (error) {
-      console.error("Error deleting document analysis:", error);
-      res.status(500).json({ error: "Failed to delete document analysis" });
     }
   });
 
