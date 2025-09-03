@@ -35,7 +35,7 @@ JSON format:
         }
       ],
       response_format: { type: "json_object" },
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
       temperature: 0.1,
     }, {
       signal: controller.signal
@@ -115,7 +115,7 @@ ${processedTranscript}
 Generate complete HTML care plan. Focus on SMARTA goals with specific Salveo services and pricing. Use first-person voice throughout.`
         }
       ],
-      max_tokens: 4000,
+      max_completion_tokens: 4000,
       temperature: 0.2,
     }, {
       signal: controller.signal
