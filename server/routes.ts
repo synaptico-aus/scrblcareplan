@@ -312,8 +312,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use chunked extraction with aggressive deployment timeout handling
       let extractedFacts;
       const wordCount = transcript.split(/\s+/).length;
-      const isLargeTranscript = wordCount > 3000;
-      const deploymentTimeout = isLargeTranscript ? 120000 : 90000; // 2 min or 1.5 min
+      const isLargeTranscript = wordCount > 2500;
+      const deploymentTimeout = isLargeTranscript ? 180000 : 120000; // 3 min or 2 min
       
       console.log(`[DEPLOYMENT] Processing transcript: ${wordCount} words, timeout: ${deploymentTimeout/1000}s`);
 
@@ -358,7 +358,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           extractedFacts = await Promise.race([
             extractFactsFromTranscript(transcript, clientName),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Standard processing timeout')), 60000) // 1 minute timeout
+              setTimeout(() => reject(new Error('Standard processing timeout')), 120000) // 2 minute timeout for deployment
             )
           ]);
         }
@@ -377,8 +377,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           extractedFacts = await extractFactsFromTranscript(transcript, clientName);
         } catch (fallbackError) {
-          console.error('All processing methods failed:', fallbackError);
-          throw new Error('Processing failed: ' + (fallbackError instanceof Error ? fallbackError.message : 'Unknown error'));
+          console.error('All AI processing methods failed, using offline fallback:', fallbackError);
+          
+          // Ultimate fallback to offline processing
+          eventEmitter.emit('generation-update', {
+            sessionId,
+            type: 'action',
+            action: 'AI processing unavailable - switching to offline mode',
+            step: 4,
+            totalSteps: 8
+          });
+          
+          // Import offline fallback here to avoid circular imports
+          const { generateOfflineFactsExtraction } = await import('./services/carePlanGenerator');
+          extractedFacts = generateOfflineFactsExtraction(transcript, clientName);
         }
       }
 
@@ -414,12 +426,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Generate care plan with deployment timeout protection
-      const generatedHtml = await Promise.race([
-        generateCarePlanHtml(transcript, clientName),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Care plan generation timeout in deployment')), 120000) // 2 minute timeout
-        )
-      ]) as string;
+      let generatedHtml;
+      try {
+        generatedHtml = await Promise.race([
+          generateCarePlanHtml(transcript, clientName),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Care plan generation timeout in deployment')), 180000) // 3 minute timeout
+          )
+        ]) as string;
+      } catch (carePlanError) {
+        console.error('AI care plan generation failed, using offline fallback:', carePlanError);
+        
+        eventEmitter.emit('generation-update', {
+          sessionId,
+          type: 'action',
+          action: 'AI care plan generation failed - using offline template',
+          step: 7,
+          totalSteps: 8
+        });
+        
+        // Import offline fallback here
+        const { generateOfflineCarePlan } = await import('./services/carePlanGenerator');
+        generatedHtml = generateOfflineCarePlan(extractedFacts, clientName, "gold-standard");
+      }
 
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {

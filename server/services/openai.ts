@@ -6,9 +6,9 @@ const openai = new OpenAI({
 });
 
 // Chunking configuration - Optimized for deployment
-const CHUNK_SIZE = 1500; // Reduced words per chunk for faster processing
-const OVERLAP_SIZE = 100; // Reduced overlap for faster processing
-const DEPLOYMENT_TIMEOUT = 45000; // 45 seconds per OpenAI request in deployment
+const CHUNK_SIZE = 1200; // Further reduced words per chunk for faster processing
+const OVERLAP_SIZE = 80; // Reduced overlap for faster processing
+const DEPLOYMENT_TIMEOUT = 90000; // 90 seconds per OpenAI request in deployment (more realistic)
 
 // Utility function to split text into words and create chunks
 function splitIntoChunks(text: string): string[] {
