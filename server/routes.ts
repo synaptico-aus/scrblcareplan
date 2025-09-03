@@ -184,6 +184,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
     res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
     
+    // Additional deployment-specific headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    
     // Send initial connection confirmation
     res.write('data: {"type":"connected","sessionId":"' + sessionId + '"}\n\n');
     
@@ -195,25 +199,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Keep connection alive with more frequent pings for deployment
     const keepAlive = setInterval(() => {
       try {
+        // Check connection health before sending ping
+        if (res.destroyed || res.writableEnded) {
+          console.log(`[DEPLOYMENT] Connection closed during ping for session ${sessionId}, clearing interval`);
+          clearInterval(keepAlive);
+          eventEmitter.removeListener('generation-update', updateHandler);
+          return;
+        }
+        
         res.write('data: {"type":"ping"}\n\n');
         if ('flush' in res && typeof (res as any).flush === 'function') {
           (res as any).flush();
         }
       } catch (error) {
-        console.error('Error sending ping:', error);
+        console.error(`[DEPLOYMENT] Error sending ping to session ${sessionId}:`, error);
+        clearInterval(keepAlive);
+        eventEmitter.removeListener('generation-update', updateHandler);
       }
-    }, 15000); // Reduced from 30s to 15s for better deployment compatibility
+    }, 10000); // Reduced to 10s for more aggressive keep-alive in deployment
 
     // Listen for updates for this session
     const updateHandler = (update: any) => {
       if (update.sessionId === sessionId) {
         try {
-          res.write(`data: ${JSON.stringify(update)}\n\n`);
+          // Check if connection is still alive before writing
+          if (res.destroyed || res.writableEnded) {
+            console.log(`[DEPLOYMENT] Connection closed for session ${sessionId}, removing handler`);
+            eventEmitter.removeListener('generation-update', updateHandler);
+            return;
+          }
+          
+          const message = `data: ${JSON.stringify(update)}\n\n`;
+          res.write(message);
+          
           if ('flush' in res && typeof (res as any).flush === 'function') {
             (res as any).flush();
           }
         } catch (error) {
-          console.error('Error sending update:', error);
+          console.error(`[DEPLOYMENT] Error sending update to session ${sessionId}:`, error);
+          // Remove handler if connection is broken
+          eventEmitter.removeListener('generation-update', updateHandler);
         }
       }
     };
@@ -284,22 +309,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Use chunked extraction with progress tracking
-      const extractedFacts = await extractFactsFromTranscriptChunked(
-        transcript, 
-        clientName,
-        (current, total, action) => {
-          // Emit progress updates for each chunk
-          eventEmitter.emit('generation-update', {
-            sessionId,
-            type: 'action',
-            action: action,
-            step: 3 + (current / total), // Gradual progress from step 3 to 4
-            totalSteps: 8,
-            chunkProgress: { current, total }
-          });
-        }
-      );
+      // Use chunked extraction with progress tracking and deployment fallback
+      let extractedFacts;
+      try {
+        extractedFacts = await Promise.race([
+          extractFactsFromTranscriptChunked(
+            transcript, 
+            clientName,
+            (current, total, action) => {
+              // Emit progress updates for each chunk
+              try {
+                eventEmitter.emit('generation-update', {
+                  sessionId,
+                  type: 'action',
+                  action: action,
+                  step: 3 + (current / total), // Gradual progress from step 3 to 4
+                  totalSteps: 8,
+                  chunkProgress: { current, total }
+                });
+              } catch (emitError) {
+                console.error('SSE emit error (continuing processing):', emitError);
+              }
+            }
+          ),
+          // Fallback timeout for deployment environments (10 minutes)
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Chunked processing timeout in deployment')), 600000)
+          )
+        ]);
+      } catch (chunkError) {
+        console.error('Chunked processing failed, falling back to standard processing:', chunkError);
+        
+        // Fallback to standard processing
+        eventEmitter.emit('generation-update', {
+          sessionId,
+          type: 'action',
+          action: 'Chunked processing failed - using standard method for reliability',
+          step: 4,
+          totalSteps: 8
+        });
+        
+        extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+      }
 
       eventEmitter.emit('generation-update', {
         sessionId,

@@ -49,8 +49,10 @@ export async function extractFactsFromTranscriptChunked(
     return await extractFactsFromTranscript(transcript, clientName);
   }
 
+  console.log(`[DEPLOYMENT] Processing ${chunks.length} chunks for transcript of ${transcript.split(' ').length} words`);
+  
   const allFacts: any[] = [];
-  const maxRetries = 2;
+  const maxRetries = 1; // Reduced retries for deployment to prevent timeouts
   
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
@@ -72,12 +74,12 @@ export async function extractFactsFromTranscriptChunked(
         
         if (retryCount <= maxRetries) {
           onProgress?.(chunkNumber, chunks.length, `Section ${chunkNumber} failed, retrying... (attempt ${retryCount})`);
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, retryCount - 1), 5000)));
+          // Shorter wait time for deployment environments
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Fixed 2s wait instead of exponential backoff
         } else {
           // All retries failed, continue with other chunks
           onProgress?.(chunkNumber, chunks.length, `Section ${chunkNumber} failed after ${maxRetries} attempts - continuing with remaining sections`);
-          console.error(`Failed to process chunk ${chunkNumber} after ${maxRetries} retries`);
+          console.error(`[DEPLOYMENT] Failed to process chunk ${chunkNumber} after ${maxRetries} retries`);
         }
       }
     }
@@ -85,10 +87,12 @@ export async function extractFactsFromTranscriptChunked(
 
   // Check if we got any facts at all
   if (allFacts.length === 0) {
+    console.error(`[DEPLOYMENT] No chunks processed successfully out of ${chunks.length} chunks`);
     throw new Error('Failed to extract facts from any transcript sections. Please try again or use offline mode.');
   }
 
   // Combine all facts from chunks
+  console.log(`[DEPLOYMENT] Successfully processed ${allFacts.length} of ${chunks.length} sections`);
   onProgress?.(chunks.length, chunks.length, `Successfully processed ${allFacts.length} of ${chunks.length} sections - combining information`);
   return combineFacts(allFacts);
 }
