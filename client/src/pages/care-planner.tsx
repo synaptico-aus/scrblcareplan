@@ -5,7 +5,6 @@ import { CarePlanForm } from "@/components/CarePlanForm";
 import { FactsPanel } from "@/components/FactsPanel";
 import { CarePlanPreview } from "@/components/CarePlanPreview";
 import { AgentUpdates } from "@/components/AgentUpdates";
-import { SettingsDialog } from "@/components/SettingsDialog";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -27,8 +26,6 @@ export default function CarePlanner() {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [isFetchingNotta, setIsFetchingNotta] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -174,13 +171,12 @@ export default function CarePlanner() {
   });
 
   const generateMutation = useMutation({
-    mutationFn: async ({ clientName, transcript, mode, fundingType, fundingLevel, fileContent }: { 
+    mutationFn: async ({ clientName, transcript, mode, fundingType, fundingLevel }: { 
       clientName: string; 
       transcript: string; 
       mode: "ai" | "offline";
       fundingType?: string;
       fundingLevel?: string;
-      fileContent?: Array<{filename: string; content: string; type: string}>;
     }) => {
       const startTime = Date.now();
       setGenerationStartTime(startTime);
@@ -197,8 +193,7 @@ export default function CarePlanner() {
         template: "gold-standard",
         fundingType: fundingType || undefined,
         fundingLevel: fundingLevel || undefined,
-        sessionId: mode === "ai" ? newSessionId : undefined,
-        fileContent: fileContent || undefined
+        sessionId: mode === "ai" ? newSessionId : undefined
       });
       
       const endTime = Date.now();
@@ -295,59 +290,22 @@ export default function CarePlanner() {
     }
   };
 
-  const handleGenerate = async () => {
-    if (!clientName.trim() || (!transcript.trim() && uploadedFiles.length === 0)) {
+  const handleGenerate = () => {
+    if (!clientName.trim() || !transcript.trim()) {
       toast({
         title: "Missing Information",
-        description: "Please enter client name and either transcript or upload files",
+        description: "Please enter both client name and transcript",
         variant: "destructive",
       });
       return;
     }
 
-    // Extract text from uploaded files if any
-    let fileContent: Array<{filename: string; content: string; type: string}> = [];
-    
-    if (uploadedFiles.length > 0) {
-      try {
-        const formData = new FormData();
-        uploadedFiles.forEach(file => {
-          formData.append('files', file);
-        });
-
-        const response = await fetch('/api/upload-files', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to process uploaded files');
-        }
-
-        const result = await response.json();
-        fileContent = result.extractedContent;
-        
-        toast({
-          title: "Files Processed",
-          description: `Successfully processed ${fileContent.length} file(s)`,
-        });
-      } catch (error) {
-        toast({
-          title: "File Processing Error",
-          description: "Failed to process uploaded files. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
     generateMutation.mutate({
       clientName: clientName.trim(),
-      transcript: transcript.trim() || " ", // Provide default if empty but files uploaded
+      transcript: transcript.trim(),
       mode: processingMode,
       fundingType: fundingType || undefined,
-      fundingLevel: fundingLevel || undefined,
-      fileContent
+      fundingLevel: fundingLevel || undefined
     });
   };
 
@@ -409,13 +367,7 @@ export default function CarePlanner() {
                 <span className="hidden sm:inline">Saved Plans</span>
               </Button>
             </Link>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              data-testid="button-settings" 
-              className="text-xs sm:text-sm"
-              onClick={() => setIsSettingsOpen(true)}
-            >
+            <Button variant="outline" size="sm" data-testid="button-settings" className="text-xs sm:text-sm">
               <Settings className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Settings</span>
             </Button>
@@ -438,8 +390,6 @@ export default function CarePlanner() {
           setFundingType={setFundingType}
           fundingLevel={fundingLevel}
           setFundingLevel={setFundingLevel}
-          uploadedFiles={uploadedFiles}
-          setUploadedFiles={setUploadedFiles}
           onGenerate={handleGenerate}
           onFetchFromNotta={handleFetchFromNotta}
           isLoading={generateMutation.isPending}
@@ -450,7 +400,7 @@ export default function CarePlanner() {
         {generateMutation.isPending && processingMode === "ai" && (
           <div className="w-full lg:w-80 p-4 border-r border-border bg-card/50 lg:min-h-0 lg:max-h-full lg:overflow-y-auto">
             <AgentUpdates
-              sessionId={sessionId || undefined}
+              sessionId={sessionId}
               isGenerating={generateMutation.isPending}
               onComplete={handleAgentCompletion}
             />
@@ -476,12 +426,6 @@ export default function CarePlanner() {
           onPrint={handlePrint}
         />
       </div>
-
-      {/* Settings Dialog */}
-      <SettingsDialog 
-        open={isSettingsOpen} 
-        onOpenChange={setIsSettingsOpen} 
-      />
     </div>
   );
 }

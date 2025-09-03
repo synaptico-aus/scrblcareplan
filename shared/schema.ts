@@ -141,13 +141,6 @@ export const factsSchema = z.object({
   }).optional(),
 });
 
-// Schema for extracted file content
-export const extractedFileContentSchema = z.object({
-  filename: z.string(),
-  content: z.string(),
-  type: z.string(),
-});
-
 export const chatParityRequestSchema = z.object({
   clientName: z.string().min(1, "Client name is required"),
   transcript: z.string().min(1, "Transcript is required"),
@@ -155,13 +148,11 @@ export const chatParityRequestSchema = z.object({
   fundingType: z.enum(["hcp", "sah"]).optional(),
   fundingLevel: z.enum(["level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "restorative", "endoflife"]).optional(),
   sessionId: z.string().optional(),
-  fileContent: z.array(extractedFileContentSchema).optional(),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type CareAnalysis = typeof careAnalyses.$inferSelect;
-export type ExtractedFileContent = z.infer<typeof extractedFileContentSchema>;
 export type InsertCareAnalysis = z.infer<typeof insertCareAnalysisSchema>;
 export type SavedCarePlan = typeof savedCarePlans.$inferSelect;
 export type InsertSavedCarePlan = z.infer<typeof insertSavedCarePlanSchema>;
