@@ -8,6 +8,7 @@ import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./servi
 import { z } from "zod";
 import puppeteer from "puppeteer";
 import { ObjectStorageService } from "./objectStorage";
+import { upload, extractTextFromFiles, ExtractedFileContent } from "./fileProcessor";
 
 // Event emitter for real-time updates
 const eventEmitter = new EventEmitter();
@@ -129,11 +130,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   });
+
+  // File upload endpoint for supporting documents
+  app.post("/api/upload-files", upload.array('files', 5), async (req, res) => {
+    try {
+      if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+        return res.status(400).json({ 
+          message: "No files uploaded" 
+        });
+      }
+
+      console.log(`Processing ${req.files.length} uploaded files`);
+      
+      // Extract text from all uploaded files
+      const extractedContent = await extractTextFromFiles(req.files);
+      
+      console.log(`Successfully processed ${extractedContent.length} files`);
+      
+      res.json({
+        files: extractedContent.map(content => ({
+          filename: content.filename,
+          type: content.type,
+          contentLength: content.content.length,
+          preview: content.content.substring(0, 200) + (content.content.length > 200 ? '...' : '')
+        })),
+        extractedContent
+      });
+
+    } catch (error) {
+      console.error("Error processing uploaded files:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to process uploaded files" 
+      });
+    }
+  });
   
   app.post("/api/chat-parity", async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
-      const { clientName, transcript, template } = validatedData;
+      const { clientName, transcript, template, fileContent } = validatedData;
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -141,10 +176,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Generate care plan using AI
+      // Combine transcript and file content for analysis
+      let combinedContent = transcript;
+      if (fileContent && fileContent.length > 0) {
+        const fileTexts = fileContent.map((file: ExtractedFileContent) => 
+          `\n\n--- Document: ${file.filename} ---\n${file.content}`
+        ).join('\n');
+        combinedContent += fileTexts;
+      }
+
+      // Generate care plan using AI with combined content
       const [extractedFacts, generatedHtml] = await Promise.all([
-        extractFactsFromTranscript(transcript, clientName),
-        generateCarePlanHtml(transcript, clientName)
+        extractFactsFromTranscript(combinedContent, clientName),
+        generateCarePlanHtml(combinedContent, clientName)
       ]);
 
       // Store the analysis
@@ -238,7 +282,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/chat-parity-stream", async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
-      const { clientName, transcript, template, sessionId } = validatedData;
+      const { clientName, transcript, template, sessionId, fileContent } = validatedData;
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -294,7 +338,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+      // Combine transcript and file content for analysis
+      let combinedContent = transcript;
+      if (fileContent && fileContent.length > 0) {
+        const fileTexts = fileContent.map(file => 
+          `\n\n--- Document: ${file.filename} ---\n${file.content}`
+        ).join('\n');
+        combinedContent += fileTexts;
+      }
+
+      const extractedFacts = await extractFactsFromTranscript(combinedContent, clientName);
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -327,7 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
+      const generatedHtml = await generateCarePlanHtml(combinedContent, clientName);
 
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {

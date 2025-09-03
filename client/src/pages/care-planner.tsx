@@ -28,6 +28,7 @@ export default function CarePlanner() {
   const [isFetchingNotta, setIsFetchingNotta] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -173,12 +174,13 @@ export default function CarePlanner() {
   });
 
   const generateMutation = useMutation({
-    mutationFn: async ({ clientName, transcript, mode, fundingType, fundingLevel }: { 
+    mutationFn: async ({ clientName, transcript, mode, fundingType, fundingLevel, fileContent }: { 
       clientName: string; 
       transcript: string; 
       mode: "ai" | "offline";
       fundingType?: string;
       fundingLevel?: string;
+      fileContent?: Array<{filename: string; content: string; type: string}>;
     }) => {
       const startTime = Date.now();
       setGenerationStartTime(startTime);
@@ -195,7 +197,8 @@ export default function CarePlanner() {
         template: "gold-standard",
         fundingType: fundingType || undefined,
         fundingLevel: fundingLevel || undefined,
-        sessionId: mode === "ai" ? newSessionId : undefined
+        sessionId: mode === "ai" ? newSessionId : undefined,
+        fileContent: fileContent || undefined
       });
       
       const endTime = Date.now();
@@ -292,22 +295,59 @@ export default function CarePlanner() {
     }
   };
 
-  const handleGenerate = () => {
-    if (!clientName.trim() || !transcript.trim()) {
+  const handleGenerate = async () => {
+    if (!clientName.trim() || (!transcript.trim() && uploadedFiles.length === 0)) {
       toast({
         title: "Missing Information",
-        description: "Please enter both client name and transcript",
+        description: "Please enter client name and either transcript or upload files",
         variant: "destructive",
       });
       return;
     }
 
+    // Extract text from uploaded files if any
+    let fileContent: Array<{filename: string; content: string; type: string}> = [];
+    
+    if (uploadedFiles.length > 0) {
+      try {
+        const formData = new FormData();
+        uploadedFiles.forEach(file => {
+          formData.append('files', file);
+        });
+
+        const response = await fetch('/api/upload-files', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to process uploaded files');
+        }
+
+        const result = await response.json();
+        fileContent = result.extractedContent;
+        
+        toast({
+          title: "Files Processed",
+          description: `Successfully processed ${fileContent.length} file(s)`,
+        });
+      } catch (error) {
+        toast({
+          title: "File Processing Error",
+          description: "Failed to process uploaded files. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     generateMutation.mutate({
       clientName: clientName.trim(),
-      transcript: transcript.trim(),
+      transcript: transcript.trim() || " ", // Provide default if empty but files uploaded
       mode: processingMode,
       fundingType: fundingType || undefined,
-      fundingLevel: fundingLevel || undefined
+      fundingLevel: fundingLevel || undefined,
+      fileContent
     });
   };
 
@@ -398,6 +438,8 @@ export default function CarePlanner() {
           setFundingType={setFundingType}
           fundingLevel={fundingLevel}
           setFundingLevel={setFundingLevel}
+          uploadedFiles={uploadedFiles}
+          setUploadedFiles={setUploadedFiles}
           onGenerate={handleGenerate}
           onFetchFromNotta={handleFetchFromNotta}
           isLoading={generateMutation.isPending}
@@ -408,7 +450,7 @@ export default function CarePlanner() {
         {generateMutation.isPending && processingMode === "ai" && (
           <div className="w-full lg:w-80 p-4 border-r border-border bg-card/50 lg:min-h-0 lg:max-h-full lg:overflow-y-auto">
             <AgentUpdates
-              sessionId={sessionId}
+              sessionId={sessionId || undefined}
               isGenerating={generateMutation.isPending}
               onComplete={handleAgentCompletion}
             />

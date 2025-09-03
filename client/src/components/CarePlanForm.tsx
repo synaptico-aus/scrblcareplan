@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Settings, Link2, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, Settings, Link2, ChevronDown, ChevronUp, FileText, X, File } from "lucide-react";
 import { fundingLevels } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -21,6 +21,8 @@ interface CarePlanFormProps {
   setFundingType: (type: "hcp" | "sah" | "") => void;
   fundingLevel: "level1" | "level2" | "level3" | "level4" | "level5" | "level6" | "level7" | "level8" | "restorative" | "endoflife" | "";
   setFundingLevel: (level: "level1" | "level2" | "level3" | "level4" | "level5" | "level6" | "level7" | "level8" | "restorative" | "endoflife" | "") => void;
+  uploadedFiles: File[];
+  setUploadedFiles: (files: File[]) => void;
   onGenerate: () => void;
   onFetchFromNotta: () => void;
   isLoading: boolean;
@@ -40,12 +42,50 @@ export function CarePlanForm({
   setFundingType,
   fundingLevel,
   setFundingLevel,
+  uploadedFiles,
+  setUploadedFiles,
   onGenerate,
   onFetchFromNotta,
   isLoading,
   isFetchingNotta
 }: CarePlanFormProps) {
   const [isNottaOpen, setIsNottaOpen] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleFileUpload = (files: FileList | null) => {
+    if (!files) return;
+    
+    const newFiles = Array.from(files).filter(file => {
+      const isValidType = file.type === 'application/pdf' || 
+                         file.type === 'application/msword' ||
+                         file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                         file.type.startsWith('image/');
+      const isValidSize = file.size <= 10 * 1024 * 1024; // 10MB limit
+      return isValidType && isValidSize;
+    });
+    
+    setUploadedFiles([...uploadedFiles, ...newFiles]);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    handleFileUpload(e.dataTransfer.files);
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(uploadedFiles.filter((_, i) => i !== index));
+  };
   
   return (
     <div className="w-full lg:w-1/3 bg-card lg:border-r border-border flex flex-col lg:min-h-0">
@@ -142,6 +182,75 @@ export function CarePlanForm({
         </div>
       </div>
 
+      {/* Supporting Documents */}
+      <div className="p-4 sm:p-6 border-b border-border">
+        <h2 className="text-lg font-semibold mb-4 flex items-center">
+          <div className="bg-primary text-primary-foreground p-1.5 rounded-lg mr-3">
+            <FileText className="w-5 h-5" />
+          </div>
+          Supporting Documents
+        </h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Upload additional documents to supplement the transcript analysis (PDFs, Word docs, images)
+        </p>
+        
+        {/* File Upload Area */}
+        <div
+          className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            isDragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <input
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,image/*"
+            onChange={(e) => handleFileUpload(e.target.files)}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            data-testid="file-upload-input"
+          />
+          <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium">Click to upload</span> or drag and drop
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            PDF, Word documents, or images (up to 10MB each)
+          </p>
+        </div>
+
+        {/* Uploaded Files List */}
+        {uploadedFiles.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm font-medium">Uploaded files:</p>
+            {uploadedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between p-2 bg-muted rounded-lg"
+              >
+                <div className="flex items-center space-x-2">
+                  <File className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm truncate">{file.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({(file.size / 1024 / 1024).toFixed(1)} MB)
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeFile(index)}
+                  className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                  data-testid={`remove-file-${index}`}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Transcript Input */}
       <div className="flex-1 p-4 sm:p-6 flex flex-col">
         <div className="mb-4">
@@ -230,7 +339,7 @@ I can't find out. I think the words are in the end...`}
             data-testid="button-generate-care-plan"
             className="flex-1"
             onClick={onGenerate}
-            disabled={isLoading || isFetchingNotta || !clientName.trim() || !transcript.trim()}
+            disabled={isLoading || isFetchingNotta || !clientName.trim() || (!transcript.trim() && uploadedFiles.length === 0)}
             size="lg"
           >
             {isLoading ? (
@@ -246,14 +355,6 @@ I can't find out. I think the words are in the end...`}
                 Generate Care Plan
               </>
             )}
-          </Button>
-          <Button
-            data-testid="button-upload-file"
-            variant="outline"
-            size="icon"
-            className="px-4"
-          >
-            <Upload className="h-4 w-4" />
           </Button>
         </div>
       </div>
