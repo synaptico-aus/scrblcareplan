@@ -58,15 +58,17 @@ export function FactsPanel({ facts, isProcessing, isCollapsed, onToggleCollapse 
           </div>
         )}
 
-        {facts && (
+        {facts && facts.clientDetails && (
           <>
             {/* Client Details */}
             <div className="space-y-2">
               <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Client Details</h3>
-              <div className="fact-item p-2 rounded border border-border bg-card" data-testid="fact-client-name">
-                <div className="text-xs text-muted-foreground">Name</div>
-                <div className="font-medium">{facts.clientDetails.name}</div>
-              </div>
+              {facts.clientDetails.name && (
+                <div className="fact-item p-2 rounded border border-border bg-card" data-testid="fact-client-name">
+                  <div className="text-xs text-muted-foreground">Name</div>
+                  <div className="font-medium">{facts.clientDetails.name}</div>
+                </div>
+              )}
               {facts.clientDetails.language && (
                 <div className="fact-item p-2 rounded border border-border bg-card" data-testid="fact-language">
                   <div className="text-xs text-muted-foreground">Language</div>
@@ -82,7 +84,7 @@ export function FactsPanel({ facts, isProcessing, isCollapsed, onToggleCollapse 
             </div>
 
             {/* Medical Information */}
-            {(facts.medical.gp || facts.medical.equipment?.length || facts.medical.pharmacy) && (
+            {facts.medical && (facts.medical.gp || facts.medical.equipment?.length || facts.medical.pharmacy) && (
               <div className="space-y-2">
                 <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Medical</h3>
                 {facts.medical.gp && (
@@ -107,7 +109,7 @@ export function FactsPanel({ facts, isProcessing, isCollapsed, onToggleCollapse 
             )}
 
             {/* Support Network */}
-            {(facts.support.primaryContact || facts.support.secondaryContact) && (
+            {facts.support && (facts.support.primaryContact || facts.support.secondaryContact) && (
               <div className="space-y-2">
                 <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Support</h3>
                 {facts.support.primaryContact && (
@@ -140,11 +142,19 @@ export function FactsPanel({ facts, isProcessing, isCollapsed, onToggleCollapse 
           </>
         )}
 
-        {!facts && !isProcessing && (
+        {(!facts || (facts && !facts.clientDetails)) && !isProcessing && (
           <div className="text-center text-muted-foreground py-8">
             <Search className="h-12 w-12 mx-auto mb-3 opacity-30" />
             <p className="text-sm">No facts extracted yet.</p>
             <p className="text-xs mt-1">Generate a care plan to see extracted facts.</p>
+          </div>
+        )}
+
+        {facts && !facts.clientDetails && !isProcessing && (
+          <div className="text-center text-muted-foreground py-8">
+            <Search className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">Processing completed but no facts were extracted.</p>
+            <p className="text-xs mt-1">Try uploading a different document or enter transcript manually.</p>
           </div>
         )}
       </div>

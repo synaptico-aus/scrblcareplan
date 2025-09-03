@@ -41,7 +41,24 @@ JSON format:
     });
 
     clearTimeout(timeoutId);
-    return JSON.parse(response.choices[0].message.content || "{}");
+    const responseContent = response.choices[0].message.content || "{}";
+    console.log(`AI Fact Extraction Response (${responseContent.length} chars):`, responseContent.substring(0, 500));
+    
+    const parsedFacts = JSON.parse(responseContent);
+    
+    // If empty response, provide minimal structure
+    if (!parsedFacts || Object.keys(parsedFacts).length === 0) {
+      console.log("Empty facts response, providing fallback structure");
+      return {
+        clientDetails: { name: clientName },
+        medical: {},
+        support: {},
+        risks: [],
+        preferences: {}
+      };
+    }
+    
+    return parsedFacts;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
@@ -120,7 +137,18 @@ Generate complete HTML care plan. Focus on SMARTA goals with specific Salveo ser
     });
 
     clearTimeout(timeoutId);
-    return response.choices[0].message.content || "";
+    const responseContent = response.choices[0].message.content || "";
+    console.log(`AI Care Plan Response (${responseContent.length} chars):`, responseContent.substring(0, 300));
+    
+    // If empty response, provide fallback
+    if (!responseContent || responseContent.trim().length === 0) {
+      console.log("Empty care plan response, providing fallback");
+      return `<h1>Care Plan</h1>
+      <p>Care plan generation encountered an issue. Please try again with your assessment content.</p>
+      <p>If this persists, try with a shorter transcript or contact support.</p>`;
+    }
+    
+    return responseContent;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
