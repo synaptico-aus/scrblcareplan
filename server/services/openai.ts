@@ -36,7 +36,6 @@ JSON format:
       ],
       response_format: { type: "json_object" },
       max_completion_tokens: 1500,
-      temperature: 0.1,
     }, {
       signal: controller.signal
     });
@@ -116,7 +115,6 @@ Generate complete HTML care plan. Focus on SMARTA goals with specific Salveo ser
         }
       ],
       max_completion_tokens: 4000,
-      temperature: 0.2,
     }, {
       signal: controller.signal
     });
