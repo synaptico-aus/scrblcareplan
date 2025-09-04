@@ -115,7 +115,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      console.log(`Successfully extracted transcript: ${transcript.length} characters`);
       res.json({ transcript });
       
     } catch (error) {
