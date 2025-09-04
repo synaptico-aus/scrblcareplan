@@ -25,56 +25,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`Attempting to extract transcript from Notta.AI URL: ${url}`);
       
-      // Launch headless browser with additional Chrome args for server environments
-      browser = await puppeteer.launch({
-        headless: true,
-        timeout: 60000, // 60 second launch timeout
-        protocolTimeout: 120000, // 2 minute protocol timeout for deployment
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-gpu',
-          '--disable-extensions',
-          '--disable-default-apps',
-          '--disable-sync',
-          '--disable-translate',
-          '--hide-scrollbars',
-          '--metrics-recording-only',
-          '--mute-audio',
-          '--no-default-browser-check',
-          '--no-sandbox',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--disable-features=TranslateUI',
-          '--disable-web-security',
-          '--disable-features=VizDisplayCompositor'
-        ],
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium-browser'
-      });
+      // First try simple HTTP fetch for better deployment compatibility
+      let transcript = null;
       
-      const page = await browser.newPage();
+      try {
+        console.log('Trying simple HTTP fetch first...');
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          },
+          signal: AbortSignal.timeout(30000) // 30 second timeout
+        });
+        
+        if (response.ok) {
+          const html = await response.text();
+          // Try to extract transcript from the HTML content
+          const simpleTranscriptMatch = html.match(/<[^>]*transcript[^>]*>([^<]+)<\/[^>]*>/i) ||
+                                       html.match(/transcript[^<>{]*[:\-\s]+([^<>{]{100,})/i) ||
+                                       html.match(/"transcript"[^"]*"([^"]{100,})"/i);
+          
+          if (simpleTranscriptMatch && simpleTranscriptMatch[1]) {
+            transcript = simpleTranscriptMatch[1].trim();
+            console.log('Successfully extracted transcript via HTTP fetch');
+          }
+        }
+      } catch (fetchError) {
+        console.log('HTTP fetch failed, falling back to Puppeteer:', (fetchError as Error).message);
+      }
       
-      // Set longer timeouts for deployment environment
-      page.setDefaultTimeout(60000); // 60 second timeout for all operations
-      page.setDefaultNavigationTimeout(60000); // 60 second navigation timeout
-      
-      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-      
-      // Navigate to the page with increased timeout
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-      
-      // Wait for content to load and try multiple selectors
-      await page.waitForFunction(() => document.readyState === 'complete');
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // Try to extract transcript using various selectors
-      const transcript = await page.evaluate(() => {
+      // If simple fetch didn't work, use Puppeteer as fallback
+      if (!transcript) {
+        console.log('Using Puppeteer fallback...');
+        
+        // Launch headless browser with deployment-optimized settings
+        browser = await puppeteer.launch({
+          headless: true,
+          timeout: 30000, // Reduced timeout
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu',
+            '--disable-extensions',
+            '--disable-default-apps',
+            '--disable-sync',
+            '--disable-translate',
+            '--hide-scrollbars',
+            '--metrics-recording-only',
+            '--mute-audio',
+            '--no-default-browser-check',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-features=TranslateUI',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor'
+          ]
+          // Remove executablePath to let Puppeteer auto-detect in deployment
+        });
+        
+        const page = await browser.newPage();
+        
+        // Set timeouts
+        page.setDefaultTimeout(30000);
+        page.setDefaultNavigationTimeout(30000);
+        
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        
+        // Navigate to the page
+        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        
+        // Wait for content to load
+        await page.waitForFunction(() => document.readyState === 'complete', { timeout: 10000 }).catch(() => {});
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Try to extract transcript using various selectors
+        transcript = await page.evaluate(() => {
         // Try multiple possible selectors for transcript content
         const selectors = [
           '[data-testid*="transcript"]',
@@ -116,7 +146,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         return null;
-      });
+        });
+      }
       
       if (!transcript) {
         return res.status(400).json({ 
