@@ -6,7 +6,6 @@ import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumen
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
-import puppeteer from "puppeteer";
 import { ObjectStorageService } from "./objectStorage";
 
 // Event emitter for real-time updates
@@ -19,7 +18,6 @@ const nottaUrlSchema = z.object({
 export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/fetch-notta", async (req, res) => {
-    let browser;
     try {
       const { url } = nottaUrlSchema.parse(req.body);
       
@@ -29,129 +27,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let transcript = null;
       
       try {
-        console.log('Trying simple HTTP fetch first...');
+        console.log('Trying enhanced HTTP fetch first...');
         const response = await fetch(url, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1'
           },
           signal: AbortSignal.timeout(30000) // 30 second timeout
         });
         
         if (response.ok) {
           const html = await response.text();
-          // Try to extract transcript from the HTML content
-          const simpleTranscriptMatch = html.match(/<[^>]*transcript[^>]*>([^<]+)<\/[^>]*>/i) ||
-                                       html.match(/transcript[^<>{]*[:\-\s]+([^<>{]{100,})/i) ||
-                                       html.match(/"transcript"[^"]*"([^"]{100,})"/i);
+          console.log(`Fetched HTML content: ${html.length} characters`);
           
-          if (simpleTranscriptMatch && simpleTranscriptMatch[1]) {
-            transcript = simpleTranscriptMatch[1].trim();
-            console.log('Successfully extracted transcript via HTTP fetch');
+          // Enhanced transcript extraction patterns
+          const patterns = [
+            // Look for JSON data containing transcript
+            /"transcript"\s*:\s*"([^"]{100,})"/i,
+            /"content"\s*:\s*"([^"]{100,})"/i,
+            // Look for data attributes
+            /data-transcript="([^"]{100,})"/i,
+            // Look for content in script tags
+            /"text"\s*:\s*"([^"]{100,})"/i,
+            // Look for plain text patterns
+            /transcript[^<>{]*[:\-\s]+([^<>{]{100,})/i,
+            // Look for meeting content
+            /meeting[^<>{]*[:\-\s]+([^<>{]{100,})/i,
+            // Look for dialogue patterns
+            /\b[A-Z][a-z]+\s*:\s*([^<>{]{50,})/,
+            // Look for time-stamped content
+            /\d{1,2}:\d{2}[^<>]*([^<>{]{50,})/
+          ];
+          
+          for (const pattern of patterns) {
+            const match = html.match(pattern);
+            if (match && match[1] && match[1].trim().length > 100) {
+              transcript = match[1].trim()
+                .replace(/\\n/g, '\n')
+                .replace(/\\t/g, '\t')
+                .replace(/\\"/g, '"')
+                .replace(/\\\//g, '/')
+                .substring(0, 10000); // Limit length
+              console.log('Successfully extracted transcript via enhanced HTTP fetch');
+              break;
+            }
           }
-        }
-      } catch (fetchError) {
-        console.log('HTTP fetch failed, falling back to Puppeteer:', (fetchError as Error).message);
-      }
-      
-      // If simple fetch didn't work, use Puppeteer as fallback
-      if (!transcript) {
-        console.log('Using Puppeteer fallback...');
-        
-        // Launch headless browser with deployment-optimized settings
-        browser = await puppeteer.launch({
-          headless: true,
-          timeout: 30000, // Reduced timeout
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu',
-            '--disable-extensions',
-            '--disable-default-apps',
-            '--disable-sync',
-            '--disable-translate',
-            '--hide-scrollbars',
-            '--metrics-recording-only',
-            '--mute-audio',
-            '--no-default-browser-check',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding',
-            '--disable-features=TranslateUI',
-            '--disable-web-security',
-            '--disable-features=VizDisplayCompositor'
-          ]
-          // Remove executablePath to let Puppeteer auto-detect in deployment
-        });
-        
-        const page = await browser.newPage();
-        
-        // Set timeouts
-        page.setDefaultTimeout(30000);
-        page.setDefaultNavigationTimeout(30000);
-        
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
-        // Navigate to the page
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        
-        // Wait for content to load
-        await page.waitForFunction(() => document.readyState === 'complete', { timeout: 10000 }).catch(() => {});
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // Try to extract transcript using various selectors
-        transcript = await page.evaluate(() => {
-        // Try multiple possible selectors for transcript content
-        const selectors = [
-          '[data-testid*="transcript"]',
-          '.transcript-content',
-          '.transcript-text',
-          '[class*="transcript"]',
-          'pre',
-          '.content-text',
-          '[data-transcript]',
-          '.meeting-transcript',
-          'div[contenteditable="true"]'
-        ];
-        
-        for (const selector of selectors) {
-          const element = document.querySelector(selector);
-          if (element && element.textContent && element.textContent.trim().length > 50) {
-            return element.textContent.trim();
-          }
-        }
-        
-        // Try to find any text content that looks like a transcript
-        const allText = document.body.innerText;
-        const lines = allText.split('\n').filter(line => line.trim().length > 10);
-        
-        // Look for patterns that suggest transcript content
-        for (let i = 0; i < lines.length - 5; i++) {
-          const section = lines.slice(i, i + 5).join('\n');
-          // Check if this looks like transcript content
-          if (section.match(/\d{1,2}:\d{2}/) || 
-              section.match(/Speaker \d+/i) ||
-              section.match(/Unknown speaker/i) ||
-              (section.length > 200 && section.split(' ').length > 30)) {
-            // Found potential transcript, get more context
-            const fullTranscript = lines.slice(i, Math.min(i + 100, lines.length)).join('\n');
-            if (fullTranscript.length > 100) {
-              return fullTranscript.trim();
+          
+          // If no direct match, try extracting from visible text
+          if (!transcript) {
+            const textMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+            if (textMatch) {
+              const bodyContent = textMatch[1]
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+              
+              if (bodyContent.length > 200) {
+                transcript = bodyContent.substring(0, 5000);
+                console.log('Extracted text content from body');
+              }
             }
           }
         }
-        
-        return null;
-        });
+      } catch (fetchError) {
+        console.log('HTTP fetch failed:', (fetchError as Error).message);
+      }
+      
+      // If HTTP fetch didn't work, provide helpful guidance
+      if (!transcript) {
+        console.log('HTTP fetch could not extract transcript content');
       }
       
       if (!transcript) {
         return res.status(400).json({ 
-          message: "Could not extract transcript content from Notta.AI page. The page may still be loading or the share link may not contain transcript text." 
+          message: "Could not automatically extract transcript from Notta.AI link. Please copy the transcript text directly from the Notta.AI page and paste it into the transcript field manually." 
         });
       }
       
@@ -162,10 +117,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         message: error instanceof Error ? error.message : "Failed to extract transcript from Notta.AI" 
       });
-    } finally {
-      if (browser) {
-        await browser.close();
-      }
     }
   });
   
