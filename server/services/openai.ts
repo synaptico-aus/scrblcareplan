@@ -3,11 +3,11 @@ import OpenAI from "openai";
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 45000  // 45 second timeout - deployment environments often have shorter limits
+  timeout: 30000  // 30 second timeout - deployment environments have strict limits
 });
 
 // Helper function to chunk transcript for large texts
-function chunkTranscript(transcript: string, maxChunkSize: number = 15000): string[] {
+function chunkTranscript(transcript: string, maxChunkSize: number = 8000): string[] {
   if (transcript.length <= maxChunkSize) {
     return [transcript];
   }
@@ -104,7 +104,9 @@ function mergeFacts(factsArray: any[]): any {
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
   try {
     // Check if transcript is too long and needs chunking
-    const chunks = chunkTranscript(transcript, 15000);
+    console.log(`Transcript length: ${transcript.length} characters for ${clientName}`);
+    const chunks = chunkTranscript(transcript, 8000);
+    console.log(`Created ${chunks.length} chunks for processing`);
     
     if (chunks.length > 1) {
       console.log(`Processing transcript in ${chunks.length} chunks for ${clientName}`);

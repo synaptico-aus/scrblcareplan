@@ -286,7 +286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Step 1: Extract facts
       // Check transcript length and emit appropriate message
       const transcriptLength = transcript.length;
-      const action = transcriptLength > 15000 
+      const action = transcriptLength > 8000 
         ? `Analyzing long transcript (${Math.round(transcriptLength/1000)}k chars) in chunks for accuracy`
         : 'Analyzing transcript for key client information';
         
@@ -317,7 +317,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const extractedFacts = await Promise.race([
         extractFactsFromTranscript(transcript, clientName),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Fact extraction timeout - transcript too long")), 45000)
+          setTimeout(() => reject(new Error("Fact extraction timeout - transcript too long")), 35000)
         )
       ]) as any;
 
@@ -361,7 +361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const generatedHtml = await Promise.race([
         generateCarePlanHtml(transcript, clientName),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Care plan generation timeout - transcript too long")), 45000)
+          setTimeout(() => reject(new Error("Care plan generation timeout - transcript too long")), 35000)
         )
       ]) as string;
 
