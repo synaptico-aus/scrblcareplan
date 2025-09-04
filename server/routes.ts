@@ -62,7 +62,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Wait for content to load and try multiple selectors
       await page.waitForFunction(() => document.readyState === 'complete');
-      if (process.env.NODE_ENV === 'development') {
+      const isLocalDev = !process.env.REPLIT_DOMAINS && !process.env.REPL_ID;
+      if (isLocalDev) {
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
       
@@ -254,6 +255,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Skip delays in production/deployment - only add in local dev
+      const isLocalDev = !process.env.REPLIT_DOMAINS && !process.env.REPL_ID;
+
       // Send initial update with proper delays for visibility
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -263,8 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      // Only add delays in development for better UX - prevents 504 timeouts in production
-      if (process.env.NODE_ENV === 'development') {
+      if (isLocalDev) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
@@ -276,7 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (process.env.NODE_ENV === 'development') {
+      if (isLocalDev) {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
@@ -289,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (process.env.NODE_ENV === 'development') {
+      if (isLocalDev) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
@@ -301,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (process.env.NODE_ENV === 'development') {
+      if (isLocalDev) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
@@ -315,7 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (process.env.NODE_ENV === 'development') {
+      if (isLocalDev) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
@@ -328,7 +331,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (process.env.NODE_ENV === 'development') {
+      if (isLocalDev) {
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
@@ -340,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (process.env.NODE_ENV === 'development') {
+      if (isLocalDev) {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
