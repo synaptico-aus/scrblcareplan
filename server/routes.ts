@@ -62,7 +62,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Wait for content to load and try multiple selectors
       await page.waitForFunction(() => document.readyState === 'complete');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      if (process.env.NODE_ENV === 'development') {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
       
       // Try to extract transcript using various selectors
       const transcript = await page.evaluate(() => {
@@ -261,7 +263,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Only add delays in development for better UX - prevents 504 timeouts in production
+      if (process.env.NODE_ENV === 'development') {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -271,7 +276,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (process.env.NODE_ENV === 'development') {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
 
       // Step 1: Extract facts
       eventEmitter.emit('generation-update', {
@@ -282,7 +289,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (process.env.NODE_ENV === 'development') {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -292,7 +301,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (process.env.NODE_ENV === 'development') {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
 
       const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
 
@@ -304,7 +315,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (process.env.NODE_ENV === 'development') {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
 
       // Step 2: Generate care plan
       eventEmitter.emit('generation-update', {
@@ -315,7 +328,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (process.env.NODE_ENV === 'development') {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -325,7 +340,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (process.env.NODE_ENV === 'development') {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
 
       const generatedHtml = await generateCarePlanHtml(transcript, clientName);
 
