@@ -367,10 +367,6 @@ export default function CarePlanner() {
                 <span className="hidden sm:inline">Saved Plans</span>
               </Button>
             </Link>
-            <Button variant="outline" size="sm" data-testid="button-settings" className="text-xs sm:text-sm">
-              <Settings className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Settings</span>
-            </Button>
           </div>
         </div>
       </header>
