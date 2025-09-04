@@ -6,14 +6,6 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 
-// Configure server timeouts for deployment
-app.use((req, res, next) => {
-  // Set timeout to 75 seconds for long-running AI operations
-  req.setTimeout(75000);
-  res.setTimeout(75000);
-  next();
-});
-
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
