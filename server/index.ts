@@ -61,12 +61,6 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  
-  // Set server timeout for long-running operations (10 minutes)
-  server.timeout = 10 * 60 * 1000; // 10 minutes for care plan generation
-  server.keepAliveTimeout = 65000; // Keep alive timeout for SSE connections
-  server.headersTimeout = 66000; // Headers timeout slightly higher than keep alive
-  
   server.listen({
     port,
     host: "0.0.0.0",

@@ -57,8 +57,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const page = await browser.newPage();
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       
-      // Navigate to the page with increased timeout for production
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+      // Navigate to the page
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
       
       // Wait for content to load and try multiple selectors
       await page.waitForFunction(() => document.readyState === 'complete');
