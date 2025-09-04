@@ -111,12 +111,19 @@ export async function extractFactsFromTranscript(transcript: string, clientName:
     if (chunks.length > 1) {
       console.log(`Processing transcript in ${chunks.length} chunks for ${clientName}`);
       
-      // Process each chunk and collect facts
-      const allFacts = [];
-      for (let i = 0; i < chunks.length; i++) {
-        const chunkFacts = await extractFactsFromChunk(chunks[i], clientName, i + 1, chunks.length);
-        allFacts.push(chunkFacts);
+      // If too many chunks, use summary mode instead
+      if (chunks.length > 8) {
+        console.log(`Too many chunks (${chunks.length}), switching to summary mode for ${clientName}`);
+        const summaryTranscript = extractKeyTranscriptSections(transcript);
+        return await extractFactsFromChunk(summaryTranscript, clientName, 1, 1);
       }
+      
+      // Process chunks in parallel for speed
+      const chunkPromises = chunks.map((chunk, i) => 
+        extractFactsFromChunk(chunk, clientName, i + 1, chunks.length)
+      );
+      
+      const allFacts = await Promise.all(chunkPromises);
       
       // Merge all facts
       return mergeFacts(allFacts);
@@ -201,7 +208,7 @@ Build comprehensive facts from the information discussed, not just isolated deta
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
   try {
     // For very long transcripts, we'll chunk them for processing
-    if (transcript.length > 25000) {
+    if (transcript.length > 50000) {
       console.log(`Transcript is very long (${transcript.length} chars), processing in summary mode for ${clientName}`);
       
       // Extract key sections for summary processing

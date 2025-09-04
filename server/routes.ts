@@ -314,10 +314,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
+      // Increase timeout for very long transcripts
+      const timeoutMs = transcriptLength > 50000 ? 60000 : 35000;
+      console.log(`Using ${timeoutMs/1000}s timeout for ${transcriptLength} char transcript`);
+      
       const extractedFacts = await Promise.race([
         extractFactsFromTranscript(transcript, clientName),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Fact extraction timeout - transcript too long")), 35000)
+          setTimeout(() => reject(new Error("Fact extraction timeout - transcript too long")), timeoutMs)
         )
       ]) as any;
 
@@ -358,10 +362,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
+      // Increase timeout for very long transcripts
+      const genTimeoutMs = transcriptLength > 50000 ? 60000 : 35000;
+      
       const generatedHtml = await Promise.race([
         generateCarePlanHtml(transcript, clientName),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Care plan generation timeout - transcript too long")), 35000)
+          setTimeout(() => reject(new Error("Care plan generation timeout - transcript too long")), genTimeoutMs)
         )
       ]) as string;
 
