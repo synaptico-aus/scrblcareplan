@@ -284,10 +284,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Step 1: Extract facts
+      // Check transcript length and emit appropriate message
+      const transcriptLength = transcript.length;
+      const action = transcriptLength > 15000 
+        ? `Analyzing long transcript (${Math.round(transcriptLength/1000)}k chars) in chunks for accuracy`
+        : 'Analyzing transcript for key client information';
+        
       eventEmitter.emit('generation-update', {
         sessionId,
         type: 'action',
-        action: 'Analyzing transcript for key client information',
+        action,
         step: 3,
         totalSteps: 8
       });

@@ -6,7 +6,128 @@ const openai = new OpenAI({
   timeout: 45000  // 45 second timeout - deployment environments often have shorter limits
 });
 
+// Helper function to chunk transcript for large texts
+function chunkTranscript(transcript: string, maxChunkSize: number = 15000): string[] {
+  if (transcript.length <= maxChunkSize) {
+    return [transcript];
+  }
+  
+  const chunks = [];
+  let startIndex = 0;
+  
+  while (startIndex < transcript.length) {
+    let endIndex = startIndex + maxChunkSize;
+    
+    // Try to break at sentence boundaries
+    if (endIndex < transcript.length) {
+      const lastPeriod = transcript.lastIndexOf('.', endIndex);
+      const lastNewline = transcript.lastIndexOf('\n', endIndex);
+      const breakPoint = Math.max(lastPeriod, lastNewline);
+      
+      if (breakPoint > startIndex + maxChunkSize * 0.7) {
+        endIndex = breakPoint + 1;
+      }
+    }
+    
+    chunks.push(transcript.slice(startIndex, endIndex));
+    startIndex = endIndex;
+  }
+  
+  return chunks;
+}
+
+// Merge facts from multiple chunks
+function mergeFacts(factsArray: any[]): any {
+  const merged = {
+    clientDetails: {
+      name: "",
+      language: null,
+      interpreterRequired: null
+    },
+    medical: {
+      gp: null,
+      pharmacy: null,
+      equipment: [] as string[],
+      medications: null,
+      allergies: null
+    },
+    support: {
+      primaryContact: null,
+      secondaryContact: null,
+      livingArrangement: null
+    },
+    risks: [] as any[],
+    preferences: {
+      workerPreferences: null,
+      serviceDeliveryPreferences: null,
+      culturalConsiderations: null
+    }
+  };
+
+  for (const facts of factsArray) {
+    // Merge client details
+    if (facts.clientDetails?.name) merged.clientDetails.name = facts.clientDetails.name;
+    if (facts.clientDetails?.language) merged.clientDetails.language = facts.clientDetails.language;
+    if (facts.clientDetails?.interpreterRequired !== null) merged.clientDetails.interpreterRequired = facts.clientDetails.interpreterRequired;
+
+    // Merge medical info
+    if (facts.medical?.gp) merged.medical.gp = facts.medical.gp;
+    if (facts.medical?.pharmacy) merged.medical.pharmacy = facts.medical.pharmacy;
+    if (facts.medical?.medications) merged.medical.medications = facts.medical.medications;
+    if (facts.medical?.allergies) merged.medical.allergies = facts.medical.allergies;
+    if (facts.medical?.equipment?.length > 0) {
+      merged.medical.equipment = [...merged.medical.equipment, ...facts.medical.equipment];
+    }
+
+    // Merge support info
+    if (facts.support?.primaryContact) merged.support.primaryContact = facts.support.primaryContact;
+    if (facts.support?.secondaryContact) merged.support.secondaryContact = facts.support.secondaryContact;
+    if (facts.support?.livingArrangement) merged.support.livingArrangement = facts.support.livingArrangement;
+
+    // Merge risks
+    if (facts.risks?.length > 0) {
+      merged.risks = [...merged.risks, ...facts.risks];
+    }
+
+    // Merge preferences
+    if (facts.preferences?.workerPreferences) merged.preferences.workerPreferences = facts.preferences.workerPreferences;
+    if (facts.preferences?.serviceDeliveryPreferences) merged.preferences.serviceDeliveryPreferences = facts.preferences.serviceDeliveryPreferences;
+    if (facts.preferences?.culturalConsiderations) merged.preferences.culturalConsiderations = facts.preferences.culturalConsiderations;
+  }
+
+  // Remove duplicates from equipment
+  merged.medical.equipment = Array.from(new Set(merged.medical.equipment));
+  
+  return merged;
+}
+
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
+  try {
+    // Check if transcript is too long and needs chunking
+    const chunks = chunkTranscript(transcript, 15000);
+    
+    if (chunks.length > 1) {
+      console.log(`Processing transcript in ${chunks.length} chunks for ${clientName}`);
+      
+      // Process each chunk and collect facts
+      const allFacts = [];
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkFacts = await extractFactsFromChunk(chunks[i], clientName, i + 1, chunks.length);
+        allFacts.push(chunkFacts);
+      }
+      
+      // Merge all facts
+      return mergeFacts(allFacts);
+    } else {
+      // Single chunk processing
+      return await extractFactsFromChunk(transcript, clientName, 1, 1);
+    }
+  } catch (error) {
+    throw new Error("Failed to extract facts from transcript: " + (error instanceof Error ? error.message : "Unknown error"));
+  }
+}
+
+async function extractFactsFromChunk(chunk: string, clientName: string, chunkIndex: number, totalChunks: number) {
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5",
@@ -56,12 +177,12 @@ Respond with JSON in this exact format:
         },
         {
           role: "user", 
-          content: `Extract key facts from this assessment transcript. Look for clearly stated information about language, family, medical details, equipment, and social needs.
+          content: `Extract key facts from this assessment transcript${totalChunks > 1 ? ` (part ${chunkIndex} of ${totalChunks})` : ''}. Look for clearly stated information about language, family, medical details, equipment, and social needs.
 
 Client Name: ${clientName}
 
 Transcript:
-${transcript}
+${chunk}
 
 Build comprehensive facts from the information discussed, not just isolated details.`
         }
@@ -77,6 +198,14 @@ Build comprehensive facts from the information discussed, not just isolated deta
 
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
   try {
+    // For very long transcripts, we'll chunk them for processing
+    if (transcript.length > 25000) {
+      console.log(`Transcript is very long (${transcript.length} chars), processing in summary mode for ${clientName}`);
+      
+      // Extract key sections for summary processing
+      const summaryTranscript = extractKeyTranscriptSections(transcript);
+      return await generateCarePlanFromSummary(summaryTranscript, clientName);
+    }
     const response = await openai.chat.completions.create({
       model: "gpt-5",
       messages: [
@@ -260,4 +389,55 @@ Create comprehensive care plan sections based on the information provided in the
   } catch (error) {
     throw new Error("Failed to generate care plan: " + (error instanceof Error ? error.message : "Unknown error"));
   }
+}
+
+function extractKeyTranscriptSections(transcript: string): string {
+  // Extract important sections from long transcripts
+  const lines = transcript.split('\n');
+  const keyLines = [];
+  
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    // Skip IVR menus and admin text
+    if (lower.includes('press') || lower.includes('menu') || lower.includes('recording')) {
+      continue;
+    }
+    
+    // Keep lines with important keywords
+    if (lower.includes('medical') || lower.includes('medication') || lower.includes('doctor') ||
+        lower.includes('family') || lower.includes('support') || lower.includes('help') ||
+        lower.includes('need') || lower.includes('want') || lower.includes('goal') ||
+        lower.includes('language') || lower.includes('service') || lower.includes('care') ||
+        lower.includes('home') || lower.includes('daily') || lower.includes('risk')) {
+      keyLines.push(line);
+    }
+  }
+  
+  const summary = keyLines.join('\n');
+  return summary.length > 15000 ? summary.substring(0, 15000) + '...' : summary;
+}
+
+async function generateCarePlanFromSummary(summaryTranscript: string, clientName: string) {
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `You are an AI care-planning assistant processing a SUMMARY of a longer assessment transcript. Generate a Gold Standard Care Plan following all the same requirements, but note that this is based on key sections from a longer conversation.`
+      },
+      {
+        role: "user",
+        content: `Generate a complete Gold Standard Care Plan HTML from this SUMMARY of key sections from a longer assessment transcript.
+
+Client Name: ${clientName}
+
+Key Sections from Transcript:
+${summaryTranscript}
+
+Note: This is a summary of key information from a longer conversation. Include all required sections but note where information may need further documentation during the full assessment review.`
+      }
+    ],
+  });
+
+  return response.choices[0].message.content || "";
 }
