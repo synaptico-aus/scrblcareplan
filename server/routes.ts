@@ -308,7 +308,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+      const extractedFacts = await Promise.race([
+        extractFactsFromTranscript(transcript, clientName),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Fact extraction timeout - transcript too long")), 45000)
+        )
+      ]) as any;
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -347,7 +352,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
-      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
+      const generatedHtml = await Promise.race([
+        generateCarePlanHtml(transcript, clientName),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Care plan generation timeout - transcript too long")), 45000)
+        )
+      ]) as string;
 
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {
