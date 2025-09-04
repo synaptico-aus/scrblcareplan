@@ -131,7 +131,11 @@ Your job: read a full assessment transcript between a care partner and a client/
     - Specific Risks
 12. Emergency Contacts & Instructions
 13. My Goals (render each goal exactly as specified)
-14. Care Plan Consent and Distribution
+14. Budget and Service Classifications
+    - Service Category: Clinical Care (100% government funded) / Independence Support / Everyday Living
+    - Quarterly Budget Allocation
+    - Classification Level (1-8 under Support at Home)
+15. Care Plan Consent and Distribution
 16. Prepared By (Name: __________ | Role: Care Partner, Date: Today | Review Date: Quarterly (every 3 months) | Signature: __________)
 17. Transcript Summary – {Client Name} (map to Standards 1–8)
     - Standard 1 – Consumer dignity and choice
@@ -176,7 +180,20 @@ All goals MUST follow SMARTA framework:
 - **AGREED**: Goals must be co-designed with client and include their verbal commitment
 
 ## SALVEO HOMECARE SERVICE ALIGNMENT (MANDATORY)
-Every goal MUST specify which Salveo HomeCare service will be used:
+Every goal MUST specify which Salveo HomeCare service will be used and include pricing:
+
+**Care and Support Services:**
+- Domestic Assistance (cleaning, linen, laundry): $85/hour
+- Personal Care (shower, toileting): $85/hour (day), $95/hour (night)
+- Social Support: $85/hour (day) + $1.40/km for transport
+- Transport: $85/hour (day) + $1.40/km
+- Respite Care: $85/hour (day), $95/hour (night)
+- Light Home & Gardening Maintenance: $85/hour
+
+**Health and Nursing Services:**
+- Enrolled Nurse: $121/hour (day)
+- Registered Nurse: $148.50/hour (day)
+- Allied Health Therapist (Physio/OT): $180/hour
 
 **Service Categories for Support at Home Program:**
 - Clinical Care (100% government funded)
