@@ -714,6 +714,252 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Funding levels data for budget calculations
+  const fundingLevels = {
+    hcp: {
+      level1: { name: "HCP Level 1", quarterlyAmount: 2140 },
+      level2: { name: "HCP Level 2", quarterlyAmount: 4005 },
+      level3: { name: "HCP Level 3", quarterlyAmount: 8190 },
+      level4: { name: "HCP Level 4", quarterlyAmount: 12435 },
+    },
+    sah: {
+      category1: { name: "Support at Home Category 1", quarterlyAmount: 3000 },
+      category2: { name: "Support at Home Category 2", quarterlyAmount: 6000 },
+      category3: { name: "Support at Home Category 3", quarterlyAmount: 12000 },
+      category4: { name: "Support at Home Category 4", quarterlyAmount: 18000 },
+    },
+  };
+
+  // Function to generate budget estimate HTML
+  const generateBudgetEstimateHTML = (carePlanHtml: string, fundingType: string, fundingLevel: string, clientName: string) => {
+    if (!fundingType || !fundingLevel) return '';
+
+    const fundingLevelKey = fundingType as keyof typeof fundingLevels;
+    const levelKey = fundingLevel as keyof typeof fundingLevels[typeof fundingLevelKey];
+    
+    let budgetData: { name: string; quarterlyAmount: number } | undefined;
+    
+    if (fundingLevelKey in fundingLevels && levelKey in fundingLevels[fundingLevelKey]) {
+      budgetData = (fundingLevels[fundingLevelKey] as any)[levelKey];
+    }
+    
+    if (!budgetData) return '';
+
+    const quarterlyBudget = budgetData.quarterlyAmount;
+    const availableBudget = quarterlyBudget * 0.9;
+
+    // Extract service costs from HTML goals section
+    const serviceMatches = carePlanHtml.match(/\$\d+\/hour.*?\$\d+\/month/g) || [];
+    const services: Array<{name: string; hourlyRate: number; monthlyRate: number}> = [];
+    
+    serviceMatches.forEach(match => {
+      const hourlyMatch = match.match(/\$(\d+)\/hour/);
+      const monthlyMatch = match.match(/\$(\d+)\/month/);
+      if (hourlyMatch && monthlyMatch) {
+        const context = carePlanHtml.substring(carePlanHtml.indexOf(match) - 100, carePlanHtml.indexOf(match) + 100);
+        let serviceName = "Care Service";
+        
+        if (context.includes("Personal Care")) serviceName = "Personal Care";
+        else if (context.includes("Domestic Assistance")) serviceName = "Domestic Assistance";
+        else if (context.includes("Allied Health")) serviceName = "Allied Health Therapy";
+        else if (context.includes("Social Support")) serviceName = "Social Support";
+        else if (context.includes("Nursing")) serviceName = "Nursing Care";
+        
+        services.push({
+          name: serviceName,
+          hourlyRate: parseInt(hourlyMatch[1]),
+          monthlyRate: parseInt(monthlyMatch[1])
+        });
+      }
+    });
+
+    const totalMonthlyCost = services.reduce((sum, service) => sum + service.monthlyRate, 0);
+    const quarterlyEstimate = totalMonthlyCost * 3;
+    const remainingBudget = availableBudget - quarterlyEstimate;
+    const utilizationPercentage = (quarterlyEstimate / availableBudget) * 100;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Budget Estimation - ${clientName}</title>
+        <style>
+          body { 
+            font-family: Arial, sans-serif; 
+            padding: 30px; 
+            background-color: #f8fafc;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            color: white;
+            border-radius: 10px;
+          }
+          .budget-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 20px 0; 
+          }
+          th, td { 
+            border: 1px solid #e2e8f0; 
+            padding: 12px; 
+            text-align: left; 
+          }
+          th { 
+            background-color: #f8fafc; 
+            font-weight: bold; 
+          }
+          .text-right { text-align: right; }
+          .highlight { background-color: #f0f9ff; font-weight: bold; }
+          .positive { color: #059669; }
+          .negative { color: #dc2626; }
+          .disclaimer { 
+            font-size: 12px; 
+            color: #6b7280; 
+            margin-top: 30px; 
+            padding: 15px;
+            background-color: #f9fafb;
+            border-left: 4px solid #d1d5db;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Budget Estimation</h1>
+          <h2>${budgetData.name}</h2>
+          <p>Client: ${clientName}</p>
+          <p>Generated on ${new Date().toLocaleDateString('en-AU', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}</p>
+        </div>
+
+        <div class="budget-container">
+          <h2>Budget Summary (90% of Quarterly Allocation)</h2>
+          
+          <table>
+            <tr class="highlight">
+              <th>Budget Summary</th>
+              <th class="text-right">Amount</th>
+            </tr>
+            <tr>
+              <td>Funding Level</td>
+              <td class="text-right">${budgetData.name}</td>
+            </tr>
+            <tr>
+              <td>Quarterly Budget</td>
+              <td class="text-right">$${quarterlyBudget.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>Available for Care (90%)</td>
+              <td class="text-right">$${availableBudget.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>Estimated Quarterly Cost</td>
+              <td class="text-right">$${quarterlyEstimate.toLocaleString()}</td>
+            </tr>
+            <tr class="highlight">
+              <td>Remaining Budget</td>
+              <td class="text-right ${remainingBudget >= 0 ? 'positive' : 'negative'}">$${remainingBudget.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>Budget Utilization</td>
+              <td class="text-right ${utilizationPercentage > 100 ? 'negative' : 'positive'}">${utilizationPercentage.toFixed(1)}%</td>
+            </tr>
+          </table>
+
+          ${services.length > 0 ? `
+          <h3>Service Breakdown</h3>
+          <table>
+            <tr class="highlight">
+              <th>Service</th>
+              <th class="text-right">Hourly Rate</th>
+              <th class="text-right">Monthly Cost</th>
+              <th class="text-right">Quarterly Cost</th>
+            </tr>
+            ${services.map(service => `
+            <tr>
+              <td>${service.name}</td>
+              <td class="text-right">$${service.hourlyRate}/hour</td>
+              <td class="text-right">$${service.monthlyRate}/month</td>
+              <td class="text-right">$${(service.monthlyRate * 3).toLocaleString()}</td>
+            </tr>
+            `).join('')}
+            <tr class="highlight">
+              <td>Total</td>
+              <td></td>
+              <td class="text-right">$${totalMonthlyCost}/month</td>
+              <td class="text-right">$${quarterlyEstimate.toLocaleString()}</td>
+            </tr>
+          </table>
+          ` : '<p><em>No services with pricing found in care plan goals.</em></p>'}
+          
+          <div class="disclaimer">
+            <strong>Note:</strong> This budget estimation is based on the services and frequencies specified in the care plan goals. 
+            Actual costs may vary based on service delivery times (day/night/weekend rates) and any additional services required.
+            Please consult with your Care Partner for final budget confirmation.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
+  // Budget generation endpoint
+  app.post("/api/generate-budget", async (req, res) => {
+    try {
+      const { carePlanHtml, fundingType, fundingLevel, clientName } = req.body;
+
+      if (!carePlanHtml || !fundingType || !fundingLevel || !clientName) {
+        return res.status(400).json({ 
+          error: "Missing required parameters: carePlanHtml, fundingType, fundingLevel, clientName" 
+        });
+      }
+
+      // Generate budget HTML
+      const budgetHtml = generateBudgetEstimateHTML(carePlanHtml, fundingType, fundingLevel, clientName);
+
+      if (!budgetHtml) {
+        return res.status(400).json({ error: "Invalid funding type or level" });
+      }
+
+      // Save budget as a client document
+      const budgetDocumentName = `${clientName} - Budget Estimate - ${new Date().toLocaleDateString('en-AU')}`;
+      
+      const budgetDocument = await storage.createClientDocument({
+        clientName,
+        fileName: budgetDocumentName,
+        fileType: "budget",
+        objectPath: budgetHtml,
+        description: "Budget estimation document"
+      });
+
+      res.json({ 
+        success: true, 
+        budgetHtml,
+        documentId: budgetDocument.id,
+        message: "Budget generated and saved successfully"
+      });
+
+    } catch (error) {
+      console.error("Error generating budget:", error);
+      res.status(500).json({ error: "Failed to generate budget" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

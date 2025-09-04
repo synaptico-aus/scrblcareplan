@@ -4,7 +4,9 @@ import { Progress } from "@/components/ui/progress";
 import { Download, FileText, Printer, Clock, DollarSign, ChevronDown, ChevronUp, FileType } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { ExtractedFacts, fundingLevels } from "@shared/schema";
+import { ExtractedFacts } from "@shared/schema";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
 import scrblLogo from "@/assets/scrbl-logo.png";
@@ -25,9 +27,52 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const [elapsedTime, setElapsedTime] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isBudgetOpen, setIsBudgetOpen] = useState(false);
+  const [isGeneratingBudget, setIsGeneratingBudget] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // Budget calculation function
+  // Budget generation mutation
+  const generateBudgetMutation = useMutation({
+    mutationFn: async () => {
+      if (!html || !clientName || !fundingType || !fundingLevel) {
+        throw new Error("Missing required data for budget generation");
+      }
+
+      const response = await apiRequest("POST", "/api/generate-budget", {
+        carePlanHtml: html,
+        fundingType,
+        fundingLevel,
+        clientName
+      });
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Budget Generated Successfully",
+        description: `Budget estimate has been saved to ${clientName}'s folder`,
+      });
+
+      // Invalidate client documents query to refresh the saved plans list
+      queryClient.invalidateQueries({ queryKey: ["/api/client-documents", clientName] });
+      queryClient.invalidateQueries({ queryKey: ["/api/client-documents"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Budget Generation Failed",
+        description: error.message || "Failed to generate budget estimate",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGenerateBudget = () => {
+    generateBudgetMutation.mutate();
+  };
+
+  const isGeneratingBudgetState = generateBudgetMutation.isPending;
+
+  // Old budget calculation function (kept for reference but not used)
   const calculateBudgetEstimate = () => {
     if (!html || !fundingType || !fundingLevel) return null;
 
@@ -283,82 +328,35 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
 
 
       {/* Budget Estimation Section */}
-      {html && budgetEstimate && (
-        <Collapsible open={isBudgetOpen} onOpenChange={setIsBudgetOpen}>
-          <div className="p-4 border-b border-border bg-accent/5">
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-between p-0 h-auto hover:bg-transparent"
-                data-testid="button-toggle-budget"
-              >
-                <h3 className="text-md font-semibold flex items-center">
-                  <DollarSign className="text-primary mr-2 h-4 w-4" />
-                  Budget Estimation (90% of Quarterly Allocation)
-                </h3>
-                {isBudgetOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent className="mt-3">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Budget Summary */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h4 className="font-medium text-sm text-muted-foreground mb-3">Budget Summary</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Quarterly Budget:</span>
-                  <span className="font-medium">${budgetEstimate.quarterlyBudget.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Available for Care (90%):</span>
-                  <span className="font-medium">${budgetEstimate.availableBudget.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Estimated Quarterly Cost:</span>
-                  <span className="font-medium">${budgetEstimate.quarterlyEstimate.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span>Remaining Budget:</span>
-                  <span className={`font-medium ${budgetEstimate.remainingBudget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    ${budgetEstimate.remainingBudget.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Budget Utilization:</span>
-                  <span className={`font-medium ${budgetEstimate.utilizationPercentage > 100 ? 'text-red-600' : 'text-green-600'}`}>
-                    {budgetEstimate.utilizationPercentage.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Service Breakdown */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h4 className="font-medium text-sm text-muted-foreground mb-3">Service Breakdown</h4>
-              <div className="space-y-2">
-                {budgetEstimate.services.map((service, index) => (
-                  <div key={index} className="flex justify-between items-center text-sm">
-                    <div>
-                      <div className="font-medium">{service.name}</div>
-                      <div className="text-xs text-muted-foreground">${service.hourlyRate}/hour</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">${service.monthlyRate}/month</div>
-                      <div className="text-xs text-muted-foreground">${(service.monthlyRate * 3).toLocaleString()}/quarter</div>
-                    </div>
-                  </div>
-                ))}
-                {budgetEstimate.services.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No services with pricing found in goals</p>
-                )}
-              </div>
-            </div>
+      {html && fundingType && fundingLevel && (
+        <div className="p-4 border-b border-border bg-accent/5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-md font-semibold flex items-center">
+              <DollarSign className="text-primary mr-2 h-4 w-4" />
+              Budget Estimation
+            </h3>
+            <Button
+              variant="default"
+              size="sm"
+              className="text-xs sm:text-sm"
+              data-testid="button-generate-budget"
+              onClick={handleGenerateBudget}
+              disabled={isGeneratingBudgetState}
+            >
+              {isGeneratingBudgetState ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Generating...
+                </>
+              ) : (
+                'Generate Budget'
+              )}
+            </Button>
           </div>
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
+          <p className="text-sm text-muted-foreground mt-2">
+            Generate detailed budget estimation based on services in this care plan
+          </p>
+        </div>
       )}
       
       <div className="flex-1 overflow-y-auto p-6">
