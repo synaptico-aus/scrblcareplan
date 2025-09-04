@@ -62,10 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Wait for content to load and try multiple selectors
       await page.waitForFunction(() => document.readyState === 'complete');
-      const isLocalDev = !process.env.REPLIT_DOMAINS && !process.env.REPL_ID;
-      if (isLocalDev) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      }
+      await new Promise(resolve => setTimeout(resolve, 5000));
       
       // Try to extract transcript using various selectors
       const transcript = await page.evaluate(() => {
@@ -255,9 +252,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Skip delays in production/deployment - only add in local dev
-      const isLocalDev = !process.env.REPLIT_DOMAINS && !process.env.REPL_ID;
-
       // Send initial update with proper delays for visibility
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -267,9 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (isLocalDev) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -279,28 +271,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (isLocalDev) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      }
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Step 1: Extract facts
-      // Check transcript length and emit appropriate message
-      const transcriptLength = transcript.length;
-      const action = transcriptLength > 8000 
-        ? `Analyzing long transcript (${Math.round(transcriptLength/1000)}k chars) in chunks for accuracy`
-        : 'Analyzing transcript for key client information';
-        
       eventEmitter.emit('generation-update', {
         sessionId,
         type: 'action',
-        action,
+        action: 'Analyzing transcript for key client information',
         step: 3,
         totalSteps: 8
       });
 
-      if (isLocalDev) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -310,20 +292,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (isLocalDev) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Increase timeout for very long transcripts
-      const timeoutMs = transcriptLength > 50000 ? 60000 : 35000;
-      console.log(`Using ${timeoutMs/1000}s timeout for ${transcriptLength} char transcript`);
-      
-      const extractedFacts = await Promise.race([
-        extractFactsFromTranscript(transcript, clientName),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Fact extraction timeout - transcript too long")), timeoutMs)
-        )
-      ]) as any;
+      const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -333,9 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (isLocalDev) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       // Step 2: Generate care plan
       eventEmitter.emit('generation-update', {
@@ -346,9 +315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (isLocalDev) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       eventEmitter.emit('generation-update', {
         sessionId,
@@ -358,19 +325,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      if (isLocalDev) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-      }
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Increase timeout for very long transcripts
-      const genTimeoutMs = transcriptLength > 50000 ? 60000 : 35000;
-      
-      const generatedHtml = await Promise.race([
-        generateCarePlanHtml(transcript, clientName),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Care plan generation timeout - transcript too long")), genTimeoutMs)
-        )
-      ]) as string;
+      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
 
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {
