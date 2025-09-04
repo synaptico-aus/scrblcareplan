@@ -28,6 +28,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Launch headless browser with additional Chrome args for server environments
       browser = await puppeteer.launch({
         headless: true,
+        timeout: 60000, // 60 second launch timeout
+        protocolTimeout: 120000, // 2 minute protocol timeout for deployment
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -49,16 +51,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
           '--disable-renderer-backgrounding',
-          '--disable-features=TranslateUI'
+          '--disable-features=TranslateUI',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor'
         ],
         executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium-browser'
       });
       
       const page = await browser.newPage();
+      
+      // Set longer timeouts for deployment environment
+      page.setDefaultTimeout(60000); // 60 second timeout for all operations
+      page.setDefaultNavigationTimeout(60000); // 60 second navigation timeout
+      
       await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
       
-      // Navigate to the page
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+      // Navigate to the page with increased timeout
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
       
       // Wait for content to load and try multiple selectors
       await page.waitForFunction(() => document.readyState === 'complete');
