@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Shield, Eye, EyeOff } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 import scrblLogo from "@assets/scrbl-logo.png";
 
 interface LoginProps {
@@ -21,16 +22,26 @@ export default function Login({ onLogin }: LoginProps) {
     setIsLoading(true);
     setError("");
 
-    // Simple password check
-    if (password === "caresalveocarl") {
-      // Store authentication in localStorage
-      localStorage.setItem("isAuthenticated", "true");
-      onLogin();
-    } else {
-      setError("Incorrect password. Please try again.");
+    try {
+      const response = await apiRequest("POST", "/api/auth/login", { password });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          onLogin();
+        } else {
+          setError("Authentication failed. Please try again.");
+        }
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || "Invalid password. Please try again.");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("An error occurred while logging in. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (

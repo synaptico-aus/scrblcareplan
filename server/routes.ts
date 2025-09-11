@@ -1,12 +1,28 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { EventEmitter } from "events";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
+
+// Extend express-session types
+declare module 'express-session' {
+  interface SessionData {
+    isAuthenticated: boolean;
+  }
+}
+
+// Authentication middleware
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (req.session.isAuthenticated) {
+    return next();
+  }
+  return res.status(401).json({ error: 'Authentication required' });
+}
 
 // Event emitter for real-time updates
 const eventEmitter = new EventEmitter();
@@ -17,7 +33,57 @@ const nottaUrlSchema = z.object({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  app.post("/api/fetch-notta", async (req, res) => {
+  // Rate limiting for login endpoint
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // Limit each IP to 5 requests per windowMs
+    message: { error: 'Too many login attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Authentication endpoints
+  app.post('/api/auth/login', loginLimiter, async (req, res) => {
+    try {
+      const { password } = req.body;
+      const correctPassword = process.env.AUTH_PASSWORD || 'caresalveocarl';
+      
+      if (password === correctPassword) {
+        // Regenerate session to prevent session fixation
+        await new Promise<void>((resolve, reject) => {
+          req.session.regenerate((err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        
+        req.session.isAuthenticated = true;
+        res.json({ success: true });
+      } else {
+        res.status(401).json({ error: 'Invalid password' });
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return res.status(500).json({ error: 'Logout failed' });
+      }
+      res.clearCookie('connect.sid');
+      res.json({ success: true });
+    });
+  });
+
+  app.get('/api/auth/me', (req, res) => {
+    res.json({ isAuthenticated: !!req.session.isAuthenticated });
+  });
+
+  app.post("/api/fetch-notta", requireAuth, async (req, res) => {
     try {
       const { url } = nottaUrlSchema.parse(req.body);
       
@@ -120,7 +186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/chat-parity", async (req, res) => {
+  app.post("/api/chat-parity", requireAuth, async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template } = validatedData;
@@ -161,7 +227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Server-Sent Events endpoint for real-time generation updates
-  app.get("/api/generation-stream/:sessionId", (req, res) => {
+  app.get("/api/generation-stream/:sessionId", requireAuth, (req, res) => {
     const sessionId = req.params.sessionId;
     
     // Set headers for SSE - Enhanced for deployment environments
@@ -170,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // Remove wildcard CORS header for same-origin requests
     res.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
     res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
     
@@ -225,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // New streaming generation endpoint
-  app.post("/api/chat-parity-stream", async (req, res) => {
+  app.post("/api/chat-parity-stream", requireAuth, async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template, sessionId } = validatedData;
@@ -373,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/offline-analysis", async (req, res) => {
+  app.post("/api/offline-analysis", requireAuth, async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript } = validatedData;
@@ -405,7 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/analysis/:id", async (req, res) => {
+  app.get("/api/analysis/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const analysis = await storage.getCareAnalysis(id);
@@ -425,7 +491,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/client/:clientName/analyses", async (req, res) => {
+  app.get("/api/client/:clientName/analyses", requireAuth, async (req, res) => {
     try {
       const { clientName } = req.params;
       const analyses = await storage.getCareAnalysesByClient(clientName);
@@ -440,7 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Saved Care Plans routes
-  app.post("/api/saved-care-plans", async (req, res) => {
+  app.post("/api/saved-care-plans", requireAuth, async (req, res) => {
     try {
       const validatedData = insertSavedCarePlanSchema.parse(req.body);
       const savedCarePlan = await storage.createSavedCarePlan(validatedData);
@@ -454,7 +520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/saved-care-plans", async (req, res) => {
+  app.get("/api/saved-care-plans", requireAuth, async (req, res) => {
     try {
       const savedCarePlans = await storage.getSavedCarePlans();
       res.json(savedCarePlans);
@@ -466,7 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/saved-care-plans/:id", async (req, res) => {
+  app.get("/api/saved-care-plans/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const savedCarePlan = await storage.getSavedCarePlan(id);
@@ -486,7 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/saved-care-plans/:id", async (req, res) => {
+  app.delete("/api/saved-care-plans/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const deleted = await storage.deleteSavedCarePlan(id);
@@ -507,7 +573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Object storage routes for document uploads
-  app.post("/api/objects/upload", async (req, res) => {
+  app.post("/api/objects/upload", requireAuth, async (req, res) => {
     try {
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
@@ -519,7 +585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Serve uploaded documents
-  app.get("/objects/:objectPath(*)", async (req, res) => {
+  app.get("/objects/:objectPath(*)", requireAuth, async (req, res) => {
     try {
       const objectStorageService = new ObjectStorageService();
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
@@ -531,7 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Handle downloads for legacy documents with Google Cloud Storage URLs
-  app.get("/api/documents/download", async (req, res) => {
+  app.get("/api/documents/download", requireAuth, async (req, res) => {
     try {
       const { url } = req.query;
       if (!url || typeof url !== 'string') {
@@ -555,7 +621,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Client document routes
-  app.post("/api/client-documents", async (req, res) => {
+  app.post("/api/client-documents", requireAuth, async (req, res) => {
     try {
       const validatedData = insertClientDocumentSchema.parse(req.body);
       
@@ -576,7 +642,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/client-documents/:clientName", async (req, res) => {
+  app.get("/api/client-documents/:clientName", requireAuth, async (req, res) => {
     try {
       const { clientName } = req.params;
       const documents = await storage.getClientDocuments(decodeURIComponent(clientName));
@@ -587,7 +653,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/client-documents", async (req, res) => {
+  app.get("/api/client-documents", requireAuth, async (req, res) => {
     try {
       const documents = await storage.getAllClientDocuments();
       res.json(documents);
@@ -597,7 +663,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/client-documents/:id", async (req, res) => {
+  app.delete("/api/client-documents/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteClientDocument(id);
@@ -614,7 +680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Client folder alias routes
-  app.post("/api/client-folder-aliases", async (req, res) => {
+  app.post("/api/client-folder-aliases", requireAuth, async (req, res) => {
     try {
       const validatedData = insertClientFolderAliasSchema.parse(req.body);
       
@@ -632,7 +698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/client-folder-aliases/:originalClientName", async (req, res) => {
+  app.get("/api/client-folder-aliases/:originalClientName", requireAuth, async (req, res) => {
     try {
       const { originalClientName } = req.params;
       const alias = await storage.getClientFolderAlias(decodeURIComponent(originalClientName));
@@ -648,7 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/client-folder-aliases", async (req, res) => {
+  app.get("/api/client-folder-aliases", requireAuth, async (req, res) => {
     try {
       const aliases = await storage.getAllClientFolderAliases();
       res.json(aliases);
@@ -658,7 +724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put("/api/client-folder-aliases/:originalClientName", async (req, res) => {
+  app.put("/api/client-folder-aliases/:originalClientName", requireAuth, async (req, res) => {
     try {
       const { originalClientName } = req.params;
       const validatedData = updateClientFolderAliasSchema.parse(req.body);

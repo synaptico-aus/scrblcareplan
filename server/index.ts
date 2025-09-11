@@ -1,10 +1,38 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Trust proxy in production for secure cookies
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+  
+  // Enforce environment variables in production
+  if (!process.env.SESSION_SECRET) {
+    throw new Error('SESSION_SECRET environment variable is required in production');
+  }
+  if (!process.env.AUTH_PASSWORD) {
+    throw new Error('AUTH_PASSWORD environment variable is required in production');
+  }
+}
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'scrbl-care-planning-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    sameSite: 'strict'
+  }
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();
