@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus, Edit } from "lucide-react";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus, Edit, LogOut } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts, ClientDocument, ClientFolderAlias } from "@shared/schema";
@@ -15,7 +15,11 @@ import scrblLogo from "@/assets/scrbl-logo.png";
 import html2pdf from "html2pdf.js";
 import { ObjectUploader } from "@/components/ObjectUploader";
 
-export default function SavedPlans() {
+interface SavedPlansProps {
+  onLogout?: () => void;
+}
+
+export default function SavedPlans({ onLogout }: SavedPlansProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<SavedCarePlan | null>(null);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -779,6 +783,19 @@ export default function SavedPlans() {
                 <span className="sm:hidden">Planner</span>
               </Button>
             </Link>
+            {onLogout && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onLogout}
+                data-testid="button-logout-saved-plans" 
+                className="w-full sm:w-auto"
+              >
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sign Out</span>
+                <span className="sm:hidden">Out</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>

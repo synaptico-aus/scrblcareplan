@@ -9,11 +9,11 @@ import SavedPlans from "@/pages/saved-plans";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/login";
 
-function Router() {
+function Router({ onLogout }: { onLogout: () => void }) {
   return (
     <Switch>
-      <Route path="/" component={CarePlanner} />
-      <Route path="/saved-plans" component={SavedPlans} />
+      <Route path="/" component={() => <CarePlanner onLogout={onLogout} />} />
+      <Route path="/saved-plans" component={() => <SavedPlans onLogout={onLogout} />} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -65,7 +65,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <Router onLogout={handleLogout} />
       </TooltipProvider>
     </QueryClientProvider>
   );

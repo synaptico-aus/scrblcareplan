@@ -8,11 +8,15 @@ import { AgentUpdates } from "@/components/AgentUpdates";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Shield, FileText } from "lucide-react";
+import { Settings, Shield, FileText, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import scrblLogo from "@/assets/scrbl-logo.png";
 
-export default function CarePlanner() {
+interface CarePlannerProps {
+  onLogout?: () => void;
+}
+
+export default function CarePlanner({ onLogout }: CarePlannerProps = {}) {
   const [clientName, setClientName] = useState("");
   const [transcript, setTranscript] = useState("");
   const [nottaUrl, setNottaUrl] = useState("");
@@ -367,6 +371,18 @@ export default function CarePlanner() {
                 <span className="hidden sm:inline">Saved Plans</span>
               </Button>
             </Link>
+            {onLogout && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={onLogout}
+                data-testid="button-logout" 
+                className="text-xs sm:text-sm"
+              >
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </Button>
+            )}
           </div>
         </div>
       </header>
