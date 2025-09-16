@@ -38,15 +38,16 @@ app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 // Replit auth mode handles its own session configuration with PostgreSQL store
 const authMode = process.env.AUTH_MODE || 'replit';
 if (authMode === 'password' || authMode === 'none') {
+  const isProduction = process.env.NODE_ENV === 'production';
   app.use(session({
     secret: process.env.SESSION_SECRET || 'scrbl-care-planning-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true, // Required with SameSite=None
+      secure: isProduction, // Only require HTTPS in production
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'none' // Allow third-party (iframe) cookies
+      sameSite: isProduction ? 'none' : 'lax' // Use 'lax' in development, 'none' in production
     }
   }));
 }
