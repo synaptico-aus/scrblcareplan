@@ -1,12 +1,81 @@
 import OpenAI from "openai";
 
+// Validate API key on startup
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error('OPENAI_API_KEY environment variable is required');
+}
+
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: 300000, // 5 minutes timeout for long care plan generation
+  maxRetries: 3,
+  dangerouslyAllowBrowser: false
 });
 
+// Utility function to check transcript length and estimate tokens
+function estimateTokenCount(text: string): number {
+  // Rough estimation: 1 token ≈ 4 characters for English text
+  return Math.ceil(text.length / 4);
+}
+
+// Function to chunk transcript if it's too long
+function chunkTranscript(transcript: string, maxTokens: number = 120000): string[] {
+  const estimatedTokens = estimateTokenCount(transcript);
+  
+  if (estimatedTokens <= maxTokens) {
+    return [transcript];
+  }
+  
+  // Split into chunks with overlap for context
+  const chunks: string[] = [];
+  const maxChunkSize = Math.floor(maxTokens * 4 * 0.8); // 80% of max, convert back to characters
+  const overlapSize = Math.floor(maxChunkSize * 0.1); // 10% overlap
+  
+  let start = 0;
+  while (start < transcript.length) {
+    const end = Math.min(start + maxChunkSize, transcript.length);
+    
+    // Try to break at sentence boundaries
+    let chunkEnd = end;
+    if (end < transcript.length) {
+      const sentenceBreak = transcript.lastIndexOf('.', end);
+      if (sentenceBreak > start + maxChunkSize * 0.5) {
+        chunkEnd = sentenceBreak + 1;
+      }
+    }
+    
+    chunks.push(transcript.slice(start, chunkEnd));
+    start = chunkEnd - overlapSize;
+  }
+  
+  return chunks;
+}
+
 export async function extractFactsFromTranscript(transcript: string, clientName: string) {
+  const startTime = Date.now();
+  console.log(`Starting fact extraction for client: ${clientName}, transcript length: ${transcript.length} characters`);
+  
   try {
+    // Check if transcript is too long and needs chunking
+    const chunks = chunkTranscript(transcript, 120000); // GPT-5 context limit
+    
+    if (chunks.length > 1) {
+      console.log(`Large transcript detected - processing in ${chunks.length} chunks`);
+      
+      // Process chunks and merge results
+      const allFacts = [];
+      for (let i = 0; i < chunks.length; i++) {
+        console.log(`Processing chunk ${i + 1}/${chunks.length}`);
+        const chunkFacts = await extractFactsFromChunk(chunks[i], clientName, i + 1, chunks.length);
+        allFacts.push(chunkFacts);
+      }
+      
+      // Merge all facts from chunks
+      return mergeFacts(allFacts);
+    }
+    
+    // Process single transcript
     const response = await openai.chat.completions.create({
       model: "gpt-5",
       messages: [
@@ -66,16 +135,183 @@ Build comprehensive facts from the information discussed, not just isolated deta
         }
       ],
       response_format: { type: "json_object" },
+    }, {
+      timeout: 180000, // 3 minutes for fact extraction
     });
 
-    return JSON.parse(response.choices[0].message.content || "{}");
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    const duration = Date.now() - startTime;
+    console.log(`Fact extraction completed in ${duration}ms`);
+    
+    return result;
   } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Fact extraction failed after ${duration}ms:`, error);
+    
+    if (error instanceof Error) {
+      if (error.message.includes('timeout')) {
+        throw new Error(`Fact extraction timed out after ${Math.floor(duration/1000)} seconds. This may be due to a very long transcript or API issues.`);
+      } else if (error.message.includes('rate_limit')) {
+        throw new Error('OpenAI API rate limit exceeded. Please try again in a few moments.');
+      } else if (error.message.includes('insufficient_quota')) {
+        throw new Error('OpenAI API quota exceeded. Please check your API usage and billing.');
+      }
+    }
+    
     throw new Error("Failed to extract facts from transcript: " + (error instanceof Error ? error.message : "Unknown error"));
   }
 }
 
+// Helper function to extract facts from a single chunk
+async function extractFactsFromChunk(chunk: string, clientName: string, chunkNum: number, totalChunks: number) {
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `You are an AI care-planning assistant for the Australian home care sector. Extract key facts from assessment transcripts.
+
+This is chunk ${chunkNum} of ${totalChunks} from a longer transcript.
+
+Rules:
+- Extract facts that are clearly mentioned or strongly implied in this chunk
+- Ignore IVR menus, timestamps, and administrative questions  
+- Look for: language mentions, communication needs, medical practitioners, equipment, family members, risks, daily routines, mobility aids, mental health mentions
+- Be thorough but accurate - extract information that's actually discussed
+- If this is a partial chunk, focus on complete information rather than fragments
+
+Respond with JSON in this exact format:
+{
+  "clientDetails": {
+    "name": "string",
+    "language": "string or null",
+    "interpreterRequired": "boolean or null"
+  },
+  "medical": {
+    "gp": "string or null",
+    "pharmacy": "string or null", 
+    "equipment": ["array of strings or empty"],
+    "medications": "string or null",
+    "allergies": "string or null"
+  },
+  "support": {
+    "primaryContact": "string or null",
+    "secondaryContact": "string or null",
+    "livingArrangement": "string or null"
+  },
+  "risks": [
+    {
+      "type": "string",
+      "description": "string",
+      "severity": "low|medium|high or null"
+    }
+  ],
+  "preferences": {
+    "workerPreferences": "string or null",
+    "serviceDeliveryPreferences": "string or null",
+    "culturalConsiderations": "string or null"
+  }
+}`
+      },
+      {
+        role: "user", 
+        content: `Extract key facts from this assessment transcript chunk (${chunkNum}/${totalChunks}). Look for clearly stated information about language, family, medical details, equipment, and social needs.
+
+Client Name: ${clientName}
+
+Transcript Chunk:
+${chunk}
+
+Build comprehensive facts from the information discussed in this chunk.`
+      }
+    ],
+    response_format: { type: "json_object" },
+  }, {
+    timeout: 120000, // 2 minutes for chunk processing
+  });
+  
+  return JSON.parse(response.choices[0].message.content || "{}");
+}
+
+// Helper function to merge facts from multiple chunks
+function mergeFacts(factsList: any[]): any {
+  const merged = {
+    clientDetails: { name: null, language: null, interpreterRequired: null },
+    medical: { gp: null, pharmacy: null, equipment: [] as string[], medications: null, allergies: null },
+    support: { primaryContact: null, secondaryContact: null, livingArrangement: null },
+    risks: [] as any[],
+    preferences: { workerPreferences: null, serviceDeliveryPreferences: null, culturalConsiderations: null }
+  };
+  
+  factsList.forEach(facts => {
+    // Merge client details (take first non-null value)
+    if (facts.clientDetails) {
+      merged.clientDetails.name = merged.clientDetails.name || facts.clientDetails.name;
+      merged.clientDetails.language = merged.clientDetails.language || facts.clientDetails.language;
+      merged.clientDetails.interpreterRequired = merged.clientDetails.interpreterRequired ?? facts.clientDetails.interpreterRequired;
+    }
+    
+    // Merge medical info
+    if (facts.medical) {
+      merged.medical.gp = merged.medical.gp || facts.medical.gp;
+      merged.medical.pharmacy = merged.medical.pharmacy || facts.medical.pharmacy;
+      merged.medical.medications = merged.medical.medications || facts.medical.medications;
+      merged.medical.allergies = merged.medical.allergies || facts.medical.allergies;
+      
+      // Merge equipment arrays and deduplicate
+      if (facts.medical.equipment && Array.isArray(facts.medical.equipment)) {
+        facts.medical.equipment.forEach((item: string) => {
+          if (!merged.medical.equipment.includes(item)) {
+            merged.medical.equipment.push(item);
+          }
+        });
+      }
+    }
+    
+    // Merge support info
+    if (facts.support) {
+      merged.support.primaryContact = merged.support.primaryContact || facts.support.primaryContact;
+      merged.support.secondaryContact = merged.support.secondaryContact || facts.support.secondaryContact;
+      merged.support.livingArrangement = merged.support.livingArrangement || facts.support.livingArrangement;
+    }
+    
+    // Merge risks (combine all unique risks)
+    if (facts.risks && Array.isArray(facts.risks)) {
+      facts.risks.forEach((risk: any) => {
+        const existingRisk = merged.risks.find((r: any) => r.type === risk.type && r.description === risk.description);
+        if (!existingRisk) {
+          merged.risks.push(risk);
+        }
+      });
+    }
+    
+    // Merge preferences
+    if (facts.preferences) {
+      merged.preferences.workerPreferences = merged.preferences.workerPreferences || facts.preferences.workerPreferences;
+      merged.preferences.serviceDeliveryPreferences = merged.preferences.serviceDeliveryPreferences || facts.preferences.serviceDeliveryPreferences;
+      merged.preferences.culturalConsiderations = merged.preferences.culturalConsiderations || facts.preferences.culturalConsiderations;
+    }
+  });
+  
+  return merged;
+}
+
 export async function generateCarePlanHtml(transcript: string, clientName: string) {
+  const startTime = Date.now();
+  console.log(`Starting care plan generation for client: ${clientName}, transcript length: ${transcript.length} characters`);
+  
   try {
+    // For care plan generation, we'll use a different strategy for long transcripts
+    // Instead of chunking, we'll summarize very long transcripts first
+    let processedTranscript = transcript;
+    
+    const estimatedTokens = estimateTokenCount(transcript);
+    if (estimatedTokens > 120000) {
+      console.log(`Very long transcript detected (${estimatedTokens} estimated tokens) - creating summary first`);
+      processedTranscript = await summarizeTranscript(transcript, clientName);
+      console.log(`Transcript summarized to ${processedTranscript.length} characters`);
+    }
+    
     const response = await openai.chat.completions.create({
       model: "gpt-5",
       messages: [
@@ -225,7 +461,7 @@ Examples:
 Client Name: ${clientName}
 
 Transcript:
-${transcript}
+${processedTranscript}
 
 CRITICAL: For the "My Goals" section, apply SMARTA principles AND Salveo HomeCare service alignment:
 
@@ -253,10 +489,71 @@ Examples of properly formatted goals:
 Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame using BOTH SMARTA principles AND specific Salveo service alignment. Only use the fallback sentence for sections where no relevant information was discussed.`
         }
       ],
+    }, {
+      timeout: 300000, // 5 minutes for care plan generation
     });
 
-    return response.choices[0].message.content || "";
+    const result = response.choices[0].message.content || "";
+    const duration = Date.now() - startTime;
+    console.log(`Care plan generation completed in ${duration}ms, output length: ${result.length} characters`);
+    
+    return result;
   } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`Care plan generation failed after ${duration}ms:`, error);
+    
+    if (error instanceof Error) {
+      if (error.message.includes('timeout')) {
+        throw new Error(`Care plan generation timed out after ${Math.floor(duration/1000)} seconds. This may be due to a very long transcript or API issues.`);
+      } else if (error.message.includes('rate_limit')) {
+        throw new Error('OpenAI API rate limit exceeded. Please try again in a few moments.');
+      } else if (error.message.includes('insufficient_quota')) {
+        throw new Error('OpenAI API quota exceeded. Please check your API usage and billing.');
+      } else if (error.message.includes('context_length_exceeded')) {
+        throw new Error('Transcript is too long for processing. Please try with a shorter transcript or contact support.');
+      }
+    }
+    
     throw new Error("Failed to generate care plan: " + (error instanceof Error ? error.message : "Unknown error"));
   }
+}
+
+// Helper function to summarize very long transcripts
+async function summarizeTranscript(transcript: string, clientName: string): Promise<string> {
+  console.log('Creating transcript summary for care plan generation...');
+  
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `You are an AI assistant helping to summarize assessment transcripts for care planning. Your job is to create a comprehensive summary that preserves all important details for care plan generation.
+
+Create a structured summary that includes:
+1. Client demographics and communication needs
+2. Medical history, conditions, and medications
+3. Current functional abilities and limitations
+4. Family and social support networks
+5. Living arrangements and environment
+6. Risks and safety concerns
+7. Goals and preferences expressed by client/family
+8. Services currently received or needed
+9. Key quotes or specific client statements
+
+Preserve all specific details like names, addresses, medication names, equipment used, etc. The summary should be comprehensive enough to generate a complete care plan.
+
+Maintain the narrative flow and preserve the conversational context where important.`
+      },
+      {
+        role: "user",
+        content: `Please create a comprehensive summary of this assessment transcript for ${clientName}. Preserve all important details needed for care plan generation:
+
+${transcript}`
+      }
+    ],
+  }, {
+    timeout: 180000, // 3 minutes for summarization
+  });
+  
+  return response.choices[0].message.content || transcript;
 }

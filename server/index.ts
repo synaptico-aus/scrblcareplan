@@ -5,10 +5,11 @@ import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 
-// Trust proxy in production for secure cookies
+// Trust proxy for secure cookies and rate limiting
+// Always enable in deployed environments (Replit uses proxies)
+app.set('trust proxy', 1);
+
 if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-  
   // Enforce environment variables in production
   if (!process.env.SESSION_SECRET) {
     throw new Error('SESSION_SECRET environment variable is required in production');
@@ -16,10 +17,14 @@ if (process.env.NODE_ENV === 'production') {
   if (!process.env.AUTH_PASSWORD) {
     throw new Error('AUTH_PASSWORD environment variable is required in production');
   }
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY environment variable is required in production');
+  }
 }
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+// Increase limits for 80-minute transcripts (can be very large)
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
 // Session configuration
 app.use(session({
