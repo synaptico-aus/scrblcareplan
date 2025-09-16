@@ -8,7 +8,7 @@ import { AgentUpdates } from "@/components/AgentUpdates";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Shield, FileText, LogOut } from "lucide-react";
+import { Settings, Shield, FileText, LogOut, Bot, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import scrblLogo from "@/assets/scrbl-logo.png";
 
@@ -30,9 +30,114 @@ export default function CarePlanner({ onLogout }: CarePlannerProps = {}) {
   const [generationTime, setGenerationTime] = useState<number | null>(null);
   const [isFetchingNotta, setIsFetchingNotta] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [asyncJobId, setAsyncJobId] = useState<string | null>(null);
+  const [isAsyncProcessing, setIsAsyncProcessing] = useState(false);
+  const [asyncProgress, setAsyncProgress] = useState(0);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Polling function for async jobs
+  const pollAsyncJob = async (jobId: string) => {
+    const maxAttempts = 120; // 10 minutes with 5-second intervals
+    let attempts = 0;
+    
+    const poll = async () => {
+      try {
+        attempts++;
+        const response = await apiRequest("GET", `/api/job-status/${jobId}`, {});
+        const jobData = await response.json();
+        
+        console.log(`Poll attempt ${attempts}: Job status`, jobData);
+        
+        setAsyncProgress(jobData.progress || 0);
+        
+        if (jobData.status === 'completed') {
+          // Job completed successfully
+          setIsAsyncProcessing(false);
+          setAsyncJobId(null);
+          
+          const endTime = Date.now();
+          const totalTime = Math.round((endTime - (generationStartTime || 0)) / 1000);
+          setGenerationTime(totalTime);
+          
+          // Process the result
+          if (jobData.result) {
+            setFacts(jobData.result.facts);
+            
+            const htmlWithBudget = generateBudgetEstimateHTML(jobData.result.html, fundingType, fundingLevel);
+            setHtml(htmlWithBudget);
+            
+            // Auto-save
+            const autoSaveName = `${clientName} - ${new Date().toLocaleDateString('en-AU')}`;
+            autoSaveMutation.mutate({
+              name: autoSaveName,
+              clientName,
+              html: htmlWithBudget,
+              extractedFacts: jobData.result.facts,
+            });
+            
+            toast({
+              title: "Long Transcript Processing Complete",
+              description: `Generated in ${totalTime} seconds using async processing and saved as "${autoSaveName}"`,
+            });
+          }
+          
+          return; // Stop polling
+        } else if (jobData.status === 'error') {
+          // Job failed
+          setIsAsyncProcessing(false);
+          setAsyncJobId(null);
+          setGenerationStartTime(null);
+          setGenerationTime(null);
+          
+          toast({
+            title: "Async Processing Failed",
+            description: jobData.error || "Unknown error occurred",
+            variant: "destructive",
+          });
+          
+          return; // Stop polling
+        } else if (attempts >= maxAttempts) {
+          // Max attempts reached
+          setIsAsyncProcessing(false);
+          setAsyncJobId(null);
+          
+          toast({
+            title: "Processing Timeout",
+            description: "The transcript is taking longer than expected to process. Please try again.",
+            variant: "destructive",
+          });
+          
+          return; // Stop polling
+        }
+        
+        // Continue polling
+        setTimeout(poll, 5000); // Poll every 5 seconds
+        
+      } catch (error) {
+        console.error('Polling error:', error);
+        attempts++;
+        
+        if (attempts >= maxAttempts) {
+          setIsAsyncProcessing(false);
+          setAsyncJobId(null);
+          toast({
+            title: "Connection Error",
+            description: "Lost connection while processing. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Retry polling after error
+        setTimeout(poll, 5000);
+      }
+    };
+    
+    // Start polling
+    poll();
+  };
 
   // Generate budget estimate HTML to append to care plan
   const generateBudgetEstimateHTML = (html: string, fundingType: string, fundingLevel: string) => {
@@ -189,24 +294,85 @@ export default function CarePlanner({ onLogout }: CarePlannerProps = {}) {
       const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       setSessionId(newSessionId);
       
-      // Use streaming endpoint for AI mode, regular endpoint for offline
-      const endpoint = mode === "ai" ? "/api/chat-parity-stream" : "/api/offline-analysis";
-      const response = await apiRequest("POST", endpoint, {
-        clientName,
-        transcript,
-        template: "gold-standard",
-        fundingType: fundingType || undefined,
-        fundingLevel: fundingLevel || undefined,
-        sessionId: mode === "ai" ? newSessionId : undefined
-      });
-      
-      const endTime = Date.now();
-      const totalTime = Math.round((endTime - startTime) / 1000);
-      setGenerationTime(totalTime);
-      
-      return response.json();
+      if (mode === "ai") {
+        // Check transcript length to determine processing approach
+        const transcriptLength = transcript.length;
+        const estimatedSeconds = Math.ceil(transcriptLength / 300);
+        
+        console.log(`Transcript: ${transcriptLength} chars, estimated: ${estimatedSeconds}s`);
+        
+        if (estimatedSeconds > 90) {
+          // Long transcript - use async processing
+          console.log('Using async processing for long transcript');
+          setIsAsyncProcessing(true);
+          setAsyncProgress(0);
+          
+          const response = await apiRequest("POST", "/api/chat-parity-async", {
+            clientName,
+            transcript,
+            template: "gold-standard",
+            fundingType: fundingType || undefined,
+            fundingLevel: fundingLevel || undefined,
+            sessionId: newSessionId,
+          });
+          
+          const asyncData = await response.json();
+          
+          if (asyncData.jobId) {
+            setAsyncJobId(asyncData.jobId);
+            // Start polling for job completion
+            pollAsyncJob(asyncData.jobId);
+            return { isAsync: true, jobId: asyncData.jobId }; // Don't process as normal response
+          } else {
+            throw new Error(asyncData.message || 'Failed to start async processing');
+          }
+        } else {
+          // Short transcript - use streaming
+          console.log('Using streaming for normal transcript');
+          const response = await apiRequest("POST", "/api/chat-parity-stream", {
+            clientName,
+            transcript,
+            template: "gold-standard",
+            fundingType: fundingType || undefined,
+            fundingLevel: fundingLevel || undefined,
+            sessionId: newSessionId,
+          });
+          
+          const endTime = Date.now();
+          const totalTime = Math.round((endTime - startTime) / 1000);
+          setGenerationTime(totalTime);
+          
+          return response.json();
+        }
+      } else {
+        // Offline mode
+        const response = await apiRequest("POST", "/api/offline-analysis", {
+          clientName,
+          transcript,
+          template: "gold-standard",
+          fundingType: fundingType || undefined,
+          fundingLevel: fundingLevel || undefined,
+          sessionId: newSessionId,
+        });
+        
+        const endTime = Date.now();
+        const totalTime = Math.round((endTime - startTime) / 1000);
+        setGenerationTime(totalTime);
+        
+        return response.json();
+      }
     },
     onSuccess: (data) => {
+      // Skip normal processing if this is an async job
+      if (data.isAsync) {
+        console.log('Async job started, skipping normal success handling');
+        toast({
+          title: "Long Transcript Detected",
+          description: "Processing in background to avoid timeout. You'll be notified when complete.",
+        });
+        return;
+      }
+      
       setFacts(data.facts);
       
       // Add budget estimate to the HTML before saving and displaying
@@ -230,6 +396,9 @@ export default function CarePlanner({ onLogout }: CarePlannerProps = {}) {
     onError: (error) => {
       setGenerationStartTime(null);
       setGenerationTime(null);
+      setIsAsyncProcessing(false);
+      setAsyncJobId(null);
+      setAsyncProgress(0);
       toast({
         title: "Generation Failed",
         description: error.message || "Failed to generate care plan",
@@ -404,31 +573,70 @@ export default function CarePlanner({ onLogout }: CarePlannerProps = {}) {
           setFundingLevel={setFundingLevel}
           onGenerate={handleGenerate}
           onFetchFromNotta={handleFetchFromNotta}
-          isLoading={generateMutation.isPending}
+          isLoading={generateMutation.isPending || isAsyncProcessing}
           isFetchingNotta={isFetchingNotta}
         />
 
         {/* Agent Updates - Show only when generating with AI */}
-        {generateMutation.isPending && processingMode === "ai" && (
+        {(generateMutation.isPending || isAsyncProcessing) && processingMode === "ai" && (
           <div className="w-full lg:w-80 p-4 border-r border-border bg-card/50 lg:min-h-0 lg:max-h-full lg:overflow-y-auto">
-            <AgentUpdates
-              sessionId={sessionId}
-              isGenerating={generateMutation.isPending}
-              onComplete={handleAgentCompletion}
-            />
+            {isAsyncProcessing ? (
+              /* Async Processing Status */
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Bot className="h-5 w-5 text-blue-500" />
+                  <h3 className="font-semibold">Background Processing</h3>
+                </div>
+                
+                <div className="space-y-3">
+                  <div className="text-sm text-muted-foreground">
+                    Processing long transcript asynchronously to avoid timeouts...
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress</span>
+                      <span>{asyncProgress}%</span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${asyncProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="text-xs text-muted-foreground">
+                    Job ID: {asyncJobId}
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-sm">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Processing in background...</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Normal Streaming Updates */
+              <AgentUpdates
+                sessionId={sessionId || undefined}
+                isGenerating={generateMutation.isPending}
+                onComplete={handleAgentCompletion}
+              />
+            )}
           </div>
         )}
 
         <FactsPanel
           facts={facts}
-          isProcessing={generateMutation.isPending}
+          isProcessing={generateMutation.isPending || isAsyncProcessing}
           isCollapsed={isFactsPanelCollapsed}
           onToggleCollapse={() => setIsFactsPanelCollapsed(!isFactsPanelCollapsed)}
         />
 
         <CarePlanPreview
           html={html}
-          isLoading={generateMutation.isPending}
+          isLoading={generateMutation.isPending || isAsyncProcessing}
           clientName={clientName}
           extractedFacts={facts}
           generationStartTime={generationStartTime}
