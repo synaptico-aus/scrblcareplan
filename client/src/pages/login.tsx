@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Shield, Eye, EyeOff } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import scrblLogo from "@assets/scrbl-logo.png";
 
@@ -12,14 +14,36 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin }: LoginProps) {
-  const [error, setError] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { toast } = useToast();
 
-  const handleReplitLogin = () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
     setError("");
-    // Redirect to Replit OAuth flow
-    window.location.href = "/api/login";
+
+    try {
+      const response = await apiRequest("POST", "/api/auth/login", {
+        password,
+      });
+
+      if (response.ok) {
+        onLogin();
+        toast({
+          title: "Login successful",
+          description: "Welcome to scrbl_v2",
+        });
+      } else {
+        setError("Invalid password. Please try again.");
+      }
+    } catch (error) {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -39,22 +63,52 @@ export default function Login({ onLogin }: LoginProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-4">
             {error && (
               <Alert variant="destructive" data-testid="alert-error">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pr-10"
+                  placeholder="Enter your password"
+                  data-testid="input-password"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                  data-testid="button-toggle-password"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+            
             <Button 
-              onClick={handleReplitLogin} 
+              type="submit"
               className="w-full" 
               disabled={isLoading}
               data-testid="button-login"
             >
-              {isLoading ? "Redirecting..." : "Login with Replit"}
+              {isLoading ? "Logging in..." : "Login"}
             </Button>
-          </div>
+          </form>
 
           <div className="mt-6 flex items-center justify-center space-x-2 text-sm text-muted-foreground">
             <Shield className="h-4 w-4" />
