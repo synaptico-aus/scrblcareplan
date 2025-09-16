@@ -128,7 +128,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           req.session.isAuthenticated = true;
-          res.json({ success: true });
+          // Explicitly save the session
+          req.session.save((err) => {
+            if (err) {
+              console.error('Session save error:', err);
+              return res.status(500).json({ error: 'Session save failed' });
+            }
+            res.json({ success: true });
+          });
         } else {
           res.status(401).json({ error: 'Invalid password' });
         }
@@ -150,6 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
 
     app.get('/api/auth/me', (req, res) => {
+      res.set('Cache-Control', 'no-store'); // Prevent caching
       res.json({ isAuthenticated: !!req.session.isAuthenticated });
     });
   } else if (authMode === 'none') {

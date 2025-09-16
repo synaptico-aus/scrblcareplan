@@ -43,10 +43,10 @@ if (authMode === 'password' || authMode === 'none') {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === 'production',
+      secure: true, // Required with SameSite=None
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: 'strict'
+      sameSite: 'none' // Allow third-party (iframe) cookies
     }
   }));
 }
