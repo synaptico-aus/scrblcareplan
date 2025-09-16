@@ -8,7 +8,7 @@ import { AgentUpdates } from "@/components/AgentUpdates";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Shield, FileText, LogOut, Bot, Loader2 } from "lucide-react";
+import { Settings, Shield, FileText, Bot, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import scrblLogo from "@/assets/scrbl-logo.png";
 

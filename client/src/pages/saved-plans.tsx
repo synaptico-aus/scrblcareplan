@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus, Edit, LogOut } from "lucide-react";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus, Edit } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts, ClientDocument, ClientFolderAlias } from "@shared/schema";
