@@ -38,30 +38,10 @@ async function loadReplitAuth() {
   return replitAuthFunctions;
 }
 
-// Authentication middleware - supports multiple auth modes
+// Authentication middleware - simplified for no auth mode
 function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (authMode === 'none' && process.env.DISABLE_AUTH === 'I_UNDERSTAND_THE_RISKS') {
-    return next(); // No authentication required
-  }
-  
-  if (authMode === 'replit') {
-    if (!replitAuthFunctions) {
-      return res.status(500).json({ error: 'Replit authentication not initialized' });
-    }
-    return replitAuthFunctions.isAuthenticated(req, res, next);
-  }
-  
-  if (authMode === 'password') {
-    console.log(`[requireAuth] Password mode - SessionID: ${req.sessionID}, isAuthenticated: ${req.session.isAuthenticated}, Path: ${req.path}`);
-    if (req.session.isAuthenticated) {
-      console.log(`[requireAuth] ALLOWED - Session authenticated`);
-      return next();
-    }
-    console.log(`[requireAuth] DENIED - Session not authenticated`);
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  
-  return res.status(500).json({ error: 'Invalid authentication mode' });
+  // No authentication required when auth mode is 'none'
+  return next();
 }
 
 // Event emitter for real-time updates
@@ -105,65 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ success: true });
       });
     });
-  } else if (authMode === 'password') {
-    // Rate limiting for login endpoint
-    const loginLimiter = rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 5, // Limit each IP to 5 requests per windowMs
-      message: { error: 'Too many login attempts, please try again later' },
-      standardHeaders: true,
-      legacyHeaders: false,
-    });
-
-    // Password-based authentication endpoints
-    app.post('/api/auth/login', loginLimiter, async (req, res) => {
-      try {
-        const { password } = req.body;
-        const correctPassword = process.env.AUTH_PASSWORD || 'caresalveocarl';
-        
-        if (password === correctPassword) {
-          // Regenerate session to prevent session fixation
-          await new Promise<void>((resolve, reject) => {
-            req.session.regenerate((err) => {
-              if (err) reject(err);
-              else resolve();
-            });
-          });
-          
-          req.session.isAuthenticated = true;
-          // Explicitly save the session
-          req.session.save((err) => {
-            if (err) {
-              console.error('Session save error:', err);
-              return res.status(500).json({ error: 'Session save failed' });
-            }
-            res.json({ success: true });
-          });
-        } else {
-          res.status(401).json({ error: 'Invalid password' });
-        }
-      } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-      }
-    });
-
-    app.post('/api/auth/logout', (req, res) => {
-      req.session.destroy((err) => {
-        if (err) {
-          console.error('Logout error:', err);
-          return res.status(500).json({ error: 'Logout failed' });
-        }
-        res.clearCookie('connect.sid');
-        res.json({ success: true });
-      });
-    });
-
-    app.get('/api/auth/me', (req, res) => {
-      res.set('Cache-Control', 'no-store'); // Prevent caching
-      res.json({ isAuthenticated: !!req.session.isAuthenticated });
-    });
-  } else if (authMode === 'none') {
+  } else {
     // No authentication - just provide status endpoints
     app.get('/api/auth/me', (req, res) => {
       res.json({ isAuthenticated: true }); // Always authenticated in no-auth mode
