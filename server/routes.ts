@@ -290,7 +290,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // New streaming generation endpoint
+  // Job storage for async processing
+  const asyncJobs = new Map();
+
+  // Async processing endpoint for long transcripts
+  app.post("/api/chat-parity-async", requireAuth, async (req, res) => {
+    try {
+      const validatedData = chatParityRequestSchema.parse(req.body);
+      const { clientName, transcript, template, sessionId } = validatedData;
+
+      if (template !== "gold-standard") {
+        return res.status(400).json({ 
+          message: "Only 'gold-standard' template is supported" 
+        });
+      }
+
+      if (!sessionId) {
+        return res.status(400).json({
+          message: "sessionId is required for async generation"
+        });
+      }
+
+      // Estimate processing time to determine if async processing is needed
+      const transcriptLength = transcript.length;
+      const estimatedSeconds = Math.ceil(transcriptLength / 300); // Conservative estimate
+      
+      console.log(`Transcript length: ${transcriptLength} characters, estimated processing: ${estimatedSeconds} seconds`);
+
+      if (estimatedSeconds > 90) {
+        // Long transcript - use async processing
+        const jobId = `async_${sessionId}_${Date.now()}`;
+        
+        asyncJobs.set(jobId, {
+          status: 'processing',
+          progress: 0,
+          startTime: Date.now(),
+          clientName,
+          transcriptLength,
+          estimatedSeconds,
+          sessionId
+        });
+
+        // Start background processing (don't await)
+        processAsyncJob(jobId, clientName, transcript, sessionId, asyncJobs, eventEmitter)
+          .catch((error: Error) => {
+            console.error(`Async job ${jobId} failed:`, error);
+            asyncJobs.set(jobId, {
+              ...asyncJobs.get(jobId),
+              status: 'error',
+              error: error.message,
+              completedAt: Date.now()
+            });
+          });
+
+        return res.json({
+          jobId,
+          status: 'processing',
+          estimatedSeconds,
+          message: `Long transcript detected (${Math.floor(transcriptLength/1000)}k chars). Processing asynchronously to avoid timeout.`,
+          pollUrl: `/api/job-status/${jobId}`
+        });
+      } else {
+        // Short transcript - process synchronously
+        return res.status(400).json({
+          message: 'Use /api/chat-parity-stream for shorter transcripts',
+          estimatedSeconds,
+          useStreaming: true
+        });
+      }
+
+    } catch (error) {
+      console.error("Error in async endpoint:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to process request" 
+      });
+    }
+  });
+
+  // Job status endpoint
+  app.get("/api/job-status/:jobId", requireAuth, (req, res) => {
+    const { jobId } = req.params;
+    const job = asyncJobs.get(jobId);
+    
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const response = {
+      ...job,
+      elapsedSeconds: Math.floor((Date.now() - job.startTime) / 1000)
+    };
+
+    // Clean up completed jobs after 1 hour
+    if (job.status === 'completed' && Date.now() - job.completedAt > 3600000) {
+      asyncJobs.delete(jobId);
+    }
+
+    res.json(response);
+  });
+
+  // New streaming generation endpoint  
   app.post("/api/chat-parity-stream", requireAuth, async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
@@ -307,6 +406,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "sessionId is required for streaming generation"
         });
       }
+
+      // Check for potential timeout risk in streaming
+      const transcriptLength = transcript.length;
+      const estimatedSeconds = Math.ceil(transcriptLength / 300);
+      
+      if (estimatedSeconds > 90) {
+        return res.status(400).json({
+          error: 'Transcript too long for streaming',
+          transcriptLength,
+          estimatedSeconds,
+          message: 'Please use the async endpoint /api/chat-parity-async for long transcripts',
+          useAsync: true
+        });
+      }
+
+      console.log(`Starting streaming generation - transcript: ${transcriptLength} chars, estimated: ${estimatedSeconds}s`);
 
       // Send initial update with proper delays for visibility
       eventEmitter.emit('generation-update', {
@@ -772,5 +887,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  // Async job processing function
+  async function processAsyncJob(
+    jobId: string, 
+    clientName: string, 
+    transcript: string, 
+    sessionId: string, 
+    asyncJobs: Map<string, any>, 
+    eventEmitter: any
+  ) {
+    try {
+      console.log(`Starting async job ${jobId} for client: ${clientName}`);
+      
+      // Update job progress
+      asyncJobs.set(jobId, {
+        ...asyncJobs.get(jobId),
+        status: 'extracting_facts',
+        progress: 10
+      });
+
+      // Send progress update via event emitter
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Starting background processing for long transcript',
+        step: 1,
+        totalSteps: 8,
+        jobId
+      });
+
+      // Step 1: Extract facts
+      asyncJobs.set(jobId, { ...asyncJobs.get(jobId), progress: 25 });
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Extracting facts from long transcript',
+        step: 3,
+        totalSteps: 8,
+        jobId
+      });
+
+      const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+
+      // Step 2: Generate care plan
+      asyncJobs.set(jobId, { 
+        ...asyncJobs.get(jobId), 
+        status: 'generating_care_plan',
+        progress: 50 
+      });
+      
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Generating care plan for long transcript',
+        step: 6,
+        totalSteps: 8,
+        jobId
+      });
+
+      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
+
+      // Step 3: Store analysis
+      asyncJobs.set(jobId, { 
+        ...asyncJobs.get(jobId), 
+        status: 'storing_results',
+        progress: 90 
+      });
+
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'action',
+        action: 'Saving care plan to database',
+        step: 8,
+        totalSteps: 8,
+        jobId
+      });
+
+      const analysis = await storage.createCareAnalysis({
+        clientName,
+        transcript,
+        processingMode: "ai",
+        extractedFacts,
+        generatedHtml,
+      });
+
+      // Complete job
+      asyncJobs.set(jobId, {
+        ...asyncJobs.get(jobId),
+        status: 'completed',
+        progress: 100,
+        completedAt: Date.now(),
+        result: {
+          html: generatedHtml,
+          facts: extractedFacts,
+          analysisId: analysis.id
+        }
+      });
+
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'complete',
+        message: 'Long transcript processing completed successfully!',
+        step: 8,
+        totalSteps: 8,
+        jobId,
+        result: {
+          html: generatedHtml,
+          facts: extractedFacts,
+          analysisId: analysis.id
+        }
+      });
+
+      console.log(`Async job ${jobId} completed successfully`);
+
+    } catch (error) {
+      console.error(`Async job ${jobId} processing error:`, error);
+      
+      asyncJobs.set(jobId, {
+        ...asyncJobs.get(jobId),
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        completedAt: Date.now()
+      });
+
+      eventEmitter.emit('generation-update', {
+        sessionId,
+        type: 'error',
+        message: `Async processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        jobId
+      });
+
+      throw error;
+    }
+  }
+
   return httpServer;
 }
