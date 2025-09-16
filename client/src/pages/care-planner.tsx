@@ -45,7 +45,7 @@ export default function CarePlanner({ onLogout }: CarePlannerProps = {}) {
     const poll = async () => {
       try {
         attempts++;
-        const response = await apiRequest("GET", `/api/job-status/${jobId}`, {});
+        const response = await apiRequest("GET", `/api/job-status/${jobId}`);
         const jobData = await response.json();
         
         console.log(`Poll attempt ${attempts}: Job status`, jobData);
