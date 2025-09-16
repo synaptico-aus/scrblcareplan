@@ -10,12 +10,7 @@ import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
 // Conditional import - only import Replit Auth when needed to avoid crashes
 
-// Extend express-session types
-declare module 'express-session' {
-  interface SessionData {
-    isAuthenticated: boolean;
-  }
-}
+// Session types no longer needed - authentication disabled
 
 // AUTH_MODE: 'replit' (default), 'password', or 'none'
 const authMode = process.env.AUTH_MODE || 'none';
