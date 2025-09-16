@@ -52,9 +52,12 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   }
   
   if (authMode === 'password') {
+    console.log(`[requireAuth] Password mode - SessionID: ${req.sessionID}, isAuthenticated: ${req.session.isAuthenticated}, Path: ${req.path}`);
     if (req.session.isAuthenticated) {
+      console.log(`[requireAuth] ALLOWED - Session authenticated`);
       return next();
     }
+    console.log(`[requireAuth] DENIED - Session not authenticated`);
     return res.status(401).json({ error: 'Authentication required' });
   }
   
