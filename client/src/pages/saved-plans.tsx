@@ -15,11 +15,7 @@ import scrblLogo from "@/assets/scrbl-logo.png";
 import html2pdf from "html2pdf.js";
 import { ObjectUploader } from "@/components/ObjectUploader";
 
-interface SavedPlansProps {
-  onLogout?: () => void;
-}
-
-export default function SavedPlans({ onLogout }: SavedPlansProps = {}) {
+export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<SavedCarePlan | null>(null);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
@@ -783,19 +779,6 @@ export default function SavedPlans({ onLogout }: SavedPlansProps = {}) {
                 <span className="sm:hidden">Planner</span>
               </Button>
             </Link>
-            {onLogout && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onLogout}
-                data-testid="button-logout-saved-plans" 
-                className="w-full sm:w-auto"
-              >
-                <LogOut className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Sign Out</span>
-                <span className="sm:hidden">Out</span>
-              </Button>
-            )}
           </div>
         </div>
       </header>

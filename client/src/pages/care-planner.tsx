@@ -12,11 +12,7 @@ import { Settings, Shield, FileText, LogOut, Bot, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import scrblLogo from "@/assets/scrbl-logo.png";
 
-interface CarePlannerProps {
-  onLogout?: () => void;
-}
-
-export default function CarePlanner({ onLogout }: CarePlannerProps = {}) {
+export default function CarePlanner() {
   const [clientName, setClientName] = useState("");
   const [transcript, setTranscript] = useState("");
   const [nottaUrl, setNottaUrl] = useState("");
@@ -540,18 +536,6 @@ export default function CarePlanner({ onLogout }: CarePlannerProps = {}) {
                 <span className="hidden sm:inline">Saved Plans</span>
               </Button>
             </Link>
-            {onLogout && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={onLogout}
-                data-testid="button-logout" 
-                className="text-xs sm:text-sm"
-              >
-                <LogOut className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </Button>
-            )}
           </div>
         </div>
       </header>
