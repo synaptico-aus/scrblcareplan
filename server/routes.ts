@@ -18,7 +18,7 @@ declare module 'express-session' {
 }
 
 // AUTH_MODE: 'replit' (default), 'password', or 'none'
-const authMode = process.env.AUTH_MODE || 'replit';
+const authMode = process.env.AUTH_MODE || 'none';
 
 // Lazy-loaded Replit Auth functions
 let replitAuthFunctions: {

@@ -19,38 +19,16 @@ if (process.env.NODE_ENV === 'production') {
   }
   
   // AUTH_MODE controls authentication method: 'replit' (default), 'password', or 'none'
-  const authMode = process.env.AUTH_MODE || 'replit';
+  const authMode = process.env.AUTH_MODE || 'none';
   
-  if (authMode === 'password' && !process.env.AUTH_PASSWORD) {
-    throw new Error('AUTH_PASSWORD environment variable is required when AUTH_MODE=password');
-  }
-  
-  if (authMode === 'none' && process.env.DISABLE_AUTH !== 'I_UNDERSTAND_THE_RISKS') {
-    throw new Error('When AUTH_MODE=none, you must set DISABLE_AUTH=I_UNDERSTAND_THE_RISKS to explicitly acknowledge security risks');
-  }
+  // Authentication disabled - no additional validation needed
 }
 
 // Increase limits for 80-minute transcripts (can be very large)
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
-// Session configuration - only for password/none auth modes
-// Replit auth mode handles its own session configuration with PostgreSQL store
-const authMode = process.env.AUTH_MODE || 'replit';
-if (authMode === 'password' || authMode === 'none') {
-  const isProduction = process.env.NODE_ENV === 'production';
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'scrbl-care-planning-secret-key-change-in-production',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: isProduction, // Only require HTTPS in production
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: isProduction ? 'none' : 'lax' // Use 'lax' in development, 'none' in production
-    }
-  }));
-}
+// No session configuration needed - authentication disabled
 
 app.use((req, res, next) => {
   const start = Date.now();
