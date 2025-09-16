@@ -927,7 +927,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobId
       });
 
-      const extractedFacts = await extractFactsFromTranscript(transcript, clientName);
+      const extractedFacts = await extractFactsFromTranscript(transcript, clientName, (progress, stage) => {
+        // Update async job with detailed progress from fact extraction
+        const adjustedProgress = 10 + (progress * 0.4); // 10% to 50% of total progress
+        asyncJobs.set(jobId, {
+          ...asyncJobs.get(jobId),
+          progress: adjustedProgress,
+          currentStage: stage
+        });
+        
+        eventEmitter.emit('generation-update', {
+          sessionId,
+          type: 'action',
+          action: stage,
+          progress: adjustedProgress,
+          jobId
+        });
+      });
 
       // Step 2: Generate care plan
       asyncJobs.set(jobId, { 
@@ -945,7 +961,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobId
       });
 
-      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
+      const generatedHtml = await generateCarePlanHtml(transcript, clientName, (progress, stage) => {
+        // Update async job with detailed progress from care plan generation  
+        const adjustedProgress = 50 + (progress * 0.4); // 50% to 90% of total progress
+        asyncJobs.set(jobId, {
+          ...asyncJobs.get(jobId),
+          progress: adjustedProgress,
+          currentStage: stage
+        });
+        
+        eventEmitter.emit('generation-update', {
+          sessionId,
+          type: 'action',
+          action: stage,
+          progress: adjustedProgress,
+          jobId
+        });
+      });
 
       // Step 3: Store analysis
       asyncJobs.set(jobId, { 

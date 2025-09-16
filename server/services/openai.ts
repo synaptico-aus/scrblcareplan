@@ -19,7 +19,7 @@ function estimateTokenCount(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-// Function to chunk transcript if it's too long
+// Enhanced function to chunk transcript intelligently for 80-minute transcripts
 function chunkTranscript(transcript: string, maxTokens: number = 120000): string[] {
   const estimatedTokens = estimateTokenCount(transcript);
   
@@ -27,52 +27,142 @@ function chunkTranscript(transcript: string, maxTokens: number = 120000): string
     return [transcript];
   }
   
-  // Split into chunks with overlap for context
+  console.log(`Long transcript detected: ${estimatedTokens} estimated tokens, splitting into chunks`);
+  
+  // Preprocess transcript to remove timestamps and clean up
+  const cleanedTranscript = preprocessTranscript(transcript);
+  
+  // Use intelligent chunking for very long transcripts
   const chunks: string[] = [];
-  const maxChunkSize = Math.floor(maxTokens * 4 * 0.8); // 80% of max, convert back to characters
-  const overlapSize = Math.floor(maxChunkSize * 0.1); // 10% overlap
+  const maxChunkSize = Math.floor(maxTokens * 4 * 0.75); // 75% of max for safety margin
+  const overlapSize = Math.floor(maxChunkSize * 0.15); // 15% overlap for better context
   
   let start = 0;
-  while (start < transcript.length) {
-    const end = Math.min(start + maxChunkSize, transcript.length);
+  while (start < cleanedTranscript.length) {
+    const end = Math.min(start + maxChunkSize, cleanedTranscript.length);
     
-    // Try to break at sentence boundaries
+    // Try to break at natural conversation boundaries
     let chunkEnd = end;
-    if (end < transcript.length) {
-      const sentenceBreak = transcript.lastIndexOf('.', end);
-      if (sentenceBreak > start + maxChunkSize * 0.5) {
-        chunkEnd = sentenceBreak + 1;
+    if (end < cleanedTranscript.length) {
+      // Look for speaker changes first (common in assessment transcripts)
+      const speakerBreak = findSpeakerBreak(cleanedTranscript, start + maxChunkSize * 0.3, end);
+      if (speakerBreak > 0) {
+        chunkEnd = speakerBreak;
+      } else {
+        // Fall back to paragraph or sentence boundaries
+        const paragraphBreak = cleanedTranscript.lastIndexOf('\n\n', end);
+        const sentenceBreak = cleanedTranscript.lastIndexOf('.', end);
+        
+        if (paragraphBreak > start + maxChunkSize * 0.5) {
+          chunkEnd = paragraphBreak + 2;
+        } else if (sentenceBreak > start + maxChunkSize * 0.5) {
+          chunkEnd = sentenceBreak + 1;
+        }
       }
     }
     
-    chunks.push(transcript.slice(start, chunkEnd));
+    const chunk = cleanedTranscript.slice(start, chunkEnd).trim();
+    if (chunk.length > 0) {
+      chunks.push(chunk);
+    }
+    
     start = chunkEnd - overlapSize;
   }
   
+  console.log(`Split transcript into ${chunks.length} chunks with average size: ${Math.round(chunks.reduce((sum, c) => sum + c.length, 0) / chunks.length)} characters`);
   return chunks;
 }
 
-export async function extractFactsFromTranscript(transcript: string, clientName: string) {
+// Preprocess transcript to remove timestamps and clean up for better processing
+function preprocessTranscript(transcript: string): string {
+  let cleaned = transcript
+    // Remove timestamps (various formats)
+    .replace(/\b\d{1,2}:\d{2}(:\d{2})?(\s*(AM|PM))?\b/gi, '')
+    .replace(/\[\d{2}:\d{2}(:\d{2})?\]/g, '')
+    // Remove call system artifacts
+    .replace(/\b(this call is being recorded|recording started|recording ended)\b/gi, '')
+    .replace(/\b(press \d+ for|to speak to|please hold|connecting)\b/gi, '')
+    // Clean up multiple spaces and newlines
+    .replace(/\s{3,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    // Remove empty lines
+    .replace(/^\s*$/gm, '')
+    .trim();
+    
+  return cleaned;
+}
+
+// Find speaker change boundaries for better chunking
+function findSpeakerBreak(text: string, minPos: number, maxPos: number): number {
+  // Look for common speaker patterns in assessment transcripts
+  const speakerPatterns = [
+    /\n(Care Partner|Assessor|Interviewer|Worker):/gi,
+    /\n(Client|Patient|Resident):/gi,
+    /\n(Family Member|Daughter|Son|Spouse):/gi,
+    /\n[A-Z][a-z]+:\s/g, // Generic "Name: " pattern
+    /\n\n[A-Z]/g // New paragraph with capital letter
+  ];
+  
+  for (const pattern of speakerPatterns) {
+    const matches = [...text.slice(minPos, maxPos).matchAll(pattern)];
+    if (matches.length > 0) {
+      // Return position of first match after minPos
+      return minPos + matches[0].index! + matches[0][0].length;
+    }
+  }
+  
+  return -1; // No speaker break found
+}
+
+export async function extractFactsFromTranscript(transcript: string, clientName: string, progressCallback?: (progress: number, stage: string) => void) {
   const startTime = Date.now();
   console.log(`Starting fact extraction for client: ${clientName}, transcript length: ${transcript.length} characters`);
   
+  progressCallback?.(5, 'Analyzing transcript structure');
+  
   try {
     // Check if transcript is too long and needs chunking
+    progressCallback?.(10, 'Preparing transcript for processing');
     const chunks = chunkTranscript(transcript, 120000); // GPT-5 context limit
     
     if (chunks.length > 1) {
       console.log(`Large transcript detected - processing in ${chunks.length} chunks`);
       
-      // Process chunks and merge results
+      // Process chunks and merge results with progress tracking
       const allFacts = [];
       for (let i = 0; i < chunks.length; i++) {
-        console.log(`Processing chunk ${i + 1}/${chunks.length}`);
-        const chunkFacts = await extractFactsFromChunk(chunks[i], clientName, i + 1, chunks.length);
-        allFacts.push(chunkFacts);
+        const startTime = Date.now();
+        console.log(`Processing fact extraction chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)`);
+        
+        try {
+          // Report progress for each chunk
+          const chunkProgress = 15 + (i / chunks.length) * 70; // 15% to 85% range
+          progressCallback?.(chunkProgress, `Extracting facts from chunk ${i + 1}/${chunks.length}`);
+          
+          const chunkFacts = await extractFactsFromChunk(chunks[i], clientName, i + 1, chunks.length);
+          allFacts.push(chunkFacts);
+          
+          const chunkTime = Date.now() - startTime;
+          console.log(`Chunk ${i + 1}/${chunks.length} completed in ${chunkTime}ms`);
+        } catch (error) {
+          console.error(`Error processing chunk ${i + 1}/${chunks.length}:`, error);
+          // Continue with other chunks - don't fail entire extraction for one chunk
+          allFacts.push({
+            clientDetails: { name: clientName, language: null, interpreterRequired: null },
+            medical: { gp: null, pharmacy: null, equipment: [], medications: null, allergies: null },
+            support: { primaryContact: null, secondaryContact: null, livingArrangement: null },
+            risks: [],
+            preferences: { workerPreferences: null, serviceDeliveryPreferences: null, culturalConsiderations: null }
+          });
+        }
       }
       
-      // Merge all facts from chunks
-      return mergeFacts(allFacts);
+      // Merge all facts from chunks with enhanced deduplication
+      progressCallback?.(90, 'Merging and deduplicating extracted facts');
+      console.log(`Merging facts from ${allFacts.length} chunks`);
+      const mergedFacts = mergeFacts(allFacts);
+      progressCallback?.(100, 'Fact extraction complete');
+      return mergedFacts;
     }
     
     // Process single transcript
@@ -143,6 +233,7 @@ Build comprehensive facts from the information discussed, not just isolated deta
     const duration = Date.now() - startTime;
     console.log(`Fact extraction completed in ${duration}ms`);
     
+    progressCallback?.(100, 'Fact extraction complete');
     return result;
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -233,8 +324,10 @@ Build comprehensive facts from the information discussed in this chunk.`
   return JSON.parse(response.choices[0].message.content || "{}");
 }
 
-// Helper function to merge facts from multiple chunks
+// Enhanced helper function to merge facts from multiple chunks with better deduplication
 function mergeFacts(factsList: any[]): any {
+  console.log(`Merging facts from ${factsList.length} chunks`);
+  
   const merged = {
     clientDetails: { name: null, language: null, interpreterRequired: null },
     medical: { gp: null, pharmacy: null, equipment: [] as string[], medications: null, allergies: null },
@@ -243,75 +336,183 @@ function mergeFacts(factsList: any[]): any {
     preferences: { workerPreferences: null, serviceDeliveryPreferences: null, culturalConsiderations: null }
   };
   
-  factsList.forEach(facts => {
-    // Merge client details (take first non-null value)
+  // Track confidence scores for better merging decisions
+  const confidenceScores = {
+    clientDetails: {} as any,
+    medical: {} as any,
+    support: {} as any
+  };
+  
+  factsList.forEach((facts, chunkIndex) => {
+    if (!facts) return;
+    
+    // Merge client details with preference for more complete information
     if (facts.clientDetails) {
-      merged.clientDetails.name = merged.clientDetails.name || facts.clientDetails.name;
-      merged.clientDetails.language = merged.clientDetails.language || facts.clientDetails.language;
-      merged.clientDetails.interpreterRequired = merged.clientDetails.interpreterRequired ?? facts.clientDetails.interpreterRequired;
+      if (!merged.clientDetails.name && facts.clientDetails.name) {
+        merged.clientDetails.name = facts.clientDetails.name;
+      }
+      
+      // Language info - prefer specific language over generic "English"
+      if (facts.clientDetails.language) {
+        if (!merged.clientDetails.language || 
+            (merged.clientDetails.language.toLowerCase() === 'english' && 
+             facts.clientDetails.language.toLowerCase() !== 'english')) {
+          merged.clientDetails.language = facts.clientDetails.language;
+        }
+      }
+      
+      // Interpreter requirement - prefer explicit true over null
+      if (facts.clientDetails.interpreterRequired !== null) {
+        merged.clientDetails.interpreterRequired = merged.clientDetails.interpreterRequired ?? facts.clientDetails.interpreterRequired;
+      }
     }
     
-    // Merge medical info
+    // Enhanced medical info merging
     if (facts.medical) {
-      merged.medical.gp = merged.medical.gp || facts.medical.gp;
-      merged.medical.pharmacy = merged.medical.pharmacy || facts.medical.pharmacy;
-      merged.medical.medications = merged.medical.medications || facts.medical.medications;
-      merged.medical.allergies = merged.medical.allergies || facts.medical.allergies;
+      // Prefer more specific/complete information
+      merged.medical.gp = selectBestValue(merged.medical.gp, facts.medical.gp);
+      merged.medical.pharmacy = selectBestValue(merged.medical.pharmacy, facts.medical.pharmacy);
+      merged.medical.medications = selectBestValue(merged.medical.medications, facts.medical.medications);
+      merged.medical.allergies = selectBestValue(merged.medical.allergies, facts.medical.allergies);
       
-      // Merge equipment arrays and deduplicate
+      // Smart equipment merging with deduplication and normalization
       if (facts.medical.equipment && Array.isArray(facts.medical.equipment)) {
         facts.medical.equipment.forEach((item: string) => {
-          if (!merged.medical.equipment.includes(item)) {
+          const normalizedItem = normalizeEquipmentName(item);
+          const existingItem = merged.medical.equipment.find(existing => 
+            normalizeEquipmentName(existing) === normalizedItem
+          );
+          
+          if (!existingItem) {
             merged.medical.equipment.push(item);
           }
         });
       }
     }
     
-    // Merge support info
+    // Enhanced support info merging
     if (facts.support) {
-      merged.support.primaryContact = merged.support.primaryContact || facts.support.primaryContact;
-      merged.support.secondaryContact = merged.support.secondaryContact || facts.support.secondaryContact;
-      merged.support.livingArrangement = merged.support.livingArrangement || facts.support.livingArrangement;
+      merged.support.primaryContact = selectBestValue(merged.support.primaryContact, facts.support.primaryContact);
+      merged.support.secondaryContact = selectBestValue(merged.support.secondaryContact, facts.support.secondaryContact);
+      merged.support.livingArrangement = selectBestValue(merged.support.livingArrangement, facts.support.livingArrangement);
     }
     
-    // Merge risks (combine all unique risks)
+    // Enhanced risk merging with deduplication by similarity
     if (facts.risks && Array.isArray(facts.risks)) {
       facts.risks.forEach((risk: any) => {
-        const existingRisk = merged.risks.find((r: any) => r.type === risk.type && r.description === risk.description);
-        if (!existingRisk) {
-          merged.risks.push(risk);
+        if (!risk || !risk.type || !risk.description) return;
+        
+        const similarRisk = merged.risks.find((r: any) => 
+          areSimilarRisks(r, risk)
+        );
+        
+        if (!similarRisk) {
+          merged.risks.push({
+            ...risk,
+            source: `chunk_${chunkIndex + 1}` // Track source for debugging
+          });
+        } else {
+          // Merge severity (take highest)
+          if (risk.severity && getSeverityScore(risk.severity) > getSeverityScore(similarRisk.severity)) {
+            similarRisk.severity = risk.severity;
+          }
         }
       });
     }
     
-    // Merge preferences
+    // Enhanced preferences merging
     if (facts.preferences) {
-      merged.preferences.workerPreferences = merged.preferences.workerPreferences || facts.preferences.workerPreferences;
-      merged.preferences.serviceDeliveryPreferences = merged.preferences.serviceDeliveryPreferences || facts.preferences.serviceDeliveryPreferences;
-      merged.preferences.culturalConsiderations = merged.preferences.culturalConsiderations || facts.preferences.culturalConsiderations;
+      merged.preferences.workerPreferences = selectBestValue(merged.preferences.workerPreferences, facts.preferences.workerPreferences);
+      merged.preferences.serviceDeliveryPreferences = selectBestValue(merged.preferences.serviceDeliveryPreferences, facts.preferences.serviceDeliveryPreferences);
+      merged.preferences.culturalConsiderations = selectBestValue(merged.preferences.culturalConsiderations, facts.preferences.culturalConsiderations);
     }
   });
   
+  console.log(`Facts merging complete - extracted ${merged.risks.length} unique risks, ${merged.medical.equipment.length} pieces of equipment`);
   return merged;
 }
 
-export async function generateCarePlanHtml(transcript: string, clientName: string) {
+// Helper function to select the best value between two options
+function selectBestValue(existing: string | null, newValue: string | null): string | null {
+  if (!existing) return newValue;
+  if (!newValue) return existing;
+  
+  // Prefer longer, more descriptive values
+  if (newValue.length > existing.length * 1.5) {
+    return newValue;
+  }
+  
+  return existing;
+}
+
+// Normalize equipment names for better deduplication
+function normalizeEquipmentName(name: string): string {
+  return name.toLowerCase()
+    .replace(/\b(walking|mobility)\s+(frame|aid)\b/g, 'walker')
+    .replace(/\b(wheel\s*chair|wheelchair)\b/g, 'wheelchair')
+    .replace(/\b(shower\s*chair|bath\s*chair)\b/g, 'shower chair')
+    .replace(/\b(toilet\s*seat|raised\s*seat)\b/g, 'toilet seat')
+    .trim();
+}
+
+// Check if two risks are similar (for deduplication)
+function areSimilarRisks(risk1: any, risk2: any): boolean {
+  if (!risk1 || !risk2) return false;
+  
+  const type1 = risk1.type?.toLowerCase() || '';
+  const type2 = risk2.type?.toLowerCase() || '';
+  const desc1 = risk1.description?.toLowerCase() || '';
+  const desc2 = risk2.description?.toLowerCase() || '';
+  
+  // Same type
+  if (type1 === type2) return true;
+  
+  // Similar descriptions (basic similarity check)
+  const commonWords = desc1.split(' ').filter(word => 
+    word.length > 3 && desc2.includes(word)
+  );
+  
+  return commonWords.length >= 2;
+}
+
+// Get numeric severity score for comparison
+function getSeverityScore(severity: string | null): number {
+  if (!severity) return 0;
+  const sev = severity.toLowerCase();
+  if (sev.includes('high')) return 3;
+  if (sev.includes('medium')) return 2;
+  if (sev.includes('low')) return 1;
+  return 0;
+}
+
+export async function generateCarePlanHtml(transcript: string, clientName: string, progressCallback?: (progress: number, stage: string) => void) {
   const startTime = Date.now();
   console.log(`Starting care plan generation for client: ${clientName}, transcript length: ${transcript.length} characters`);
   
   try {
     // For care plan generation, we'll use a different strategy for long transcripts
     // Instead of chunking, we'll summarize very long transcripts first
+    progressCallback?.(5, 'Analyzing transcript for care plan generation');
     let processedTranscript = transcript;
     
     const estimatedTokens = estimateTokenCount(transcript);
     if (estimatedTokens > 120000) {
-      console.log(`Very long transcript detected (${estimatedTokens} estimated tokens) - creating summary first`);
-      processedTranscript = await summarizeTranscript(transcript, clientName);
-      console.log(`Transcript summarized to ${processedTranscript.length} characters`);
+      console.log(`Very long transcript detected (${estimatedTokens} estimated tokens, ${Math.floor(transcript.length/1000)}k chars) - creating comprehensive summary`);
+      
+      // For extremely long transcripts (80+ minutes), use multi-pass summarization
+      progressCallback?.(20, 'Creating comprehensive summary of long transcript');
+      if (estimatedTokens > 200000) {
+        console.log('Using multi-pass summarization for extremely long transcript');
+        processedTranscript = await multiPassSummarize(transcript, clientName);
+      } else {
+        processedTranscript = await summarizeTranscript(transcript, clientName);
+      }
+      progressCallback?.(40, 'Transcript summarization complete');
+      
+      console.log(`Transcript processed: ${transcript.length} → ${processedTranscript.length} characters (${Math.round((processedTranscript.length/transcript.length)*100)}% of original)`);
     }
     
+    progressCallback?.(50, 'Generating Gold Standard Care Plan with AI');
     const response = await openai.chat.completions.create({
       model: "gpt-5",
       messages: [
@@ -497,6 +698,7 @@ Create comprehensive care plan sections based on the information provided in the
     const duration = Date.now() - startTime;
     console.log(`Care plan generation completed in ${duration}ms, output length: ${result.length} characters`);
     
+    progressCallback?.(100, 'Care plan generation complete');
     return result;
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -556,4 +758,116 @@ ${transcript}`
   });
   
   return response.choices[0].message.content || transcript;
+}
+
+// Multi-pass summarization for extremely long transcripts (80+ minute assessments)
+async function multiPassSummarize(transcript: string, clientName: string): Promise<string> {
+  console.log('Starting multi-pass summarization for extremely long transcript...');
+  
+  // First pass: Split into logical sections and summarize each
+  const sections = splitIntoSections(transcript);
+  console.log(`Split transcript into ${sections.length} sections for processing`);
+  
+  const sectionSummaries = [];
+  for (let i = 0; i < sections.length; i++) {
+    console.log(`Summarizing section ${i + 1}/${sections.length} (${sections[i].length} chars)`);
+    
+    const sectionSummary = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        {
+          role: "system",
+          content: `Summarize this section of an aged care assessment transcript, preserving all medically relevant details, client goals, family information, and care requirements. Be comprehensive but concise.`
+        },
+        {
+          role: "user",
+          content: `Summarize this section (${i + 1}/${sections.length}) of ${clientName}'s assessment:\n\n${sections[i]}`
+        }
+      ]
+    }, { timeout: 120000 });
+    
+    sectionSummaries.push(sectionSummary.choices[0].message.content || '');
+  }
+  
+  // Second pass: Combine section summaries into final comprehensive summary
+  const combinedSummary = sectionSummaries.join('\n\n---\n\n');
+  console.log(`Combining ${sectionSummaries.length} section summaries (${combinedSummary.length} chars total)`);
+  
+  if (estimateTokenCount(combinedSummary) > 100000) {
+    // Still too long, need final condensation
+    console.log('Combined summary still too long, performing final condensation');
+    
+    const finalSummary = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        {
+          role: "system",
+          content: `Create a comprehensive but concise summary of this aged care assessment, preserving all critical information for care plan generation. Focus on: client demographics, medical conditions, functional abilities, family support, risks, goals, and preferences.`
+        },
+        {
+          role: "user",
+          content: `Create final summary for ${clientName}'s assessment:\n\n${combinedSummary}`
+        }
+      ]
+    }, { timeout: 120000 });
+    
+    return finalSummary.choices[0].message.content || combinedSummary;
+  }
+  
+  return combinedSummary;
+}
+
+// Split transcript into logical sections based on content patterns
+function splitIntoSections(transcript: string): string[] {
+  // Clean the transcript first
+  const cleaned = preprocessTranscript(transcript);
+  
+  // Look for natural section breaks in assessment transcripts
+  const sectionBreaks = [
+    /\b(demographics?|personal\s+information)\b/gi,
+    /\b(medical\s+history|health\s+conditions?)\b/gi,
+    /\b(medications?|prescriptions?)\b/gi,
+    /\b(family|relatives?|contacts?)\b/gi,
+    /\b(daily\s+activities|functional\s+abilities?)\b/gi,
+    /\b(goals?|objectives?|what.*want)\b/gi,
+    /\b(risks?|safety|concerns?)\b/gi,
+    /\b(services?|supports?|help)\b/gi
+  ];
+  
+  const sections: string[] = [];
+  const maxSectionSize = 30000; // ~7500 tokens
+  
+  let currentSection = '';
+  const lines = cleaned.split('\n');
+  
+  for (const line of lines) {
+    currentSection += line + '\n';
+    
+    // Check if we've hit a natural break and the section is large enough
+    if (currentSection.length > maxSectionSize * 0.5) {
+      const foundBreak = sectionBreaks.some(pattern => pattern.test(line));
+      
+      if (foundBreak || currentSection.length > maxSectionSize) {
+        sections.push(currentSection.trim());
+        currentSection = '';
+      }
+    }
+  }
+  
+  // Add remaining content
+  if (currentSection.trim()) {
+    sections.push(currentSection.trim());
+  }
+  
+  // Ensure no section is too small (merge with previous if needed)
+  const mergedSections = [];
+  for (let i = 0; i < sections.length; i++) {
+    if (sections[i].length < 5000 && mergedSections.length > 0) {
+      mergedSections[mergedSections.length - 1] += '\n\n' + sections[i];
+    } else {
+      mergedSections.push(sections[i]);
+    }
+  }
+  
+  return mergedSections;
 }
