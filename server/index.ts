@@ -14,11 +14,19 @@ if (process.env.NODE_ENV === 'production') {
   if (!process.env.SESSION_SECRET) {
     throw new Error('SESSION_SECRET environment variable is required in production');
   }
-  if (!process.env.AUTH_PASSWORD) {
-    throw new Error('AUTH_PASSWORD environment variable is required in production');
-  }
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY environment variable is required in production');
+  }
+  
+  // AUTH_MODE controls authentication method: 'replit' (default), 'password', or 'none'
+  const authMode = process.env.AUTH_MODE || 'replit';
+  
+  if (authMode === 'password' && !process.env.AUTH_PASSWORD) {
+    throw new Error('AUTH_PASSWORD environment variable is required when AUTH_MODE=password');
+  }
+  
+  if (authMode === 'none' && process.env.DISABLE_AUTH !== 'I_UNDERSTAND_THE_RISKS') {
+    throw new Error('When AUTH_MODE=none, you must set DISABLE_AUTH=I_UNDERSTAND_THE_RISKS to explicitly acknowledge security risks');
   }
 }
 
@@ -26,18 +34,22 @@ if (process.env.NODE_ENV === 'production') {
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
-// Session configuration
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'scrbl-care-planning-secret-key-change-in-production',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    sameSite: 'strict'
-  }
-}));
+// Session configuration - only for password/none auth modes
+// Replit auth mode handles its own session configuration with PostgreSQL store
+const authMode = process.env.AUTH_MODE || 'replit';
+if (authMode === 'password' || authMode === 'none') {
+  app.use(session({
+    secret: process.env.SESSION_SECRET || 'scrbl-care-planning-secret-key-change-in-production',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'strict'
+    }
+  }));
+}
 
 app.use((req, res, next) => {
   const start = Date.now();

@@ -8,6 +8,7 @@ import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/ope
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
+// Conditional import - only import Replit Auth when needed to avoid crashes
 
 // Extend express-session types
 declare module 'express-session' {
@@ -16,12 +17,48 @@ declare module 'express-session' {
   }
 }
 
-// Authentication middleware
-function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (req.session.isAuthenticated) {
-    return next();
+// AUTH_MODE: 'replit' (default), 'password', or 'none'
+const authMode = process.env.AUTH_MODE || 'replit';
+
+// Lazy-loaded Replit Auth functions
+let replitAuthFunctions: {
+  setupAuth: (app: Express) => Promise<void>;
+  isAuthenticated: (req: Request, res: Response, next: NextFunction) => Promise<void>;
+} | null = null;
+
+// Lazy load Replit Auth only when needed
+async function loadReplitAuth() {
+  if (!replitAuthFunctions && authMode === 'replit') {
+    const replitAuth = await import('./replitAuth');
+    replitAuthFunctions = {
+      setupAuth: replitAuth.setupAuth,
+      isAuthenticated: replitAuth.isAuthenticated
+    };
   }
-  return res.status(401).json({ error: 'Authentication required' });
+  return replitAuthFunctions;
+}
+
+// Authentication middleware - supports multiple auth modes
+function requireAuth(req: Request, res: Response, next: NextFunction) {
+  if (authMode === 'none' && process.env.DISABLE_AUTH === 'I_UNDERSTAND_THE_RISKS') {
+    return next(); // No authentication required
+  }
+  
+  if (authMode === 'replit') {
+    if (!replitAuthFunctions) {
+      return res.status(500).json({ error: 'Replit authentication not initialized' });
+    }
+    return replitAuthFunctions.isAuthenticated(req, res, next);
+  }
+  
+  if (authMode === 'password') {
+    if (req.session.isAuthenticated) {
+      return next();
+    }
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  
+  return res.status(500).json({ error: 'Invalid authentication mode' });
 }
 
 // Event emitter for real-time updates
@@ -33,55 +70,94 @@ const nottaUrlSchema = z.object({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Rate limiting for login endpoint
-  const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // Limit each IP to 5 requests per windowMs
-    message: { error: 'Too many login attempts, please try again later' },
-    standardHeaders: true,
-    legacyHeaders: false,
-  });
-
-  // Authentication endpoints
-  app.post('/api/auth/login', loginLimiter, async (req, res) => {
-    try {
-      const { password } = req.body;
-      const correctPassword = process.env.AUTH_PASSWORD || 'caresalveocarl';
-      
-      if (password === correctPassword) {
-        // Regenerate session to prevent session fixation
-        await new Promise<void>((resolve, reject) => {
-          req.session.regenerate((err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
-        
-        req.session.isAuthenticated = true;
-        res.json({ success: true });
-      } else {
-        res.status(401).json({ error: 'Invalid password' });
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ error: 'Internal server error' });
+  // Set up authentication based on AUTH_MODE
+  if (authMode === 'replit') {
+    const replitAuth = await loadReplitAuth();
+    if (!replitAuth) {
+      throw new Error('Failed to load Replit authentication');
     }
-  });
-
-  app.post('/api/auth/logout', (req, res) => {
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Logout error:', err);
-        return res.status(500).json({ error: 'Logout failed' });
+    
+    await replitAuth.setupAuth(app);
+    
+    // Add user endpoint for Replit Auth
+    app.get('/api/auth/user', replitAuth.isAuthenticated, async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const user = await storage.getUser(userId);
+        res.json(user);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        res.status(500).json({ message: "Failed to fetch user" });
       }
-      res.clearCookie('connect.sid');
-      res.json({ success: true });
     });
-  });
+    
+    // Standardize to /api/auth/me for all auth modes
+    app.get('/api/auth/me', (req, res) => {
+      res.json({ isAuthenticated: req.isAuthenticated() });
+    });
+    
+    // Add standardized logout endpoint that mirrors password mode
+    app.post('/api/auth/logout', (req, res) => {
+      req.logout(() => {
+        res.json({ success: true });
+      });
+    });
+  } else if (authMode === 'password') {
+    // Rate limiting for login endpoint
+    const loginLimiter = rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 5, // Limit each IP to 5 requests per windowMs
+      message: { error: 'Too many login attempts, please try again later' },
+      standardHeaders: true,
+      legacyHeaders: false,
+    });
 
-  app.get('/api/auth/me', (req, res) => {
-    res.json({ isAuthenticated: !!req.session.isAuthenticated });
-  });
+    // Password-based authentication endpoints
+    app.post('/api/auth/login', loginLimiter, async (req, res) => {
+      try {
+        const { password } = req.body;
+        const correctPassword = process.env.AUTH_PASSWORD || 'caresalveocarl';
+        
+        if (password === correctPassword) {
+          // Regenerate session to prevent session fixation
+          await new Promise<void>((resolve, reject) => {
+            req.session.regenerate((err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          
+          req.session.isAuthenticated = true;
+          res.json({ success: true });
+        } else {
+          res.status(401).json({ error: 'Invalid password' });
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    });
+
+    app.post('/api/auth/logout', (req, res) => {
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Logout error:', err);
+          return res.status(500).json({ error: 'Logout failed' });
+        }
+        res.clearCookie('connect.sid');
+        res.json({ success: true });
+      });
+    });
+
+    app.get('/api/auth/me', (req, res) => {
+      res.json({ isAuthenticated: !!req.session.isAuthenticated });
+    });
+  } else if (authMode === 'none') {
+    // No authentication - just provide status endpoints
+    app.get('/api/auth/me', (req, res) => {
+      res.json({ isAuthenticated: true }); // Always authenticated in no-auth mode
+    });
+  }
 
   app.post("/api/fetch-notta", requireAuth, async (req, res) => {
     try {
