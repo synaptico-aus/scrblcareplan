@@ -590,8 +590,9 @@ export default function CarePlanner() {
                     </div>
                   </div>
                   
-                  <div className="text-xs text-muted-foreground">
-                    Job ID: {asyncJobId}
+                  <div className="bg-secondary/50 p-2 rounded border">
+                    <div className="text-xs font-medium text-muted-foreground mb-1">Job ID:</div>
+                    <div className="text-xs font-mono break-all">{asyncJobId}</div>
                   </div>
                   
                   <div className="flex items-center gap-2 text-sm">
