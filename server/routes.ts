@@ -134,6 +134,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/auth/me", (req, res) => {
     if (req.isAuthenticated()) {
       const user = req.user as User;
+      const session = req.session as any;
+      
       res.json({
         isAuthenticated: true,
         user: {
@@ -145,10 +147,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
           organizationId: user.organizationId,
           monthlyPlanLimit: user.monthlyPlanLimit,
           plansGeneratedThisMonth: user.plansGeneratedThisMonth
+        },
+        impersonation: session.impersonatedUserId ? {
+          isImpersonating: true,
+          impersonatorId: session.impersonatorId,
+          impersonatedUserId: session.impersonatedUserId
+        } : {
+          isImpersonating: false
         }
       });
     } else {
       res.json({ isAuthenticated: false });
+    }
+  });
+
+  // Impersonation routes (super admin only)
+  app.post("/api/impersonation/start", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { userId } = req.body;
+      const superAdmin = req.user as User;
+      
+      if (!userId) {
+        return res.status(400).json({ message: "User ID is required" });
+      }
+      
+      // Fetch the target user
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Store impersonation state in session
+      const session = req.session as any;
+      session.impersonatorId = superAdmin.id;
+      session.impersonatedUserId = targetUser.id;
+      session.impersonationStartedAt = new Date().toISOString();
+      
+      // Save session
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      
+      console.log(`[IMPERSONATION] Super admin ${superAdmin.email} (${superAdmin.id}) started impersonating ${targetUser.email} (${targetUser.id})`);
+      
+      res.json({
+        success: true,
+        impersonatedUser: {
+          id: targetUser.id,
+          email: targetUser.email,
+          firstName: targetUser.firstName,
+          lastName: targetUser.lastName,
+          role: targetUser.role,
+          organizationId: targetUser.organizationId,
+          monthlyPlanLimit: targetUser.monthlyPlanLimit,
+          plansGeneratedThisMonth: targetUser.plansGeneratedThisMonth
+        }
+      });
+    } catch (error) {
+      console.error("Error starting impersonation:", error);
+      res.status(500).json({ message: "Failed to start impersonation" });
+    }
+  });
+
+  app.post("/api/impersonation/stop", requireAuth, async (req, res) => {
+    try {
+      const session = req.session as any;
+      
+      if (!session.impersonatedUserId) {
+        return res.status(400).json({ message: "Not currently impersonating" });
+      }
+      
+      const impersonatorId = session.impersonatorId;
+      const impersonatedUserId = session.impersonatedUserId;
+      
+      // Clear impersonation state
+      delete session.impersonatorId;
+      delete session.impersonatedUserId;
+      delete session.impersonationStartedAt;
+      
+      // Save session
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      
+      console.log(`[IMPERSONATION] Stopped impersonating user ${impersonatedUserId} (was ${impersonatorId})`);
+      
+      // Fetch the original super admin user
+      const superAdmin = await storage.getUser(impersonatorId);
+      
+      res.json({
+        success: true,
+        user: superAdmin ? {
+          id: superAdmin.id,
+          email: superAdmin.email,
+          firstName: superAdmin.firstName,
+          lastName: superAdmin.lastName,
+          role: superAdmin.role,
+          organizationId: superAdmin.organizationId,
+          monthlyPlanLimit: superAdmin.monthlyPlanLimit,
+          plansGeneratedThisMonth: superAdmin.plansGeneratedThisMonth
+        } : null
+      });
+    } catch (error) {
+      console.error("Error stopping impersonation:", error);
+      res.status(500).json({ message: "Failed to stop impersonation" });
     }
   });
 
