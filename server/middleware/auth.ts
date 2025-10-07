@@ -20,8 +20,23 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   }
 
   const user = req.user as User;
-  if (user.role !== "admin") {
+  if (user.role !== "admin" && user.role !== "super_admin") {
     res.status(403).json({ message: "Forbidden - Admin access required" });
+    return;
+  }
+
+  next();
+}
+
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ message: "Unauthorized - Please log in" });
+    return;
+  }
+
+  const user = req.user as User;
+  if (user.role !== "super_admin") {
+    res.status(403).json({ message: "Forbidden - Super admin access required" });
     return;
   }
 

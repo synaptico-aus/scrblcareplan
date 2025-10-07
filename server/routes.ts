@@ -5,8 +5,8 @@ import passport from "passport";
 import bcrypt from "bcrypt";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { requireAuth, requireAdmin, getOrganizationId } from "./middleware/auth";
-import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, loginSchema, signupSchema, createUserSchema, type User } from "@shared/schema";
+import { requireAuth, requireAdmin, requireSuperAdmin, getOrganizationId } from "./middleware/auth";
+import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, loginSchema, signupSchema, createUserSchema, updateUserLimitSchema, type User } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
@@ -214,6 +214,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Super admin route to update user monthly plan limits
+  app.patch("/api/users/:userId/limit", requireAuth, requireSuperAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const validatedData = updateUserLimitSchema.parse({ ...req.body, userId });
+      
+      const updatedUser = await storage.updateUserLimit(userId, validatedData.monthlyPlanLimit);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        role: updatedUser.role,
+        monthlyPlanLimit: updatedUser.monthlyPlanLimit,
+        plansGeneratedThisMonth: updatedUser.plansGeneratedThisMonth,
+        organizationId: updatedUser.organizationId
+      });
+    } catch (error) {
+      console.error("Error updating user limit:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: error.errors[0]?.message || "Validation failed" 
+        });
+      }
+      res.status(500).json({ message: "Failed to update user limit" });
     }
   });
 
