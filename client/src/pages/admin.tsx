@@ -39,6 +39,8 @@ type User = {
   firstName: string | null;
   lastName: string | null;
   role: string;
+  monthlyPlanLimit: number | null;
+  plansGeneratedThisMonth: number;
   organizationId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -49,6 +51,9 @@ export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLimitDialogOpen, setIsLimitDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [monthlyLimit, setMonthlyLimit] = useState<string>("");
   const [newUser, setNewUser] = useState({
     email: "",
     password: "",
@@ -57,7 +62,9 @@ export default function AdminDashboard() {
     role: "user" as "admin" | "user",
   });
 
-  if (user?.role !== "admin") {
+  const isSuperAdmin = user?.role === "super_admin";
+
+  if (user?.role !== "admin" && user?.role !== "super_admin") {
     setLocation("/");
     return null;
   }
@@ -94,6 +101,31 @@ export default function AdminDashboard() {
     },
   });
 
+  const updateLimitMutation = useMutation({
+    mutationFn: async ({ userId, limit }: { userId: string; limit: number | null }) => {
+      return apiRequest("PATCH", `/api/users/${userId}/limit`, { 
+        monthlyPlanLimit: limit 
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      setIsLimitDialogOpen(false);
+      setSelectedUser(null);
+      setMonthlyLimit("");
+      toast({
+        title: "Success",
+        description: "Monthly plan limit updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update limit",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateUser = () => {
     if (!newUser.email || !newUser.password) {
       toast({
@@ -104,6 +136,29 @@ export default function AdminDashboard() {
       return;
     }
     createUserMutation.mutate(newUser);
+  };
+
+  const handleOpenLimitDialog = (user: User) => {
+    setSelectedUser(user);
+    setMonthlyLimit(user.monthlyPlanLimit !== null ? user.monthlyPlanLimit.toString() : "");
+    setIsLimitDialogOpen(true);
+  };
+
+  const handleUpdateLimit = () => {
+    if (!selectedUser) return;
+    
+    const limit = monthlyLimit.trim() === "" ? null : parseInt(monthlyLimit);
+    
+    if (limit !== null && (isNaN(limit) || limit < 0)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid number (0 or greater) or leave empty for unlimited",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateLimitMutation.mutate({ userId: selectedUser.id, limit });
   };
 
   return (
@@ -216,6 +271,52 @@ export default function AdminDashboard() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {isSuperAdmin && (
+            <Dialog open={isLimitDialogOpen} onOpenChange={setIsLimitDialogOpen}>
+              <DialogContent data-testid="dialog-set-limit">
+                <DialogHeader>
+                  <DialogTitle>Set Monthly Plan Limit</DialogTitle>
+                  <DialogDescription>
+                    Set the monthly care plan generation limit for {selectedUser?.email}. Leave empty for unlimited plans.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="monthlyLimit">Monthly Plan Limit</Label>
+                    <Input
+                      id="monthlyLimit"
+                      type="number"
+                      min="0"
+                      value={monthlyLimit}
+                      onChange={(e) => setMonthlyLimit(e.target.value)}
+                      placeholder="Leave empty for unlimited"
+                      data-testid="input-monthly-limit"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Current: {selectedUser?.plansGeneratedThisMonth || 0} generated this month
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsLimitDialogOpen(false)}
+                    data-testid="button-cancel-limit"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpdateLimit}
+                    disabled={updateLimitMutation.isPending}
+                    data-testid="button-submit-limit"
+                  >
+                    {updateLimitMutation.isPending ? "Updating..." : "Update Limit"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -230,38 +331,65 @@ export default function AdminDashboard() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Role</TableHead>
+                  {isSuperAdmin && <TableHead>Monthly Limit</TableHead>}
+                  {isSuperAdmin && <TableHead>Generated</TableHead>}
                   <TableHead>Created</TableHead>
+                  {isSuperAdmin && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users && users.length > 0 ? (
-                  users.map((user) => (
-                    <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                      <TableCell data-testid={`text-username-${user.id}`}>
-                        {user.firstName && user.lastName
-                          ? `${user.firstName} ${user.lastName}`
-                          : user.firstName || user.lastName || "-"}
+                  users.map((targetUser) => (
+                    <TableRow key={targetUser.id} data-testid={`row-user-${targetUser.id}`}>
+                      <TableCell data-testid={`text-username-${targetUser.id}`}>
+                        {targetUser.firstName && targetUser.lastName
+                          ? `${targetUser.firstName} ${targetUser.lastName}`
+                          : targetUser.firstName || targetUser.lastName || "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-email-${user.id}`}>{user.email}</TableCell>
-                      <TableCell data-testid={`text-role-${user.id}`}>
+                      <TableCell data-testid={`text-email-${targetUser.id}`}>{targetUser.email}</TableCell>
+                      <TableCell data-testid={`text-role-${targetUser.id}`}>
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            user.role === "admin"
+                            targetUser.role === "super_admin"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                              : targetUser.role === "admin"
                               ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200"
                               : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
                           }`}
                         >
-                          {user.role}
+                          {targetUser.role === "super_admin" ? "Super Admin" : targetUser.role}
                         </span>
                       </TableCell>
-                      <TableCell data-testid={`text-created-${user.id}`}>
-                        {new Date(user.createdAt).toLocaleDateString()}
+                      {isSuperAdmin && (
+                        <TableCell data-testid={`text-limit-${targetUser.id}`}>
+                          {targetUser.monthlyPlanLimit === null ? "Unlimited" : targetUser.monthlyPlanLimit}
+                        </TableCell>
+                      )}
+                      {isSuperAdmin && (
+                        <TableCell data-testid={`text-generated-${targetUser.id}`}>
+                          {targetUser.plansGeneratedThisMonth || 0}
+                        </TableCell>
+                      )}
+                      <TableCell data-testid={`text-created-${targetUser.id}`}>
+                        {new Date(targetUser.createdAt).toLocaleDateString()}
                       </TableCell>
+                      {isSuperAdmin && (
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleOpenLimitDialog(targetUser)}
+                            data-testid={`button-set-limit-${targetUser.id}`}
+                          >
+                            Set Limit
+                          </Button>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-gray-500 dark:text-gray-400">
+                    <TableCell colSpan={isSuperAdmin ? 7 : 4} className="text-center text-gray-500 dark:text-gray-400">
                       No users found
                     </TableCell>
                   </TableRow>
