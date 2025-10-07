@@ -48,7 +48,7 @@ type User = {
 };
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
+  const { user, refetchUser } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -108,8 +108,14 @@ export default function AdminDashboard() {
         monthlyPlanLimit: limit 
       });
     },
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      
+      // If updating own limit, refresh current user data
+      if (variables.userId === user?.id) {
+        await refetchUser();
+      }
+      
       setIsLimitDialogOpen(false);
       setSelectedUser(null);
       setMonthlyLimit("");
