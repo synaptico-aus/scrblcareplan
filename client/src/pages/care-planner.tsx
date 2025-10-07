@@ -585,7 +585,7 @@ export default function CarePlanner() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {user?.role === "admin" && (
+                {(user?.role === "admin" || user?.role === "super_admin") && (
                   <>
                     <DropdownMenuItem asChild>
                       <Link href="/admin" data-testid="link-admin">
