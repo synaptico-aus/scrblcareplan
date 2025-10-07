@@ -40,7 +40,10 @@ export default function Login() {
         title: "Login successful",
         description: "Welcome to scrbl_v2",
       });
-      setLocation("/");
+      // Small delay to ensure state is updated before redirect
+      setTimeout(() => {
+        setLocation("/");
+      }, 100);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Login failed";
       setError(errorMessage);
