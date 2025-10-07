@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, ArrowLeft } from "lucide-react";
+import { UserPlus, ArrowLeft, UserCog } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -166,6 +166,34 @@ export default function AdminDashboard() {
     }
 
     updateLimitMutation.mutate({ userId: selectedUser.id, limit });
+  };
+
+  const impersonateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest("POST", "/api/impersonation/start", { userId });
+      return response.json();
+    },
+    onSuccess: async () => {
+      // Refresh user data to get impersonation state
+      await refetchUser();
+      toast({
+        title: "Success",
+        description: "Now impersonating user",
+      });
+      // Redirect to care planner as the impersonated user
+      setLocation("/care-planner");
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start impersonation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleImpersonate = (targetUser: User) => {
+    impersonateMutation.mutate(targetUser.id);
   };
 
   return (
@@ -388,14 +416,26 @@ export default function AdminDashboard() {
                       </TableCell>
                       {isSuperAdmin && (
                         <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleOpenLimitDialog(targetUser)}
-                            data-testid={`button-set-limit-${targetUser.id}`}
-                          >
-                            Set Limit
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenLimitDialog(targetUser)}
+                              data-testid={`button-set-limit-${targetUser.id}`}
+                            >
+                              Set Limit
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleImpersonate(targetUser)}
+                              disabled={impersonateMutation.isPending || targetUser.id === user?.id}
+                              data-testid={`button-impersonate-${targetUser.id}`}
+                            >
+                              <UserCog className="h-4 w-4 mr-1" />
+                              Impersonate
+                            </Button>
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>

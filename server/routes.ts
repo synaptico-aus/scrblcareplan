@@ -191,7 +191,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
       
-      console.log(`[IMPERSONATION] Super admin ${superAdmin.email} (${superAdmin.id}) started impersonating ${targetUser.email} (${targetUser.id})`);
+      // Audit log: Impersonation started
+      console.log(JSON.stringify({
+        event: "IMPERSONATION_START",
+        timestamp: new Date().toISOString(),
+        superAdminId: superAdmin.id,
+        superAdminEmail: superAdmin.email,
+        impersonatedUserId: targetUser.id,
+        impersonatedUserEmail: targetUser.email,
+        impersonatedUserOrg: targetUser.organizationId
+      }));
       
       res.json({
         success: true,
@@ -236,7 +245,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       });
       
-      console.log(`[IMPERSONATION] Stopped impersonating user ${impersonatedUserId} (was ${impersonatorId})`);
+      // Audit log: Impersonation stopped
+      console.log(JSON.stringify({
+        event: "IMPERSONATION_STOP",
+        timestamp: new Date().toISOString(),
+        superAdminId: impersonatorId,
+        impersonatedUserId: impersonatedUserId
+      }));
       
       // Fetch the original super admin user
       const superAdmin = await storage.getUser(impersonatorId);

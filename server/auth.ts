@@ -52,3 +52,44 @@ export function setupPassport() {
     }
   });
 }
+
+// Middleware to handle impersonation
+export function handleImpersonation(req: any, res: any, next: any) {
+  const session = req.session as any;
+  
+  if (session && session.impersonatedUserId && req.user) {
+    // If impersonating, load the impersonated user as req.user
+    storage.getUser(session.impersonatedUserId)
+      .then(impersonatedUser => {
+        if (impersonatedUser) {
+          req.user = impersonatedUser;
+          next();
+        } else {
+          // Impersonated user not found - fail closed by clearing impersonation
+          delete session.impersonatorId;
+          delete session.impersonatedUserId;
+          delete session.impersonationStartedAt;
+          
+          session.save((err: any) => {
+            if (err) {
+              console.error("Error clearing invalid impersonation session:", err);
+              return res.status(500).json({ message: "Session error" });
+            }
+            // Continue with original user (super admin)
+            next();
+          });
+        }
+      })
+      .catch(err => {
+        console.error("Error loading impersonated user:", err);
+        // Database error - fail closed by clearing impersonation and returning error
+        delete session.impersonatorId;
+        delete session.impersonatedUserId;
+        delete session.impersonationStartedAt;
+        
+        res.status(500).json({ message: "Failed to load user context" });
+      });
+  } else {
+    next();
+  }
+}

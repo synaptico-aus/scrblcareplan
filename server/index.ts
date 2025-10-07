@@ -3,7 +3,7 @@ import session from "express-session";
 import passport from "passport";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { setupPassport } from "./auth";
+import { setupPassport, handleImpersonation } from "./auth";
 
 const app = express();
 
@@ -46,6 +46,9 @@ app.use(
 setupPassport();
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Handle impersonation - this must come after passport.session()
+app.use(handleImpersonation);
 
 app.use((req, res, next) => {
   const start = Date.now();

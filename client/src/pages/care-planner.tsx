@@ -9,7 +9,7 @@ import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Shield, FileText, Bot, Loader2, LogOut, User, Users } from "lucide-react";
+import { Settings, Shield, FileText, Bot, Loader2, LogOut, User, Users, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -41,7 +41,7 @@ export default function CarePlanner() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user, logout } = useAuth();
+  const { user, logout, impersonation, stopImpersonation } = useAuth();
   const [, setLocation] = useLocation();
 
   const handleLogout = async () => {
@@ -56,6 +56,23 @@ export default function CarePlanner() {
       toast({
         title: "Logout failed",
         description: "An error occurred while logging out",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleStopImpersonation = async () => {
+    try {
+      await stopImpersonation();
+      toast({
+        title: "Impersonation ended",
+        description: "You are now back to your own account",
+      });
+      setLocation("/admin");
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to stop impersonation",
         variant: "destructive",
       });
     }
@@ -539,6 +556,29 @@ export default function CarePlanner() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Impersonation Banner */}
+      {impersonation.isImpersonating && (
+        <div className="bg-yellow-500 dark:bg-yellow-600 text-black dark:text-white px-4 py-2" data-testid="banner-impersonation">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <UserCog className="h-5 w-5" />
+              <span className="font-medium">
+                Impersonating: {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email}
+              </span>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleStopImpersonation}
+              data-testid="button-stop-impersonation"
+              className="bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              Exit Impersonation
+            </Button>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="bg-card border-b border-border px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">

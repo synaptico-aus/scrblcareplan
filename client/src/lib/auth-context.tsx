@@ -2,12 +2,20 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { apiRequest } from "./queryClient";
 import type { User } from "@shared/schema";
 
+interface ImpersonationInfo {
+  isImpersonating: boolean;
+  impersonatorId?: string;
+  impersonatedUserId?: string;
+}
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  impersonation: ImpersonationInfo;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
+  stopImpersonation: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,6 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [impersonation, setImpersonation] = useState<ImpersonationInfo>({ isImpersonating: false });
 
   useEffect(() => {
     checkAuth();
@@ -27,12 +36,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (data.isAuthenticated && data.user) {
         setUser(data.user);
+        setImpersonation(data.impersonation || { isImpersonating: false });
       } else {
         setUser(null);
+        setImpersonation({ isImpersonating: false });
       }
     } catch (error) {
       console.error("Auth check failed:", error);
       setUser(null);
+      setImpersonation({ isImpersonating: false });
     } finally {
       setIsLoading(false);
     }
@@ -57,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
       setUser(null);
+      setImpersonation({ isImpersonating: false });
     } catch (error) {
       console.error("Logout failed:", error);
       throw error;
@@ -67,8 +80,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await checkAuth();
   };
 
+  const stopImpersonation = async () => {
+    try {
+      const response = await apiRequest("POST", "/api/impersonation/stop", {});
+      const data = await response.json();
+      
+      if (data.success && data.user) {
+        setUser(data.user);
+        setImpersonation({ isImpersonating: false });
+      }
+    } catch (error) {
+      console.error("Failed to stop impersonation:", error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, refetchUser }}>
+    <AuthContext.Provider value={{ user, isLoading, impersonation, login, logout, refetchUser, stopImpersonation }}>
       {children}
     </AuthContext.Provider>
   );
