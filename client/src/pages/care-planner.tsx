@@ -9,7 +9,7 @@ import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Shield, FileText, Bot, Loader2, LogOut, User } from "lucide-react";
+import { Settings, Shield, FileText, Bot, Loader2, LogOut, User, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -585,6 +585,17 @@ export default function CarePlanner() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                {user?.role === "admin" && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" data-testid="link-admin">
+                        <Users className="mr-2 h-4 w-4" />
+                        <span>User Management</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>

@@ -6,7 +6,7 @@ import bcrypt from "bcrypt";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { requireAuth, requireAdmin, getOrganizationId } from "./middleware/auth";
-import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, loginSchema, signupSchema, type User } from "@shared/schema";
+import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, loginSchema, signupSchema, createUserSchema, type User } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
@@ -133,6 +133,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } else {
       res.json({ isAuthenticated: false });
+    }
+  });
+
+  // User management routes (admin only)
+  app.get("/api/users", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const organizationId = getOrganizationId(req);
+      const users = await storage.getUsersByOrganization(organizationId);
+      
+      const usersWithoutPasswords = users.map(u => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        role: u.role,
+        organizationId: u.organizationId,
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt
+      }));
+      
+      res.json(usersWithoutPasswords);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.post("/api/users", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const organizationId = getOrganizationId(req);
+      const validatedData = createUserSchema.parse(req.body);
+      const { email, password, firstName, lastName, role } = validatedData;
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        organizationId,
+        role,
+      });
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        organizationId: user.organizationId,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      });
+    } catch (error) {
+      console.error("Error creating user:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: error.errors[0]?.message || "Validation failed" 
+        });
+      }
+      res.status(500).json({ message: "Failed to create user" });
     }
   });
 

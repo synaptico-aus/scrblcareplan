@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import CarePlanner from "@/pages/care-planner";
 import SavedPlans from "@/pages/saved-plans";
+import AdminDashboard from "@/pages/admin";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
 import { PasswordProtected } from "@/components/PasswordProtected";
@@ -33,6 +34,11 @@ function App() {
                 >
                   <SavedPlans />
                 </PasswordProtected>
+              </ProtectedRoute>
+            </Route>
+            <Route path="/admin">
+              <ProtectedRoute>
+                <AdminDashboard />
               </ProtectedRoute>
             </Route>
             <Route component={NotFound} />
