@@ -14,19 +14,30 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table for Replit Auth
+// Organizations table for multi-tenancy
+export const organizations = pgTable("organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// User storage table with authentication and organization membership
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
+  email: varchar("email").unique().notNull(),
+  passwordHash: varchar("password_hash").notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  role: varchar("role").notNull().default("user"), // "admin" or "user"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const careAnalyses = pgTable("care_analyses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   clientName: text("client_name").notNull(),
   transcript: text("transcript").notNull(),
   extractedFacts: jsonb("extracted_facts"),
@@ -37,6 +48,7 @@ export const careAnalyses = pgTable("care_analyses", {
 
 export const savedCarePlans = pgTable("saved_care_plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   name: text("name").notNull(),
   clientName: text("client_name").notNull(),
   html: text("html").notNull(),
@@ -47,6 +59,7 @@ export const savedCarePlans = pgTable("saved_care_plans", {
 
 export const clientDocuments = pgTable("client_documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   clientName: text("client_name").notNull(),
   fileName: text("file_name").notNull(),
   fileType: text("file_type").notNull(),
@@ -58,26 +71,29 @@ export const clientDocuments = pgTable("client_documents", {
 
 export const clientFolderAliases = pgTable("client_folder_aliases", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  originalClientName: text("original_client_name").notNull().unique(),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  originalClientName: text("original_client_name").notNull(),
   displayName: text("display_name").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_client_folder_org").on(table.organizationId, table.originalClientName),
+]);
 
-export const insertUserSchema = createInsertSchema(users).omit({
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({
+  id: true,
   createdAt: true,
   updatedAt: true,
 });
 
-export const upsertUserSchema = createInsertSchema(users).pick({
+export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
-  email: true,
-  firstName: true,
-  lastName: true,
-  profileImageUrl: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertCareAnalysisSchema = createInsertSchema(careAnalyses).pick({
+  organizationId: true,
   clientName: true,
   transcript: true,
   processingMode: true,
@@ -106,6 +122,7 @@ export const fundingLevels = {
 } as const;
 
 export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick({
+  organizationId: true,
   name: true,
   clientName: true,
   html: true,
@@ -118,6 +135,7 @@ export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick
 });
 
 export const insertClientDocumentSchema = createInsertSchema(clientDocuments).pick({
+  organizationId: true,
   clientName: true,
   fileName: true,
   fileType: true,
@@ -127,6 +145,7 @@ export const insertClientDocumentSchema = createInsertSchema(clientDocuments).pi
 });
 
 export const insertClientFolderAliasSchema = createInsertSchema(clientFolderAliases).pick({
+  organizationId: true,
   originalClientName: true,
   displayName: true,
 });
@@ -174,8 +193,22 @@ export const chatParityRequestSchema = z.object({
   sessionId: z.string().optional(),
 });
 
+export const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export const signupSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  organizationName: z.string().min(1, "Organization name is required"),
+});
+
+export type Organization = typeof organizations.$inferSelect;
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type CareAnalysis = typeof careAnalyses.$inferSelect;
 export type InsertCareAnalysis = z.infer<typeof insertCareAnalysisSchema>;
