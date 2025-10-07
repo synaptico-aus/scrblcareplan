@@ -93,7 +93,6 @@ export const insertUserSchema = createInsertSchema(users).omit({
 });
 
 export const insertCareAnalysisSchema = createInsertSchema(careAnalyses).pick({
-  organizationId: true,
   clientName: true,
   transcript: true,
   processingMode: true,
@@ -122,7 +121,6 @@ export const fundingLevels = {
 } as const;
 
 export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick({
-  organizationId: true,
   name: true,
   clientName: true,
   html: true,
@@ -135,7 +133,6 @@ export const insertSavedCarePlanSchema = createInsertSchema(savedCarePlans).pick
 });
 
 export const insertClientDocumentSchema = createInsertSchema(clientDocuments).pick({
-  organizationId: true,
   clientName: true,
   fileName: true,
   fileType: true,
@@ -145,7 +142,6 @@ export const insertClientDocumentSchema = createInsertSchema(clientDocuments).pi
 });
 
 export const insertClientFolderAliasSchema = createInsertSchema(clientFolderAliases).pick({
-  organizationId: true,
   originalClientName: true,
   displayName: true,
 });
