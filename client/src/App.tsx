@@ -25,6 +25,11 @@ function App() {
                 <CarePlanner />
               </ProtectedRoute>
             </Route>
+            <Route path="/care-planner">
+              <ProtectedRoute>
+                <CarePlanner />
+              </ProtectedRoute>
+            </Route>
             <Route path="/saved-plans">
               <ProtectedRoute>
                 <SavedPlans />
