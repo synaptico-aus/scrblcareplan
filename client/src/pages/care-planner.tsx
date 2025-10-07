@@ -558,6 +558,17 @@ export default function CarePlanner() {
               <Shield className="text-accent h-4 w-4" />
               <span className="text-sm font-medium text-foreground">Privacy Act Compliant</span>
             </div>
+            {/* Plans remaining display */}
+            {user && (
+              <div className="hidden sm:flex items-center justify-center space-x-2 bg-primary/10 px-3 py-1 rounded-full" data-testid="text-plans-remaining">
+                <FileText className="text-primary h-4 w-4" />
+                <span className="text-sm font-medium text-foreground">
+                  {user.monthlyPlanLimit === null || user.monthlyPlanLimit === undefined
+                    ? "Unlimited plans"
+                    : `${Math.max(0, user.monthlyPlanLimit - (user.plansGeneratedThisMonth || 0))} of ${user.monthlyPlanLimit} plans remaining`}
+                </span>
+              </div>
+            )}
             <Link href="/saved-plans">
               <Button variant="outline" size="sm" data-testid="button-saved-plans" className="text-xs sm:text-sm">
                 <FileText className="h-4 w-4 sm:mr-2" />
