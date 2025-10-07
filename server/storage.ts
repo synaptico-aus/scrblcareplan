@@ -14,6 +14,9 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsersByOrganization(organizationId: string): Promise<User[]>;
+  updateUserLimit(userId: string, monthlyPlanLimit: number | null): Promise<User | undefined>;
+  incrementUserPlanCount(userId: string): Promise<void>;
+  checkAndResetUserPlanCount(userId: string): Promise<{ canGenerate: boolean; remainingPlans: number | null }>;
   
   // Care analysis operations (organization-scoped)
   createCareAnalysis(organizationId: string, analysis: InsertCareAnalysis & { extractedFacts?: any; generatedHtml?: string }): Promise<CareAnalysis>;
@@ -95,6 +98,9 @@ export class MemStorage implements IStorage {
       lastName: insertUser.lastName || null,
       organizationId: insertUser.organizationId,
       role: insertUser.role || "user",
+      monthlyPlanLimit: null,
+      plansGeneratedThisMonth: 0,
+      limitResetDate: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -104,6 +110,57 @@ export class MemStorage implements IStorage {
 
   async getUsersByOrganization(organizationId: string): Promise<User[]> {
     return Array.from(this.users.values()).filter(u => u.organizationId === organizationId);
+  }
+
+  async updateUserLimit(userId: string, monthlyPlanLimit: number | null): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    
+    user.monthlyPlanLimit = monthlyPlanLimit;
+    user.updatedAt = new Date();
+    this.users.set(userId, user);
+    return user;
+  }
+
+  async incrementUserPlanCount(userId: string): Promise<void> {
+    const user = this.users.get(userId);
+    if (!user) return;
+    
+    user.plansGeneratedThisMonth = (user.plansGeneratedThisMonth || 0) + 1;
+    user.updatedAt = new Date();
+    this.users.set(userId, user);
+  }
+
+  async checkAndResetUserPlanCount(userId: string): Promise<{ canGenerate: boolean; remainingPlans: number | null }> {
+    const user = this.users.get(userId);
+    if (!user) {
+      return { canGenerate: false, remainingPlans: null };
+    }
+
+    // Check if we need to reset the count (new month)
+    const now = new Date();
+    const resetDate = user.limitResetDate;
+    
+    if (!resetDate || now >= resetDate) {
+      // Reset count and set next reset date to first day of next month
+      user.plansGeneratedThisMonth = 0;
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      user.limitResetDate = nextMonth;
+      user.updatedAt = new Date();
+      this.users.set(userId, user);
+    }
+
+    // If no limit set, user can generate unlimited plans
+    if (user.monthlyPlanLimit === null) {
+      return { canGenerate: true, remainingPlans: null };
+    }
+
+    // Check if user has exceeded limit
+    const remaining = user.monthlyPlanLimit - (user.plansGeneratedThisMonth || 0);
+    return {
+      canGenerate: remaining > 0,
+      remainingPlans: remaining
+    };
   }
 
   async createCareAnalysis(organizationId: string, analysis: InsertCareAnalysis & { extractedFacts?: any; generatedHtml?: string }): Promise<CareAnalysis> {
@@ -287,6 +344,68 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByOrganization(organizationId: string): Promise<User[]> {
     return await db.select().from(users).where(eq(users.organizationId, organizationId));
+  }
+
+  async updateUserLimit(userId: string, monthlyPlanLimit: number | null): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ 
+        monthlyPlanLimit,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async incrementUserPlanCount(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        plansGeneratedThisMonth: sql`${users.plansGeneratedThisMonth} + 1`,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async checkAndResetUserPlanCount(userId: string): Promise<{ canGenerate: boolean; remainingPlans: number | null }> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    
+    if (!user) {
+      return { canGenerate: false, remainingPlans: null };
+    }
+
+    // Check if we need to reset the count (new month)
+    const now = new Date();
+    const resetDate = user.limitResetDate;
+    
+    if (!resetDate || now >= resetDate) {
+      // Reset count and set next reset date to first day of next month
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      await db
+        .update(users)
+        .set({ 
+          plansGeneratedThisMonth: 0,
+          limitResetDate: nextMonth,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId));
+      
+      user.plansGeneratedThisMonth = 0;
+      user.limitResetDate = nextMonth;
+    }
+
+    // If no limit set, user can generate unlimited plans
+    if (user.monthlyPlanLimit === null) {
+      return { canGenerate: true, remainingPlans: null };
+    }
+
+    // Check if user has exceeded limit
+    const remaining = user.monthlyPlanLimit - (user.plansGeneratedThisMonth || 0);
+    return {
+      canGenerate: remaining > 0,
+      remainingPlans: remaining
+    };
   }
 
   async createCareAnalysis(organizationId: string, analysis: InsertCareAnalysis & { extractedFacts?: any; generatedHtml?: string }): Promise<CareAnalysis> {
