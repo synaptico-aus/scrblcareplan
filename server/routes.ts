@@ -84,14 +84,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
       if (err) {
+        console.error("Passport authentication error:", err);
         return res.status(500).json({ message: "Login failed" });
       }
       if (!user) {
+        console.log("Authentication failed:", info);
         return res.status(401).json({ message: info?.message || "Invalid email or password" });
       }
 
       req.login(user, (err) => {
         if (err) {
+          console.error("Session login error:", err);
           return res.status(500).json({ message: "Login failed" });
         }
         res.json({
