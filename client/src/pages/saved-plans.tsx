@@ -191,14 +191,8 @@ export default function SavedPlans() {
   };
   
   const handleDownloadDocument = (doc: ClientDocument) => {
-    let downloadUrl = doc.objectPath;
-    
-    // Handle both old format (Google Cloud Storage URLs) and new format (/objects/ paths)
-    if (downloadUrl.startsWith('https://storage.googleapis.com/')) {
-      // For old documents, request download through backend API which will handle the conversion
-      downloadUrl = `/api/documents/download?url=${encodeURIComponent(downloadUrl)}`;
-    }
-    // New documents already have the correct /objects/ path format
+    // Use the new S3-based download endpoint
+    const downloadUrl = `/api/client-documents/download/${doc.id}`;
     
     const link = document.createElement('a');
     link.href = downloadUrl;
@@ -248,6 +242,14 @@ export default function SavedPlans() {
       minute: '2-digit',
       hour12: true
     });
+  };
+
+  const formatFileSize = (bytes: number | null | undefined): string => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   const handleExportToPDF = (plan: SavedCarePlan) => {
@@ -716,7 +718,7 @@ export default function SavedPlans() {
                       <CardTitle className="text-sm truncate">{document.fileName}</CardTitle>
                       <CardDescription>
                         <div className="flex items-center justify-between text-xs">
-                          <span>{document.fileSize}</span>
+                          <span>{formatFileSize(document.fileSize)}</span>
                           <span>{formatDateTime(document.uploadedAt!)}</span>
                         </div>
                         {document.description && (

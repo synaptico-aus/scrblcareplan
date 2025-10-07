@@ -8,6 +8,8 @@ import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/ope
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
+import { uploadFile, getFile, deleteFile, listFiles } from "./services/s3";
+import multer from "multer";
 // Conditional import - only import Replit Auth when needed to avoid crashes
 
 // Session types no longer needed - authentication disabled
@@ -34,9 +36,9 @@ async function loadReplitAuth() {
 }
 
 // Authentication middleware - simplified for no auth mode
-function requireAuth(req: Request, res: Response, next: NextFunction) {
+function requireAuth(req: Request, res: Response, next: NextFunction): void {
   // No authentication required when auth mode is 'none'
-  return next();
+  next();
 }
 
 // Event emitter for real-time updates
@@ -44,6 +46,14 @@ const eventEmitter = new EventEmitter();
 
 const nottaUrlSchema = z.object({
   url: z.string().url()
+});
+
+// Configure multer for file uploads (store in memory)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  }
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -739,25 +749,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Client document routes
-  app.post("/api/client-documents", requireAuth, async (req, res) => {
+  // Client document routes - using S3
+  app.post("/api/client-documents", requireAuth, upload.single('file'), async (req, res) => {
+    let s3Key: string | null = null;
+    
     try {
-      const validatedData = insertClientDocumentSchema.parse(req.body);
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // STEP 1: Validate request metadata BEFORE uploading to S3
+      const validatedData = insertClientDocumentSchema.parse({
+        clientName: req.body.clientName,
+        fileName: req.file.originalname,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size,
+        objectPath: '', // Will be set after S3 upload
+        description: req.body.description?.trim() || undefined,
+      });
+
+      // STEP 2: Generate S3 key for the file
+      const timestamp = Date.now();
+      s3Key = `client-documents/${validatedData.clientName}/${timestamp}-${req.file.originalname}`;
+
+      // STEP 3: Upload file to S3 (only after validation succeeds)
+      await uploadFile(s3Key, req.file.buffer, req.file.mimetype);
+
+      // STEP 4: Store in database with the S3 path
+      validatedData.objectPath = s3Key;
+      const document = await storage.createClientDocument(validatedData);
       
-      // Normalize the object path if it's a raw Google Cloud Storage URL
-      const objectStorageService = new ObjectStorageService();
-      const normalizedPath = objectStorageService.normalizeObjectEntityPath(validatedData.objectPath);
-      
-      const documentData = {
-        ...validatedData,
-        objectPath: normalizedPath
-      };
-      
-      const document = await storage.createClientDocument(documentData);
       res.status(201).json(document);
     } catch (error) {
-      console.error("Error creating client document:", error);
-      res.status(500).json({ error: "Failed to create document record" });
+      // Clean up orphaned S3 object if upload succeeded but database storage failed
+      if (s3Key) {
+        try {
+          await deleteFile(s3Key);
+          console.log(`Cleaned up orphaned S3 object: ${s3Key}`);
+        } catch (cleanupError) {
+          console.error(`Failed to clean up S3 object ${s3Key}:`, cleanupError);
+        }
+      }
+      
+      console.error("Error uploading client document:", error);
+      
+      // Return proper HTTP status codes
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "Validation failed",
+          details: error.errors 
+        });
+      }
+      
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to upload document" 
+      });
     }
   });
   
@@ -774,7 +820,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/client-documents", requireAuth, async (req, res) => {
     try {
+      // List all documents from database
       const documents = await storage.getAllClientDocuments();
+      
+      // Optionally, we could also list files from S3 to verify consistency
+      // const s3Files = await listFiles('client-documents/');
+      
       res.json(documents);
     } catch (error) {
       console.error("Error fetching all client documents:", error);
@@ -782,19 +833,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get individual document file from S3 by ID
+  app.get("/api/client-documents/download/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Get document metadata from database
+      const documents = await storage.getAllClientDocuments();
+      const document = documents.find(doc => doc.id === id);
+      
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      // Get file from S3
+      const fileBuffer = await getFile(document.objectPath);
+
+      // Set appropriate headers for download
+      res.setHeader('Content-Type', document.fileType || 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${document.fileName}"`);
+      res.setHeader('Content-Length', fileBuffer.length);
+
+      // Send the file
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error("Error downloading client document from S3:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to download document" 
+      });
+    }
+  });
+  
   app.delete("/api/client-documents/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      
+      // First, get the document to retrieve the S3 key
+      const documents = await storage.getAllClientDocuments();
+      const document = documents.find(doc => doc.id === id);
+      
+      if (!document) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+
+      // Delete from S3
+      await deleteFile(document.objectPath);
+
+      // Delete from database
       const success = await storage.deleteClientDocument(id);
       
       if (success) {
         res.json({ message: "Document deleted successfully" });
       } else {
-        res.status(404).json({ error: "Document not found" });
+        res.status(404).json({ error: "Document not found in database" });
       }
     } catch (error) {
       console.error("Error deleting client document:", error);
-      res.status(500).json({ error: "Failed to delete document" });
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to delete document" 
+      });
     }
   });
   

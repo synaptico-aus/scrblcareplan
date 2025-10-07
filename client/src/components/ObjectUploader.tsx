@@ -11,7 +11,7 @@ interface ObjectUploaderProps {
   onUploadComplete?: (fileData: {
     fileName: string;
     fileType: string;
-    fileSize: string;
+    fileSize: number;
     objectPath: string;
     description?: string;
   }) => void;
@@ -56,57 +56,35 @@ export function ObjectUploader({
     setIsUploading(true);
     
     try {
-      // Get upload URL from server
-      const uploadResponse = await fetch('/api/objects/upload', {
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('clientName', clientName);
+      if (description.trim()) {
+        formData.append('description', description.trim());
+      }
+
+      // Upload file directly to server (which uploads to S3)
+      const uploadResponse = await fetch('/api/client-documents', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        body: formData,
       });
 
       if (!uploadResponse.ok) {
-        throw new Error('Failed to get upload URL');
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || 'Failed to upload document');
       }
 
-      const { uploadURL } = await uploadResponse.json();
+      const document = await uploadResponse.json();
 
-      // Upload file to object storage
-      const uploadFileResponse = await fetch(uploadURL, {
-        method: 'PUT',
-        body: selectedFile,
-        headers: {
-          'Content-Type': selectedFile.type,
-        },
+      // Call completion callback with document data
+      onUploadComplete?.({
+        fileName: document.fileName,
+        fileType: document.fileType,
+        fileSize: document.fileSize,
+        objectPath: document.objectPath,
+        description: document.description,
       });
-
-      if (!uploadFileResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
-
-      // Create document record in database
-      const fileData = {
-        clientName,
-        fileName: selectedFile.name,
-        fileType: selectedFile.type,
-        fileSize: (selectedFile.size / 1024).toFixed(2) + ' KB',
-        objectPath: uploadURL.split('?')[0], // Remove query parameters to get object path
-        description: description.trim() || undefined,
-      };
-
-      const saveResponse = await fetch('/api/client-documents', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(fileData),
-      });
-
-      if (!saveResponse.ok) {
-        throw new Error('Failed to save document record');
-      }
-
-      // Call completion callback
-      onUploadComplete?.(fileData);
 
       // Reset form
       setSelectedFile(null);

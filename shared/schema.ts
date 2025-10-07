@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, timestamp, index, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -50,7 +50,7 @@ export const clientDocuments = pgTable("client_documents", {
   clientName: text("client_name").notNull(),
   fileName: text("file_name").notNull(),
   fileType: text("file_type").notNull(),
-  fileSize: text("file_size"),
+  fileSize: integer("file_size"),
   objectPath: text("object_path").notNull(),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
   description: text("description"),
