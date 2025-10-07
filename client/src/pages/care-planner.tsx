@@ -34,7 +34,7 @@ export default function CarePlanner() {
   const queryClient = useQueryClient();
 
   // Polling function for async jobs
-  const pollAsyncJob = async (jobId: string) => {
+  const pollAsyncJob = async (jobId: string, startTime: number) => {
     const maxAttempts = 120; // 10 minutes with 5-second intervals
     let attempts = 0;
     
@@ -54,7 +54,7 @@ export default function CarePlanner() {
           setAsyncJobId(null);
           
           const endTime = Date.now();
-          const totalTime = Math.round((endTime - (generationStartTime || 0)) / 1000);
+          const totalTime = Math.round((endTime - startTime) / 1000);
           setGenerationTime(totalTime);
           
           // Process the result
@@ -317,7 +317,7 @@ export default function CarePlanner() {
           if (asyncData.jobId) {
             setAsyncJobId(asyncData.jobId);
             // Start polling for job completion
-            pollAsyncJob(asyncData.jobId);
+            pollAsyncJob(asyncData.jobId, startTime);
             return { isAsync: true, jobId: asyncData.jobId }; // Don't process as normal response
           } else {
             throw new Error(asyncData.message || 'Failed to start async processing');
