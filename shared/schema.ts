@@ -30,7 +30,10 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
-  role: varchar("role").notNull().default("user"), // "admin" or "user"
+  role: varchar("role").notNull().default("user"), // "super_admin", "admin", or "user"
+  monthlyPlanLimit: integer("monthly_plan_limit"), // null = unlimited
+  plansGeneratedThisMonth: integer("plans_generated_this_month").notNull().default(0),
+  limitResetDate: timestamp("limit_reset_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -211,7 +214,12 @@ export const createUserSchema = z.object({
     .regex(/[0-9]/, "Password must contain at least one number"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
-  role: z.enum(["admin", "user"]).default("user"),
+  role: z.enum(["super_admin", "admin", "user"]).default("user"),
+});
+
+export const updateUserLimitSchema = z.object({
+  userId: z.string(),
+  monthlyPlanLimit: z.number().int().min(0).nullable(),
 });
 
 export type Organization = typeof organizations.$inferSelect;
@@ -227,5 +235,6 @@ export type InsertClientDocument = z.infer<typeof insertClientDocumentSchema>;
 export type ClientFolderAlias = typeof clientFolderAliases.$inferSelect;
 export type InsertClientFolderAlias = z.infer<typeof insertClientFolderAliasSchema>;
 export type UpdateClientFolderAlias = z.infer<typeof updateClientFolderAliasSchema>;
+export type UpdateUserLimit = z.infer<typeof updateUserLimitSchema>;
 export type ExtractedFacts = z.infer<typeof factsSchema>;
 export type ChatParityRequest = z.infer<typeof chatParityRequestSchema>;
