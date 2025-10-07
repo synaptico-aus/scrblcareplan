@@ -145,6 +145,19 @@ export default function Login() {
                   "Login"
                 )}
               </Button>
+
+              <div className="text-center text-sm text-muted-foreground">
+                Don't have an account?{" "}
+                <Button
+                  type="button"
+                  variant="link"
+                  className="p-0 h-auto font-normal"
+                  onClick={() => setLocation("/register")}
+                  data-testid="link-register"
+                >
+                  Create account
+                </Button>
+              </div>
             </form>
           </Form>
 
