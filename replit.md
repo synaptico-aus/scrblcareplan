@@ -7,7 +7,7 @@ This is a full-stack web application designed to assist care professionals in th
 - Aged Care Act (current)
 - Support at Home Program (from July 2025)
 - Aged Care Quality Standards (1-8)
-- Salveo "Gold Standard" headings and format
+- "Gold Standard" headings and format
 
 The system uses AI to extract key facts from transcripts and generate properly formatted care plans in HTML format, following specific clinical documentation standards with first-person narrative style.
 

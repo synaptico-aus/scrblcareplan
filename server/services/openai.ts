@@ -524,7 +524,7 @@ Your job: read a full assessment transcript between a care partner and a client/
 - Aged Care Act (current)
 - Support at Home Program (from November 1, 2025)
 - Aged Care Quality Standards (1–8)
-- Salveo "Gold Standard" headings and order
+- Your provider's "Gold Standard" headings and order
 - Single Assessment System with Integrated Assessment Tool (IAT)
 - Quarterly care plan review cycle (not annual)
 
