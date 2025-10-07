@@ -1,45 +1,18 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { EventEmitter } from "events";
+import passport from "passport";
+import bcrypt from "bcrypt";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema } from "@shared/schema";
+import { requireAuth, requireAdmin, getOrganizationId } from "./middleware/auth";
+import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, loginSchema, signupSchema, type User } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
 import { uploadFile, getFile, deleteFile, listFiles } from "./services/s3";
 import multer from "multer";
-// Conditional import - only import Replit Auth when needed to avoid crashes
-
-// Session types no longer needed - authentication disabled
-
-// AUTH_MODE: 'replit' (default), 'password', or 'none'
-const authMode = process.env.AUTH_MODE || 'none';
-
-// Lazy-loaded Replit Auth functions
-let replitAuthFunctions: {
-  setupAuth: (app: Express) => Promise<void>;
-  isAuthenticated: (req: Request, res: Response, next: NextFunction) => Promise<void>;
-} | null = null;
-
-// Lazy load Replit Auth only when needed
-async function loadReplitAuth() {
-  if (!replitAuthFunctions && authMode === 'replit') {
-    const replitAuth = await import('./replitAuth');
-    replitAuthFunctions = {
-      setupAuth: replitAuth.setupAuth,
-      isAuthenticated: replitAuth.isAuthenticated
-    };
-  }
-  return replitAuthFunctions;
-}
-
-// Authentication middleware - simplified for no auth mode
-function requireAuth(req: Request, res: Response, next: NextFunction): void {
-  // No authentication required when auth mode is 'none'
-  next();
-}
 
 // Event emitter for real-time updates
 const eventEmitter = new EventEmitter();
@@ -58,44 +31,110 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Set up authentication based on AUTH_MODE
-  if (authMode === 'replit') {
-    const replitAuth = await loadReplitAuth();
-    if (!replitAuth) {
-      throw new Error('Failed to load Replit authentication');
-    }
-    
-    await replitAuth.setupAuth(app);
-    
-    // Add user endpoint for Replit Auth
-    app.get('/api/auth/user', replitAuth.isAuthenticated, async (req: any, res) => {
-      try {
-        const userId = req.user.claims.sub;
-        const user = await storage.getUser(userId);
-        res.json(user);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-        res.status(500).json({ message: "Failed to fetch user" });
+  // Authentication routes
+  app.post("/api/auth/signup", async (req, res) => {
+    try {
+      const validatedData = signupSchema.parse(req.body);
+      const { email, password, firstName, lastName, organizationName } = validatedData;
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already in use" });
       }
-    });
-    
-    // Standardize to /api/auth/me for all auth modes
-    app.get('/api/auth/me', (req, res) => {
-      res.json({ isAuthenticated: req.isAuthenticated() });
-    });
-    
-    // Add standardized logout endpoint that mirrors password mode
-    app.post('/api/auth/logout', (req, res) => {
-      req.logout(() => {
-        res.json({ success: true });
+
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      const organization = await storage.createOrganization({ name: organizationName });
+
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        firstName,
+        lastName,
+        organizationId: organization.id,
+        role: "admin",
       });
+
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed after signup" });
+        }
+        res.json({ 
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            organizationId: user.organizationId
+          }
+        });
+      });
+    } catch (error) {
+      console.error("Signup error:", error);
+      res.status(500).json({ message: error instanceof Error ? error.message : "Signup failed" });
+    }
+  });
+
+  app.post("/api/auth/login", (req, res, next) => {
+    const result = loginSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+
+    passport.authenticate("local", (err: any, user: User | false, info: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Login failed" });
+      }
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid email or password" });
+      }
+
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Login failed" });
+        }
+        res.json({
+          user: {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            organizationId: user.organizationId
+          }
+        });
+      });
+    })(req, res, next);
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout failed" });
+      }
+      res.json({ success: true });
     });
-  } else {
-    // No authentication - just provide status endpoints
-    app.get('/api/auth/me', (req, res) => {
-      res.json({ isAuthenticated: true }); // Always authenticated in no-auth mode
-    });
-  }
+  });
+
+  app.get("/api/auth/me", (req, res) => {
+    if (req.isAuthenticated()) {
+      const user = req.user as User;
+      res.json({
+        isAuthenticated: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          organizationId: user.organizationId
+        }
+      });
+    } else {
+      res.json({ isAuthenticated: false });
+    }
+  });
 
   app.post("/api/fetch-notta", requireAuth, async (req, res) => {
     try {
@@ -204,6 +243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template } = validatedData;
+      const organizationId = getOrganizationId(req);
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -218,7 +258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
 
       // Store the analysis
-      const analysis = await storage.createCareAnalysis({
+      const analysis = await storage.createCareAnalysis(organizationId, {
         clientName,
         transcript,
         processingMode: "ai",
@@ -346,7 +386,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         // Start background processing (don't await)
-        processAsyncJob(jobId, clientName, transcript, sessionId, asyncJobs, eventEmitter)
+        const organizationId = getOrganizationId(req);
+        processAsyncJob(jobId, clientName, transcript, sessionId, organizationId, asyncJobs, eventEmitter)
           .catch((error: Error) => {
             console.error(`Async job ${jobId} failed:`, error);
             asyncJobs.set(jobId, {
@@ -523,7 +564,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      const analysis = await storage.createCareAnalysis({
+      const organizationId = getOrganizationId(req);
+      const analysis = await storage.createCareAnalysis(organizationId, {
         clientName,
         transcript,
         processingMode: "ai",
@@ -578,7 +620,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const generatedHtml = generateOfflineCarePlan(transcript, clientName);
 
       // Store the analysis
-      const analysis = await storage.createCareAnalysis({
+      const organizationId = getOrganizationId(req);
+      const analysis = await storage.createCareAnalysis(organizationId, {
         clientName,
         transcript,
         processingMode: "offline",
@@ -603,7 +646,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/analysis/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const analysis = await storage.getCareAnalysis(id);
+      const organizationId = getOrganizationId(req);
+      const analysis = await storage.getCareAnalysis(organizationId, id);
       
       if (!analysis) {
         return res.status(404).json({ 
@@ -623,7 +667,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client/:clientName/analyses", requireAuth, async (req, res) => {
     try {
       const { clientName } = req.params;
-      const analyses = await storage.getCareAnalysesByClient(clientName);
+      const organizationId = getOrganizationId(req);
+      const analyses = await storage.getCareAnalysesByClient(organizationId, clientName);
       
       res.json(analyses);
     } catch (error) {
@@ -638,7 +683,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/saved-care-plans", requireAuth, async (req, res) => {
     try {
       const validatedData = insertSavedCarePlanSchema.parse(req.body);
-      const savedCarePlan = await storage.createSavedCarePlan(validatedData);
+      const organizationId = getOrganizationId(req);
+      const savedCarePlan = await storage.createSavedCarePlan(organizationId, validatedData);
       
       res.json(savedCarePlan);
     } catch (error) {
@@ -651,7 +697,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/saved-care-plans", requireAuth, async (req, res) => {
     try {
-      const savedCarePlans = await storage.getSavedCarePlans();
+      const organizationId = getOrganizationId(req);
+      const savedCarePlans = await storage.getSavedCarePlans(organizationId);
       res.json(savedCarePlans);
     } catch (error) {
       console.error("Error fetching saved care plans:", error);
@@ -664,7 +711,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/saved-care-plans/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const savedCarePlan = await storage.getSavedCarePlan(id);
+      const organizationId = getOrganizationId(req);
+      const savedCarePlan = await storage.getSavedCarePlan(organizationId, id);
       
       if (!savedCarePlan) {
         return res.status(404).json({ 
@@ -684,7 +732,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/saved-care-plans/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const deleted = await storage.deleteSavedCarePlan(id);
+      const organizationId = getOrganizationId(req);
+      const deleted = await storage.deleteSavedCarePlan(organizationId, id);
       
       if (!deleted) {
         return res.status(404).json({ 
@@ -777,7 +826,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // STEP 4: Store in database with the S3 path
       validatedData.objectPath = s3Key;
-      const document = await storage.createClientDocument(validatedData);
+      const organizationId = getOrganizationId(req);
+      const document = await storage.createClientDocument(organizationId, validatedData);
       
       res.status(201).json(document);
     } catch (error) {
@@ -810,7 +860,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client-documents/:clientName", requireAuth, async (req, res) => {
     try {
       const { clientName } = req.params;
-      const documents = await storage.getClientDocuments(decodeURIComponent(clientName));
+      const organizationId = getOrganizationId(req);
+      const documents = await storage.getClientDocuments(organizationId, decodeURIComponent(clientName));
       res.json(documents);
     } catch (error) {
       console.error("Error fetching client documents:", error);
@@ -821,7 +872,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client-documents", requireAuth, async (req, res) => {
     try {
       // List all documents from database
-      const documents = await storage.getAllClientDocuments();
+      const organizationId = getOrganizationId(req);
+      const documents = await storage.getAllClientDocuments(organizationId);
       
       // Optionally, we could also list files from S3 to verify consistency
       // const s3Files = await listFiles('client-documents/');
@@ -837,9 +889,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client-documents/download/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      const organizationId = getOrganizationId(req);
       
       // Get document metadata from database
-      const documents = await storage.getAllClientDocuments();
+      const documents = await storage.getAllClientDocuments(organizationId);
       const document = documents.find(doc => doc.id === id);
       
       if (!document) {
@@ -867,9 +920,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/client-documents/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      const organizationId = getOrganizationId(req);
       
       // First, get the document to retrieve the S3 key
-      const documents = await storage.getAllClientDocuments();
+      const documents = await storage.getAllClientDocuments(organizationId);
       const document = documents.find(doc => doc.id === id);
       
       if (!document) {
@@ -880,7 +934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await deleteFile(document.objectPath);
 
       // Delete from database
-      const success = await storage.deleteClientDocument(id);
+      const success = await storage.deleteClientDocument(organizationId, id);
       
       if (success) {
         res.json({ message: "Document deleted successfully" });
@@ -898,15 +952,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Client folder alias routes
   app.post("/api/client-folder-aliases", requireAuth, async (req, res) => {
     try {
+      const organizationId = getOrganizationId(req);
       const validatedData = insertClientFolderAliasSchema.parse(req.body);
       
       // Check if alias already exists
-      const existing = await storage.getClientFolderAlias(validatedData.originalClientName);
+      const existing = await storage.getClientFolderAlias(organizationId, validatedData.originalClientName);
       if (existing) {
         return res.status(409).json({ error: "Folder alias already exists for this client" });
       }
       
-      const alias = await storage.createClientFolderAlias(validatedData);
+      const alias = await storage.createClientFolderAlias(organizationId, validatedData);
       res.status(201).json(alias);
     } catch (error) {
       console.error("Error creating client folder alias:", error);
@@ -917,7 +972,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client-folder-aliases/:originalClientName", requireAuth, async (req, res) => {
     try {
       const { originalClientName } = req.params;
-      const alias = await storage.getClientFolderAlias(decodeURIComponent(originalClientName));
+      const organizationId = getOrganizationId(req);
+      const alias = await storage.getClientFolderAlias(organizationId, decodeURIComponent(originalClientName));
       
       if (alias) {
         res.json(alias);
@@ -932,7 +988,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/client-folder-aliases", requireAuth, async (req, res) => {
     try {
-      const aliases = await storage.getAllClientFolderAliases();
+      const organizationId = getOrganizationId(req);
+      const aliases = await storage.getAllClientFolderAliases(organizationId);
       res.json(aliases);
     } catch (error) {
       console.error("Error fetching all client folder aliases:", error);
@@ -943,14 +1000,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/client-folder-aliases/:originalClientName", requireAuth, async (req, res) => {
     try {
       const { originalClientName } = req.params;
+      const organizationId = getOrganizationId(req);
       const validatedData = updateClientFolderAliasSchema.parse(req.body);
       
       // Check if alias exists first, if not create it
-      const existing = await storage.getClientFolderAlias(decodeURIComponent(originalClientName));
+      const existing = await storage.getClientFolderAlias(organizationId, decodeURIComponent(originalClientName));
       
       if (!existing) {
         // Create new alias
-        const newAlias = await storage.createClientFolderAlias({
+        const newAlias = await storage.createClientFolderAlias(organizationId, {
           originalClientName: decodeURIComponent(originalClientName),
           displayName: validatedData.displayName
         });
@@ -958,7 +1016,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Update existing alias
-      const updated = await storage.updateClientFolderAlias(decodeURIComponent(originalClientName), validatedData);
+      const updated = await storage.updateClientFolderAlias(organizationId, decodeURIComponent(originalClientName), validatedData);
       
       if (updated) {
         res.json(updated);
@@ -971,10 +1029,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete("/api/client-folder-aliases/:originalClientName", async (req, res) => {
+  app.delete("/api/client-folder-aliases/:originalClientName", requireAuth, async (req, res) => {
     try {
       const { originalClientName } = req.params;
-      const success = await storage.deleteClientFolderAlias(decodeURIComponent(originalClientName));
+      const organizationId = getOrganizationId(req);
+      const success = await storage.deleteClientFolderAlias(organizationId, decodeURIComponent(originalClientName));
       
       if (success) {
         res.json({ success: true });
@@ -994,6 +1053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     clientName: string, 
     transcript: string, 
     sessionId: string, 
+    organizationId: string,
     asyncJobs: Map<string, any>, 
     eventEmitter: any
   ) {
@@ -1096,7 +1156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobId
       });
 
-      const analysis = await storage.createCareAnalysis({
+      const analysis = await storage.createCareAnalysis(organizationId, {
         clientName,
         transcript,
         processingMode: "ai",

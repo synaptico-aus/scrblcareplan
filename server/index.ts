@@ -1,12 +1,18 @@
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
+import passport from "passport";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { setupPassport } from "./auth";
 
 const app = express();
 
 // Trust proxy for secure cookies and rate limiting
 // Always enable in deployed environments (Replit uses proxies)
 app.set('trust proxy', 1);
+
+// Session secret - use environment variable or default for development
+const SESSION_SECRET = process.env.SESSION_SECRET || 'dev-secret-change-in-production';
 
 if (process.env.NODE_ENV === 'production') {
   // Enforce environment variables in production
@@ -16,18 +22,30 @@ if (process.env.NODE_ENV === 'production') {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY environment variable is required in production');
   }
-  
-  // AUTH_MODE controls authentication method: 'replit' (default), 'password', or 'none'
-  const authMode = process.env.AUTH_MODE || 'none';
-  
-  // Authentication disabled - no additional validation needed
 }
 
 // Increase limits for 80-minute transcripts (can be very large)
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
-// No session configuration needed - authentication disabled
+// Session configuration
+app.use(
+  session({
+    secret: SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+// Initialize Passport
+setupPassport();
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use((req, res, next) => {
   const start = Date.now();
