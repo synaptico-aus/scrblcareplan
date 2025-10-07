@@ -37,15 +37,22 @@ The frontend follows a component-based architecture with reusable UI components.
 The backend implements a service-oriented architecture with separate services for OpenAI integration and offline care plan generation. The storage layer uses an interface pattern to allow easy switching between storage implementations.
 
 ### Data Storage Solutions
-- **Current Implementation**: In-memory storage using Maps
-- **Database Schema**: Drizzle ORM configured for PostgreSQL with tables for users and care analyses
-- **Schema Design**: 
-  - Users table with authentication fields
-  - Care analyses table storing transcripts, extracted facts (JSONB), and generated HTML
-  - Support for processing mode tracking (AI vs offline)
+- **Production Database**: AWS RDS PostgreSQL in Sydney region (ap-southeast-2) for healthcare data compliance
+- **Database Schema**: Drizzle ORM configured with the following tables:
+  - **organizations**: Multi-tenant organization management
+  - **users**: User accounts with email/password authentication, organization membership, and role-based access
+  - **care_analyses**: Care plan transcripts and AI-generated analyses (organization-scoped)
+  - **saved_care_plans**: Saved care plans with extracted facts and HTML (organization-scoped)
+  - **client_documents**: Client file attachments stored in object storage (organization-scoped)
+  - **client_folder_aliases**: Display name mappings for client folders (organization-scoped)
+  - **sessions**: PostgreSQL-backed session storage for authentication
 
 ### Authentication and Authorization
-The application is structured to support user authentication with a users table in the database schema, though the current implementation focuses on the core care planning functionality.
+- **Authentication System**: Multi-tenant Passport.js local strategy with bcrypt password hashing (10 rounds)
+- **Session Management**: PostgreSQL-backed sessions with secure cookies
+- **Authorization**: Role-based access control (admin/user roles)
+- **Data Isolation**: Complete organization-level data scoping enforced at storage layer
+- **Password Protection**: Removed from saved plans route - now relies on authentication system
 
 ### Processing Architecture
 - **AI Processing**: OpenAI GPT-5 integration for intelligent fact extraction and care plan generation

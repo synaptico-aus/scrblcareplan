@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type UpsertUser, type Organization, type InsertOrganization, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, users, organizations, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases } from "@shared/schema";
+import { type User, type InsertUser, type Organization, type InsertOrganization, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, users, organizations, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, sql, and } from "drizzle-orm";
@@ -11,7 +11,6 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsersByOrganization(organizationId: string): Promise<User[]>;
@@ -84,24 +83,6 @@ export class MemStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     return undefined;
-  }
-
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const id = userData.id || randomUUID();
-    const existingUser = this.users.get(id);
-    const user: User = {
-      id,
-      email: userData.email!,
-      passwordHash: userData.passwordHash!,
-      firstName: userData.firstName || null,
-      lastName: userData.lastName || null,
-      organizationId: userData.organizationId!,
-      role: userData.role || "user",
-      createdAt: existingUser?.createdAt || new Date(),
-      updatedAt: new Date(),
-    };
-    this.users.set(id, user);
-    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -228,8 +209,8 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const newAlias: ClientFolderAlias = {
       id,
-      organizationId,
       ...alias,
+      organizationId,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -294,21 +275,6 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     return undefined;
-  }
-
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {

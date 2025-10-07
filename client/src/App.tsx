@@ -10,8 +10,6 @@ import SavedPlans from "@/pages/saved-plans";
 import AdminDashboard from "@/pages/admin";
 import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
-import { PasswordProtected } from "@/components/PasswordProtected";
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -27,13 +25,7 @@ function App() {
             </Route>
             <Route path="/saved-plans">
               <ProtectedRoute>
-                <PasswordProtected 
-                  requiredPassword="caresalveocarl"
-                  title="Saved Plans Access"
-                  description="This area contains sensitive client information and requires authentication."
-                >
-                  <SavedPlans />
-                </PasswordProtected>
+                <SavedPlans />
               </ProtectedRoute>
             </Route>
             <Route path="/admin">
