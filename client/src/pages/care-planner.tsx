@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { CarePlanForm } from "@/components/CarePlanForm";
 import { FactsPanel } from "@/components/FactsPanel";
 import { CarePlanPreview } from "@/components/CarePlanPreview";
@@ -8,8 +8,17 @@ import { AgentUpdates } from "@/components/AgentUpdates";
 import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, Shield, FileText, Bot, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { Settings, Shield, FileText, Bot, Loader2, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import scrblLogo from "@/assets/scrbl-logo.png";
 
 export default function CarePlanner() {
@@ -32,6 +41,25 @@ export default function CarePlanner() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out",
+      });
+      setLocation("/login");
+    } catch (error) {
+      toast({
+        title: "Logout failed",
+        description: "An error occurred while logging out",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Polling function for async jobs
   const pollAsyncJob = async (jobId: string, startTime: number) => {
@@ -536,6 +564,33 @@ export default function CarePlanner() {
                 <span className="hidden sm:inline">Saved Plans</span>
               </Button>
             </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-user-menu">
+                  <User className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">{user?.firstName || user?.email}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">
+                      {user?.firstName && user?.lastName 
+                        ? `${user.firstName} ${user.lastName}` 
+                        : user?.email}
+                    </p>
+                    <p className="text-xs leading-none text-muted-foreground" data-testid="text-user-email">
+                      {user?.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
