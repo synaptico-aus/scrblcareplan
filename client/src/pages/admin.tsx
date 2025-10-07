@@ -42,6 +42,7 @@ type User = {
   monthlyPlanLimit: number | null;
   plansGeneratedThisMonth: number;
   organizationId: string;
+  organizationName: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -330,6 +331,7 @@ export default function AdminDashboard() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
+                  {isSuperAdmin && <TableHead>Organization</TableHead>}
                   <TableHead>Role</TableHead>
                   {isSuperAdmin && <TableHead>Monthly Limit</TableHead>}
                   {isSuperAdmin && <TableHead>Generated</TableHead>}
@@ -347,6 +349,11 @@ export default function AdminDashboard() {
                           : targetUser.firstName || targetUser.lastName || "-"}
                       </TableCell>
                       <TableCell data-testid={`text-email-${targetUser.id}`}>{targetUser.email}</TableCell>
+                      {isSuperAdmin && (
+                        <TableCell data-testid={`text-org-${targetUser.id}`}>
+                          {targetUser.organizationName}
+                        </TableCell>
+                      )}
                       <TableCell data-testid={`text-role-${targetUser.id}`}>
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -389,7 +396,7 @@ export default function AdminDashboard() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={isSuperAdmin ? 7 : 4} className="text-center text-gray-500 dark:text-gray-400">
+                    <TableCell colSpan={isSuperAdmin ? 8 : 4} className="text-center text-gray-500 dark:text-gray-400">
                       No users found
                     </TableCell>
                   </TableRow>

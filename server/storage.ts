@@ -14,6 +14,7 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   getUsersByOrganization(organizationId: string): Promise<User[]>;
+  getAllUsers(): Promise<User[]>;
   updateUserLimit(userId: string, monthlyPlanLimit: number | null): Promise<User | undefined>;
   incrementUserPlanCount(userId: string): Promise<void>;
   checkAndResetUserPlanCount(userId: string): Promise<{ canGenerate: boolean; remainingPlans: number | null }>;
@@ -110,6 +111,10 @@ export class MemStorage implements IStorage {
 
   async getUsersByOrganization(organizationId: string): Promise<User[]> {
     return Array.from(this.users.values()).filter(u => u.organizationId === organizationId);
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 
   async updateUserLimit(userId: string, monthlyPlanLimit: number | null): Promise<User | undefined> {
@@ -344,6 +349,10 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByOrganization(organizationId: string): Promise<User[]> {
     return await db.select().from(users).where(eq(users.organizationId, organizationId));
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
   }
 
   async updateUserLimit(userId: string, monthlyPlanLimit: number | null): Promise<User | undefined> {

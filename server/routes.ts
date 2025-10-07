@@ -153,23 +153,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User management routes (admin only)
   app.get("/api/users", requireAuth, requireAdmin, async (req, res) => {
     try {
+      const user = req.user as User;
       const organizationId = getOrganizationId(req);
-      const users = await storage.getUsersByOrganization(organizationId);
       
-      const usersWithoutPasswords = users.map(u => ({
-        id: u.id,
-        email: u.email,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        role: u.role,
-        monthlyPlanLimit: u.monthlyPlanLimit,
-        plansGeneratedThisMonth: u.plansGeneratedThisMonth,
-        organizationId: u.organizationId,
-        createdAt: u.createdAt,
-        updatedAt: u.updatedAt
-      }));
+      // Super admins can see all users across all organizations
+      const users = user.role === "super_admin" 
+        ? await storage.getAllUsers()
+        : await storage.getUsersByOrganization(organizationId);
       
-      res.json(usersWithoutPasswords);
+      // Fetch organization names for all users
+      const usersWithOrgNames = await Promise.all(
+        users.map(async (u) => {
+          const org = await storage.getOrganization(u.organizationId);
+          return {
+            id: u.id,
+            email: u.email,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            role: u.role,
+            monthlyPlanLimit: u.monthlyPlanLimit,
+            plansGeneratedThisMonth: u.plansGeneratedThisMonth,
+            organizationId: u.organizationId,
+            organizationName: org?.name || "Unknown",
+            createdAt: u.createdAt,
+            updatedAt: u.updatedAt
+          };
+        })
+      );
+      
+      res.json(usersWithOrgNames);
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
@@ -223,17 +235,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/users/:userId/limit", requireAuth, requireSuperAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
-      const organizationId = getOrganizationId(req);
       const validatedData = updateUserLimitSchema.parse({ ...req.body, userId });
       
-      // Verify the target user belongs to the super admin's organization
+      // Verify the target user exists (super admins can modify users across all organizations)
       const targetUser = await storage.getUser(userId);
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
-      }
-      
-      if (targetUser.organizationId !== organizationId) {
-        return res.status(403).json({ message: "Cannot modify users outside your organization" });
       }
       
       const updatedUser = await storage.updateUserLimit(userId, validatedData.monthlyPlanLimit);
