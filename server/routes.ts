@@ -162,6 +162,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: u.firstName,
         lastName: u.lastName,
         role: u.role,
+        monthlyPlanLimit: u.monthlyPlanLimit,
+        plansGeneratedThisMonth: u.plansGeneratedThisMonth,
         organizationId: u.organizationId,
         createdAt: u.createdAt,
         updatedAt: u.updatedAt
@@ -221,7 +223,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/users/:userId/limit", requireAuth, requireSuperAdmin, async (req, res) => {
     try {
       const { userId } = req.params;
+      const organizationId = getOrganizationId(req);
       const validatedData = updateUserLimitSchema.parse({ ...req.body, userId });
+      
+      // Verify the target user belongs to the super admin's organization
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      if (targetUser.organizationId !== organizationId) {
+        return res.status(403).json({ message: "Cannot modify users outside your organization" });
+      }
       
       const updatedUser = await storage.updateUserLimit(userId, validatedData.monthlyPlanLimit);
       
