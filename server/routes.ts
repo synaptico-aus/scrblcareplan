@@ -142,7 +142,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
-          organizationId: user.organizationId
+          organizationId: user.organizationId,
+          monthlyPlanLimit: user.monthlyPlanLimit,
+          plansGeneratedThisMonth: user.plansGeneratedThisMonth
         }
       });
     } else {
