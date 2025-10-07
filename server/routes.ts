@@ -33,9 +33,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
+    const result = signupSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ 
+        message: "Invalid signup data",
+        errors: result.error.issues.map(issue => ({
+          field: issue.path.join('.'),
+          message: issue.message
+        }))
+      });
+    }
+
     try {
-      const validatedData = signupSchema.parse(req.body);
-      const { email, password, firstName, lastName, organizationName } = validatedData;
+      const { email, password, firstName, lastName, organizationName } = result.data;
 
       const existingUser = await storage.getUserByEmail(email);
       if (existingUser) {
@@ -57,6 +67,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       req.login(user, (err) => {
         if (err) {
+          console.error("Session login error after signup:", err);
           return res.status(500).json({ message: "Login failed after signup" });
         }
         res.json({ 
