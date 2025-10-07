@@ -325,10 +325,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template } = validatedData;
       const organizationId = getOrganizationId(req);
+      const userId = req.user!.id;
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
           message: "Only 'gold-standard' template is supported" 
+        });
+      }
+
+      // Check user's monthly plan limit
+      const limitCheck = await storage.checkAndResetUserPlanCount(userId);
+      if (!limitCheck.canGenerate) {
+        return res.status(403).json({
+          message: limitCheck.remainingPlans === 0 
+            ? "You have reached your monthly care plan generation limit. Please contact your administrator."
+            : "You have exceeded your monthly care plan generation limit.",
+          remainingPlans: limitCheck.remainingPlans
         });
       }
 
@@ -346,6 +358,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         extractedFacts,
         generatedHtml,
       });
+
+      // Increment user's plan count after successful generation
+      await storage.incrementUserPlanCount(userId);
 
       res.json({
         html: generatedHtml,
@@ -433,6 +448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template, sessionId } = validatedData;
+      const userId = req.user!.id;
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -443,6 +459,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionId) {
         return res.status(400).json({
           message: "sessionId is required for async generation"
+        });
+      }
+
+      // Check user's monthly plan limit
+      const limitCheck = await storage.checkAndResetUserPlanCount(userId);
+      if (!limitCheck.canGenerate) {
+        return res.status(403).json({
+          message: limitCheck.remainingPlans === 0 
+            ? "You have reached your monthly care plan generation limit. Please contact your administrator."
+            : "You have exceeded your monthly care plan generation limit.",
+          remainingPlans: limitCheck.remainingPlans
         });
       }
 
@@ -463,12 +490,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           clientName,
           transcriptLength,
           estimatedSeconds,
-          sessionId
+          sessionId,
+          userId
         });
 
         // Start background processing (don't await)
         const organizationId = getOrganizationId(req);
-        processAsyncJob(jobId, clientName, transcript, sessionId, organizationId, asyncJobs, eventEmitter)
+        processAsyncJob(jobId, clientName, transcript, sessionId, organizationId, userId, asyncJobs, eventEmitter)
           .catch((error: Error) => {
             console.error(`Async job ${jobId} failed:`, error);
             asyncJobs.set(jobId, {
@@ -530,6 +558,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template, sessionId } = validatedData;
+      const userId = req.user!.id;
+      const organizationId = getOrganizationId(req);
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -540,6 +570,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!sessionId) {
         return res.status(400).json({
           message: "sessionId is required for streaming generation"
+        });
+      }
+
+      // Check user's monthly plan limit
+      const limitCheck = await storage.checkAndResetUserPlanCount(userId);
+      if (!limitCheck.canGenerate) {
+        return res.status(403).json({
+          message: limitCheck.remainingPlans === 0 
+            ? "You have reached your monthly care plan generation limit. Please contact your administrator."
+            : "You have exceeded your monthly care plan generation limit.",
+          remainingPlans: limitCheck.remainingPlans
         });
       }
 
@@ -645,7 +686,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSteps: 8
       });
 
-      const organizationId = getOrganizationId(req);
       const analysis = await storage.createCareAnalysis(organizationId, {
         clientName,
         transcript,
@@ -653,6 +693,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         extractedFacts,
         generatedHtml,
       });
+
+      // Increment user's plan count after successful generation
+      await storage.incrementUserPlanCount(userId);
 
       // Send completion
       eventEmitter.emit('generation-update', {
@@ -695,13 +738,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript } = validatedData;
+      const userId = req.user!.id;
+      const organizationId = getOrganizationId(req);
+
+      // Check user's monthly plan limit
+      const limitCheck = await storage.checkAndResetUserPlanCount(userId);
+      if (!limitCheck.canGenerate) {
+        return res.status(403).json({
+          message: limitCheck.remainingPlans === 0 
+            ? "You have reached your monthly care plan generation limit. Please contact your administrator."
+            : "You have exceeded your monthly care plan generation limit.",
+          remainingPlans: limitCheck.remainingPlans
+        });
+      }
 
       // Generate care plan using offline processing
       const extractedFacts = generateOfflineFactsExtraction(transcript, clientName);
       const generatedHtml = generateOfflineCarePlan(transcript, clientName);
 
       // Store the analysis
-      const organizationId = getOrganizationId(req);
       const analysis = await storage.createCareAnalysis(organizationId, {
         clientName,
         transcript,
@@ -709,6 +764,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         extractedFacts,
         generatedHtml,
       });
+
+      // Increment user's plan count after successful generation
+      await storage.incrementUserPlanCount(userId);
 
       res.json({
         html: generatedHtml,
@@ -1135,6 +1193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     transcript: string, 
     sessionId: string, 
     organizationId: string,
+    userId: string,
     asyncJobs: Map<string, any>, 
     eventEmitter: any
   ) {
@@ -1244,6 +1303,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         extractedFacts,
         generatedHtml,
       });
+
+      // Increment user's plan count after successful generation
+      await storage.incrementUserPlanCount(userId);
 
       // Complete job
       asyncJobs.set(jobId, {
