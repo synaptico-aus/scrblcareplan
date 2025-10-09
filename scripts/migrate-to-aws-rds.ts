@@ -18,6 +18,7 @@ async function exportData() {
   console.log('📤 Exporting data from current database...');
   
   const tables = [
+    'organizations',
     'users',
     'care_analyses', 
     'saved_care_plans',
@@ -52,13 +53,26 @@ async function createSchema() {
   
   // Create tables in order (respecting foreign keys)
   const schema = `
-    -- Users table
+    -- Organizations table (must be created first for foreign keys)
+    CREATE TABLE IF NOT EXISTS organizations (
+      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+
+    -- Users table with authentication and multi-tenant support
     CREATE TABLE IF NOT EXISTS users (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-      email VARCHAR UNIQUE,
+      email VARCHAR UNIQUE NOT NULL,
+      password_hash VARCHAR NOT NULL,
       first_name VARCHAR,
       last_name VARCHAR,
-      profile_image_url VARCHAR,
+      organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+      role VARCHAR NOT NULL DEFAULT 'user',
+      monthly_plan_limit INTEGER,
+      plans_generated_this_month INTEGER NOT NULL DEFAULT 0,
+      limit_reset_date TIMESTAMP,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     );
@@ -74,6 +88,7 @@ async function createSchema() {
     -- Care analyses table
     CREATE TABLE IF NOT EXISTS care_analyses (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      organization_id VARCHAR NOT NULL REFERENCES organizations(id),
       client_name TEXT NOT NULL,
       transcript TEXT NOT NULL,
       extracted_facts JSONB,
@@ -85,6 +100,7 @@ async function createSchema() {
     -- Saved care plans table
     CREATE TABLE IF NOT EXISTS saved_care_plans (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      organization_id VARCHAR NOT NULL REFERENCES organizations(id),
       name TEXT NOT NULL,
       client_name TEXT NOT NULL,
       html TEXT NOT NULL,
@@ -96,6 +112,7 @@ async function createSchema() {
     -- Client documents table
     CREATE TABLE IF NOT EXISTS client_documents (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+      organization_id VARCHAR NOT NULL REFERENCES organizations(id),
       client_name TEXT NOT NULL,
       file_name TEXT NOT NULL,
       file_type TEXT NOT NULL,
@@ -108,11 +125,13 @@ async function createSchema() {
     -- Client folder aliases table
     CREATE TABLE IF NOT EXISTS client_folder_aliases (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
-      original_client_name TEXT NOT NULL UNIQUE,
+      organization_id VARCHAR NOT NULL REFERENCES organizations(id),
+      original_client_name TEXT NOT NULL,
       display_name TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     );
+    CREATE INDEX IF NOT EXISTS idx_client_folder_org ON client_folder_aliases(organization_id, original_client_name);
   `;
   
   await targetPool.query(schema);
@@ -123,6 +142,7 @@ async function importData(data: any) {
   console.log('📥 Importing data to Australian AWS RDS...\n');
   
   const tables = [
+    'organizations',
     'users',
     'sessions',
     'care_analyses',
@@ -167,8 +187,9 @@ async function verifyMigration() {
   console.log('🔍 Verifying migration...\n');
   
   const tables = [
-    'saved_care_plans',
+    'organizations',
     'users',
+    'saved_care_plans',
     'client_documents',
     'client_folder_aliases'
   ];
