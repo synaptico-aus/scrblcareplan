@@ -15,6 +15,17 @@ import scrblLogo from "@/assets/scrbl-logo.png";
 import html2pdf from "html2pdf.js";
 import { ObjectUploader } from "@/components/ObjectUploader";
 
+// HTML escape function to prevent XSS
+function escapeHtml(unsafe: string | null | undefined): string {
+  if (!unsafe) return '';
+  return String(unsafe)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<SavedCarePlan | null>(null);
@@ -257,7 +268,7 @@ export default function SavedPlans() {
     const htmlWithLogo = `
       <html>
         <head>
-          <title>Care Plan - ${plan.clientName}</title>
+          <title>Care Plan - ${escapeHtml(plan.clientName)}</title>
           <style>
             body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
             .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
@@ -304,7 +315,7 @@ export default function SavedPlans() {
     const htmlWithLogo = `
       <html>
         <head>
-          <title>Care Plan - ${plan.clientName}</title>
+          <title>Care Plan - ${escapeHtml(plan.clientName)}</title>
           <meta charset="utf-8">
           <style>
             body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
@@ -350,24 +361,24 @@ export default function SavedPlans() {
         
         <div style="margin-bottom: 20px;">
           <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Client Details</h3>
-          <p><strong>Name:</strong> ${facts.clientDetails?.name || "Not documented"}</p>
-          <p><strong>Language:</strong> ${facts.clientDetails?.language || "Not documented"}</p>
+          <p><strong>Name:</strong> ${escapeHtml(facts.clientDetails?.name) || "Not documented"}</p>
+          <p><strong>Language:</strong> ${escapeHtml(facts.clientDetails?.language) || "Not documented"}</p>
           <p><strong>Interpreter Required:</strong> ${facts.clientDetails?.interpreterRequired !== undefined ? (facts.clientDetails?.interpreterRequired ? "Yes" : "No") : "Not documented"}</p>
         </div>
         
         <div style="margin-bottom: 20px;">
           <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Medical Information</h3>
-          <p><strong>GP:</strong> ${facts.medical?.gp || "Not documented"}</p>
-          <p><strong>Pharmacy:</strong> ${facts.medical?.pharmacy || "Not documented"}</p>
-          <p><strong>Medications:</strong> ${facts.medical?.medications || "Not documented"}</p>
-          <p><strong>Allergies:</strong> ${facts.medical?.allergies || "Not documented"}</p>
+          <p><strong>GP:</strong> ${escapeHtml(facts.medical?.gp) || "Not documented"}</p>
+          <p><strong>Pharmacy:</strong> ${escapeHtml(facts.medical?.pharmacy) || "Not documented"}</p>
+          <p><strong>Medications:</strong> ${escapeHtml(facts.medical?.medications) || "Not documented"}</p>
+          <p><strong>Allergies:</strong> ${escapeHtml(facts.medical?.allergies) || "Not documented"}</p>
         </div>
         
         <div style="margin-bottom: 20px;">
           <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Support Network</h3>
-          <p><strong>Primary Contact:</strong> ${facts.support?.primaryContact || "Not documented"}</p>
-          <p><strong>Secondary Contact:</strong> ${facts.support?.secondaryContact || "Not documented"}</p>
-          <p><strong>Living Arrangement:</strong> ${facts.support?.livingArrangement || "Not documented"}</p>
+          <p><strong>Primary Contact:</strong> ${escapeHtml(facts.support?.primaryContact) || "Not documented"}</p>
+          <p><strong>Secondary Contact:</strong> ${escapeHtml(facts.support?.secondaryContact) || "Not documented"}</p>
+          <p><strong>Living Arrangement:</strong> ${escapeHtml(facts.support?.livingArrangement) || "Not documented"}</p>
         </div>
       </div>
     `;
@@ -406,7 +417,7 @@ export default function SavedPlans() {
                     printWindow.document.write(`
                       <html>
                         <head>
-                          <title>Care Plan - ${selectedPlan.clientName}</title>
+                          <title>Care Plan - ${escapeHtml(selectedPlan.clientName)}</title>
                           <style>
                             body { font-family: 'Inter', sans-serif; margin: 40px; line-height: 1.6; }
                             h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
