@@ -50,9 +50,10 @@ The backend implements a service-oriented architecture with separate services fo
 ### Authentication and Authorization
 - **Authentication System**: Multi-tenant Passport.js local strategy with bcrypt password hashing (10 rounds)
 - **Session Management**: PostgreSQL-backed sessions with secure cookies
-- **Authorization**: Role-based access control (admin/user roles)
+- **Authorization**: Role-based access control (super_admin/admin/user roles)
 - **Data Isolation**: Complete organization-level data scoping enforced at storage layer
-- **Password Protection**: Removed from saved plans route - now relies on authentication system
+- **User Impersonation**: Super admins can impersonate any user for support purposes with full audit trail
+- **Security Features**: Fail-closed middleware, structured JSON audit logging, session-based impersonation state
 
 ### Processing Architecture
 - **AI Processing**: OpenAI GPT-5 integration for intelligent fact extraction and care plan generation
@@ -97,3 +98,14 @@ The backend implements a service-oriented architecture with separate services fo
 - **CLSX**: Conditional className utility
 
 The application is designed to be deployed on Replit with specific configuration for the development environment, including runtime error overlays and cartographer integration for enhanced debugging.
+
+## Deployment
+
+### AWS RDS Migration
+- **Migration Script**: `scripts/migrate-to-aws-rds.ts` handles data migration from development (Neon) to production (AWS RDS Sydney)
+- **Schema Alignment**: Migration script updated (Oct 2025) to include all critical fields:
+  - Organizations table (multi-tenant foundation)
+  - Users table with password_hash, organization_id, role, and plan limiting fields
+  - All data tables with organization_id for proper data isolation
+- **Migration Process**: Export → Create Schema → Import → Verify
+- **IMPORTANT**: Always test migration on staging data before production deployment
