@@ -9,7 +9,7 @@ import { ExtractedFacts, fundingLevels } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Shield, FileText, Bot, Loader2, LogOut, User, Users, UserCog } from "lucide-react";
+import { Settings, Shield, FileText, Bot, Loader2, LogOut, User, Users, UserCog, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -615,6 +615,14 @@ export default function CarePlanner() {
                 <span className="hidden sm:inline">Saved Plans</span>
               </Button>
             </Link>
+            {user?.email?.endsWith('@salveocare.com.au') && (
+              <a href="https://scrblinterview.replit.app" target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" size="sm" data-testid="button-interview" className="text-xs sm:text-sm">
+                  <ExternalLink className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Interview</span>
+                </Button>
+              </a>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" data-testid="button-user-menu">
