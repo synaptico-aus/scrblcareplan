@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Organization, type InsertOrganization, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, users, organizations, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases } from "@shared/schema";
+import { type User, type InsertUser, type Organization, type InsertOrganization, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, type ServiceRate, type InsertServiceRate, type UpdateServiceRate, users, organizations, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases, serviceRates, DEFAULT_SERVICES } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, sql, and } from "drizzle-orm";
@@ -42,6 +42,11 @@ export interface IStorage {
   getAllClientFolderAliases(organizationId: string): Promise<ClientFolderAlias[]>;
   updateClientFolderAlias(organizationId: string, originalClientName: string, update: UpdateClientFolderAlias): Promise<ClientFolderAlias | undefined>;
   deleteClientFolderAlias(organizationId: string, originalClientName: string): Promise<boolean>;
+  
+  // Service rate operations (organization-scoped)
+  getServiceRates(organizationId: string): Promise<ServiceRate[]>;
+  updateServiceRate(organizationId: string, serviceId: string, update: UpdateServiceRate): Promise<ServiceRate | undefined>;
+  seedDefaultServiceRates(organizationId: string): Promise<ServiceRate[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -51,6 +56,7 @@ export class MemStorage implements IStorage {
   private savedCarePlans: Map<string, SavedCarePlan>;
   private clientDocuments: Map<string, ClientDocument>;
   private clientFolderAliases: Map<string, ClientFolderAlias>;
+  private serviceRates: Map<string, ServiceRate>;
 
   constructor() {
     this.organizations = new Map();
@@ -59,6 +65,7 @@ export class MemStorage implements IStorage {
     this.savedCarePlans = new Map();
     this.clientDocuments = new Map();
     this.clientFolderAliases = new Map();
+    this.serviceRates = new Map();
   }
 
   async createOrganization(org: InsertOrganization): Promise<Organization> {
@@ -308,6 +315,55 @@ export class MemStorage implements IStorage {
   async deleteClientFolderAlias(organizationId: string, originalClientName: string): Promise<boolean> {
     const key = `${organizationId}_${originalClientName}`;
     return this.clientFolderAliases.delete(key);
+  }
+
+  async getServiceRates(organizationId: string): Promise<ServiceRate[]> {
+    const rates = Array.from(this.serviceRates.values())
+      .filter(rate => rate.organizationId === organizationId);
+    
+    if (rates.length === 0) {
+      return this.seedDefaultServiceRates(organizationId);
+    }
+    
+    return rates;
+  }
+
+  async updateServiceRate(organizationId: string, serviceId: string, update: UpdateServiceRate): Promise<ServiceRate | undefined> {
+    // Use organization-scoped key
+    const key = `${organizationId}_${serviceId}`;
+    const rate = this.serviceRates.get(key);
+    if (!rate || rate.organizationId !== organizationId) return undefined;
+    
+    const updated: ServiceRate = {
+      ...rate,
+      ...update,
+      updatedAt: new Date(),
+    };
+    this.serviceRates.set(key, updated);
+    return updated;
+  }
+
+  async seedDefaultServiceRates(organizationId: string): Promise<ServiceRate[]> {
+    const seededRates: ServiceRate[] = [];
+    
+    for (const service of DEFAULT_SERVICES) {
+      const id = randomUUID();
+      const rate: ServiceRate = {
+        id,
+        organizationId,
+        serviceName: service.serviceName,
+        category: service.category,
+        hourlyRate: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      // Use organization-scoped key for tenant isolation
+      const key = `${organizationId}_${id}`;
+      this.serviceRates.set(key, rate);
+      seededRates.push(rate);
+    }
+    
+    return seededRates;
   }
 }
 
@@ -559,6 +615,49 @@ export class DatabaseStorage implements IStorage {
         eq(clientFolderAliases.organizationId, organizationId)
       ));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async getServiceRates(organizationId: string): Promise<ServiceRate[]> {
+    const rates = await db.select().from(serviceRates)
+      .where(eq(serviceRates.organizationId, organizationId))
+      .orderBy(serviceRates.category, serviceRates.serviceName);
+    
+    if (rates.length === 0) {
+      return this.seedDefaultServiceRates(organizationId);
+    }
+    
+    return rates;
+  }
+
+  async updateServiceRate(organizationId: string, serviceId: string, update: UpdateServiceRate): Promise<ServiceRate | undefined> {
+    const [updated] = await db
+      .update(serviceRates)
+      .set({
+        hourlyRate: update.hourlyRate,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(serviceRates.id, serviceId),
+        eq(serviceRates.organizationId, organizationId)
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async seedDefaultServiceRates(organizationId: string): Promise<ServiceRate[]> {
+    const values = DEFAULT_SERVICES.map(service => ({
+      organizationId,
+      serviceName: service.serviceName,
+      category: service.category,
+      hourlyRate: null,
+    }));
+    
+    const seededRates = await db
+      .insert(serviceRates)
+      .values(values)
+      .returning();
+    
+    return seededRates;
   }
 }
 

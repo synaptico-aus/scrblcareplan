@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useLocation } from "wouter";
@@ -29,7 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, ArrowLeft, UserCog } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UserPlus, ArrowLeft, UserCog, DollarSign, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -43,6 +44,16 @@ type User = {
   plansGeneratedThisMonth: number;
   organizationId: string;
   organizationName: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type ServiceRate = {
+  id: string;
+  organizationId: string;
+  serviceName: string;
+  category: string;
+  hourlyRate: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -62,6 +73,8 @@ export default function AdminDashboard() {
     lastName: "",
     role: "user" as "admin" | "user",
   });
+  const [serviceRates, setServiceRates] = useState<Record<string, string>>({});
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const isSuperAdmin = user?.role === "super_admin";
 
@@ -73,6 +86,22 @@ export default function AdminDashboard() {
   const { data: users, isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+
+  const { data: rates, isLoading: isLoadingRates } = useQuery<ServiceRate[]>({
+    queryKey: ["/api/service-rates"],
+  });
+
+  // Initialize service rates when data loads
+  useEffect(() => {
+    if (rates) {
+      const ratesMap: Record<string, string> = {};
+      rates.forEach(rate => {
+        ratesMap[rate.id] = rate.hourlyRate || "";
+      });
+      setServiceRates(ratesMap);
+      setHasUnsavedChanges(false);
+    }
+  }, [rates]);
 
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof newUser) => {
@@ -196,26 +225,80 @@ export default function AdminDashboard() {
     impersonateMutation.mutate(targetUser.id);
   };
 
+  const updateServiceRateMutation = useMutation({
+    mutationFn: async ({ id, hourlyRate }: { id: string; hourlyRate: string | null }) => {
+      return apiRequest("PUT", `/api/service-rates/${id}`, { hourlyRate });
+    },
+  });
+
+  const handleSaveRates = async () => {
+    if (!rates || !Array.isArray(rates)) return;
+    
+    try {
+      const updates = rates.map((rate: ServiceRate) => ({
+        id: rate.id,
+        hourlyRate: serviceRates[rate.id] || null,
+      }));
+
+      await Promise.all(
+        updates.map((update: { id: string; hourlyRate: string | null }) => updateServiceRateMutation.mutateAsync(update))
+      );
+
+      queryClient.invalidateQueries({ queryKey: ["/api/service-rates"] });
+      setHasUnsavedChanges(false);
+      toast({
+        title: "Success",
+        description: "Service rates updated successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update service rates",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRateChange = (id: string, value: string) => {
+    setServiceRates(prev => ({ ...prev, [id]: value }));
+    setHasUnsavedChanges(true);
+  };
+
+  const groupedRates = rates?.reduce((acc: Record<string, ServiceRate[]>, rate: ServiceRate) => {
+    if (!acc[rate.category]) {
+      acc[rate.category] = [];
+    }
+    acc[rate.category].push(rate);
+    return acc;
+  }, {} as Record<string, ServiceRate[]>) || {};
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation("/")}
-              data-testid="button-back-to-planner"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Planner
-            </Button>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white" data-testid="text-page-title">
-              User Management
-            </h1>
-          </div>
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation("/")}
+            data-testid="button-back-to-planner"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Planner
+          </Button>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white" data-testid="text-page-title">
+            Admin Dashboard
+          </h1>
+        </div>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Tabs defaultValue="users" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+            <TabsTrigger value="users" data-testid="tab-users">User Management</TabsTrigger>
+            <TabsTrigger value="rates" data-testid="tab-rates">Service Rates</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="users" className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="button-create-user">
                 <UserPlus className="h-4 w-4 mr-2" />
@@ -451,6 +534,79 @@ export default function AdminDashboard() {
             </Table>
           )}
         </div>
+          </TabsContent>
+
+          <TabsContent value="rates" className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Configure Service Rates</h2>
+              <Button
+                onClick={handleSaveRates}
+                disabled={!hasUnsavedChanges || updateServiceRateMutation.isPending || isLoadingRates}
+                data-testid="button-save-rates"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {updateServiceRateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+
+            {isLoadingRates ? (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8">
+                <div className="space-y-4">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-1/4"></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="space-y-2">
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-3/4"></div>
+                        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : !rates || rates.length === 0 ? (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6 text-center">
+                <p className="text-yellow-800 dark:text-yellow-200" data-testid="text-no-rates">
+                  No service rates configured. Default services will be created automatically on first save.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {Object.entries(groupedRates).map(([category, categoryRates]) => (
+                  <div key={category} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      <DollarSign className="h-5 w-5 mr-2 text-primary" />
+                      {category}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {(categoryRates as ServiceRate[]).map((rate: ServiceRate) => (
+                        <div key={rate.id} className="space-y-2">
+                          <Label htmlFor={`rate-${rate.id}`} className="text-sm font-medium">
+                            {rate.serviceName}
+                          </Label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                            <Input
+                              id={`rate-${rate.id}`}
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={serviceRates[rate.id] || ""}
+                              onChange={(e) => handleRateChange(rate.id, e.target.value)}
+                              placeholder="0.00"
+                              className="pl-7"
+                              data-testid={`input-rate-${rate.id}`}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">/hour</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

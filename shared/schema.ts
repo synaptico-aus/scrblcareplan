@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, timestamp, index, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, timestamp, index, integer, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -83,6 +83,18 @@ export const clientFolderAliases = pgTable("client_folder_aliases", {
   index("idx_client_folder_org").on(table.organizationId, table.originalClientName),
 ]);
 
+export const serviceRates = pgTable("service_rates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  serviceName: text("service_name").notNull(),
+  category: text("category").notNull(),
+  hourlyRate: numeric("hourly_rate", { precision: 10, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_service_rates_org").on(table.organizationId),
+]);
+
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({
   id: true,
   createdAt: true,
@@ -152,6 +164,42 @@ export const insertClientFolderAliasSchema = createInsertSchema(clientFolderAlia
 export const updateClientFolderAliasSchema = insertClientFolderAliasSchema.pick({
   displayName: true,
 });
+
+export const insertServiceRateSchema = createInsertSchema(serviceRates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  organizationId: true,
+});
+
+export const updateServiceRateSchema = insertServiceRateSchema.pick({
+  hourlyRate: true,
+});
+
+export const DEFAULT_SERVICES = [
+  { serviceName: "Registered nurse", category: "Clinical/Nursing" },
+  { serviceName: "Enrolled nurse", category: "Clinical/Nursing" },
+  { serviceName: "Nursing assistant", category: "Clinical/Nursing" },
+  { serviceName: "Enrolled nurse - Telehealth", category: "Clinical/Nursing" },
+  { serviceName: "Registered nurse - Telehealth", category: "Clinical/Nursing" },
+  { serviceName: "Allied Health Therapy assistant", category: "Allied Health" },
+  { serviceName: "Counsellor or Psychotherapist", category: "Allied Health" },
+  { serviceName: "Dietitian or Nutritionist", category: "Allied Health" },
+  { serviceName: "Exercise physiologist", category: "Allied Health" },
+  { serviceName: "Occupational therapist", category: "Allied Health" },
+  { serviceName: "Physiotherapist", category: "Allied Health" },
+  { serviceName: "Podiatrist", category: "Allied Health" },
+  { serviceName: "Psychologist", category: "Allied Health" },
+  { serviceName: "Social worker", category: "Allied Health" },
+  { serviceName: "Speech pathologist", category: "Allied Health" },
+  { serviceName: "Personal care", category: "Care & Support" },
+  { serviceName: "Social support and community engagement", category: "Care & Support" },
+  { serviceName: "Respite Care", category: "Care & Support" },
+  { serviceName: "Remedial Massage", category: "Care & Support" },
+  { serviceName: "Domestic assistance", category: "Care & Support" },
+  { serviceName: "Home Gardening & Maintenance", category: "Care & Support" },
+  { serviceName: "Meal preparation", category: "Care & Support" },
+] as const;
 
 export const factsSchema = z.object({
   clientDetails: z.object({
@@ -238,3 +286,6 @@ export type UpdateClientFolderAlias = z.infer<typeof updateClientFolderAliasSche
 export type UpdateUserLimit = z.infer<typeof updateUserLimitSchema>;
 export type ExtractedFacts = z.infer<typeof factsSchema>;
 export type ChatParityRequest = z.infer<typeof chatParityRequestSchema>;
+export type ServiceRate = typeof serviceRates.$inferSelect;
+export type InsertServiceRate = z.infer<typeof insertServiceRateSchema>;
+export type UpdateServiceRate = z.infer<typeof updateServiceRateSchema>;

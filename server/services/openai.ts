@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { storage } from "../storage";
 
 // Validate API key on startup
 if (!process.env.OPENAI_API_KEY) {
@@ -485,9 +486,46 @@ function getSeverityScore(severity: string | null): number {
   return 0;
 }
 
-export async function generateCarePlanHtml(transcript: string, clientName: string, progressCallback?: (progress: number, stage: string) => void) {
+export async function generateCarePlanHtml(transcript: string, clientName: string, organizationId: string, progressCallback?: (progress: number, stage: string) => void) {
   const startTime = Date.now();
   console.log(`Starting care plan generation for client: ${clientName}, transcript length: ${transcript.length} characters`);
+  
+  // Fetch service rates for this organization with fallback
+  let serviceRatesText = "";
+  try {
+    const serviceRates = await storage.getServiceRates(organizationId);
+    
+    // Group service rates by category and format for the prompt
+    const groupedRates: Record<string, Array<{name: string, rate: string}>> = {};
+    serviceRates.forEach(rate => {
+      if (!groupedRates[rate.category]) {
+        groupedRates[rate.category] = [];
+      }
+      if (rate.hourlyRate) {
+        groupedRates[rate.category].push({
+          name: rate.serviceName,
+          rate: `$${rate.hourlyRate}/hour`
+        });
+      }
+    });
+    
+    // Format service rates for the prompt
+    if (Object.keys(groupedRates).length > 0) {
+      for (const [category, rates] of Object.entries(groupedRates)) {
+        serviceRatesText += `\n**${category}:**\n`;
+        rates.forEach(rate => {
+          serviceRatesText += `- ${rate.name}: ${rate.rate}\n`;
+        });
+      }
+    } else {
+      // Fallback to a generic message if no rates are configured
+      serviceRatesText = "\n(Service rates not configured - please contact your administrator to set up pricing)\n";
+    }
+  } catch (error) {
+    console.error("Error fetching service rates, using fallback:", error);
+    // Fallback to generic message if storage fails
+    serviceRatesText = "\n(Service rates temporarily unavailable - using standard provider pricing)\n";
+  }
   
   try {
     // For care plan generation, we'll use a different strategy for long transcripts
@@ -618,20 +656,7 @@ All goals MUST follow SMARTA framework:
 
 ## PROVIDER SERVICE ALIGNMENT (MANDATORY)
 Every goal MUST specify which of your provider's services will be used and include pricing:
-
-**Care and Support Services:**
-- Domestic Assistance (cleaning, linen, laundry): $85/hour
-- Personal Care (shower, toileting): $85/hour (day), $95/hour (night)
-- Social Support: $85/hour (day) + $1.40/km for transport
-- Transport: $85/hour (day) + $1.40/km
-- Respite Care: $85/hour (day), $95/hour (night)
-- Light Home & Gardening Maintenance: $85/hour
-
-**Health and Nursing Services:**
-- Enrolled Nurse: $121/hour (day)
-- Registered Nurse: $148.50/hour (day)
-- Allied Health Therapist (Physio/OT): $180/hour
-
+${serviceRatesText}
 **Service Categories for Support at Home Program:**
 - Clinical Care (100% government funded)
 - Independence Support 

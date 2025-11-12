@@ -525,7 +525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate care plan using AI
       const [extractedFacts, generatedHtml] = await Promise.all([
         extractFactsFromTranscript(transcript, clientName),
-        generateCarePlanHtml(transcript, clientName)
+        generateCarePlanHtml(transcript, clientName, organizationId)
       ]);
 
       // Store the analysis
@@ -853,7 +853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      const generatedHtml = await generateCarePlanHtml(transcript, clientName);
+      const generatedHtml = await generateCarePlanHtml(transcript, clientName, organizationId);
 
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {
@@ -1363,6 +1363,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Service Rates endpoints
+  app.get("/api/service-rates", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const organizationId = getOrganizationId(req);
+      const rates = await storage.getServiceRates(organizationId);
+      res.json(rates);
+    } catch (error) {
+      console.error("Error fetching service rates:", error);
+      res.status(500).json({ error: "Failed to fetch service rates" });
+    }
+  });
+
+  app.put("/api/service-rates/:id", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const organizationId = getOrganizationId(req);
+      
+      // Validate and coerce hourlyRate to number or null
+      const rateSchema = z.object({
+        hourlyRate: z.union([
+          z.string().transform(val => {
+            const trimmed = val.trim();
+            if (trimmed === '') return null;
+            const parsed = parseFloat(trimmed);
+            if (isNaN(parsed)) throw new Error('Invalid number');
+            return parsed;
+          }),
+          z.number(),
+          z.null()
+        ]).nullable()
+      });
+      
+      const { hourlyRate } = rateSchema.parse(req.body);
+      
+      const updated = await storage.updateServiceRate(organizationId, id, { 
+        hourlyRate 
+      });
+      
+      if (updated) {
+        res.json(updated);
+      } else {
+        res.status(404).json({ error: "Service rate not found" });
+      }
+    } catch (error) {
+      console.error("Error updating service rate:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid hourly rate format" });
+      }
+      res.status(500).json({ error: "Failed to update service rate" });
+    }
+  });
+
   const httpServer = createServer(app);
   // Async job processing function
   async function processAsyncJob(
@@ -1440,7 +1492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobId
       });
 
-      const generatedHtml = await generateCarePlanHtml(transcript, clientName, (progress, stage) => {
+      const generatedHtml = await generateCarePlanHtml(transcript, clientName, organizationId, (progress, stage) => {
         // Update async job with detailed progress from care plan generation  
         const adjustedProgress = 50 + (progress * 0.4); // 50% to 90% of total progress
         asyncJobs.set(jobId, {
