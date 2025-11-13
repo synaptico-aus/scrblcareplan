@@ -492,31 +492,46 @@ export async function generateCarePlanHtml(transcript: string, clientName: strin
   
   // Fetch service rates for this organization with fallback
   let serviceRatesText = "";
+  let serviceRatesJson: Array<{service: string, hourlyRate: number, category: string}> = [];
   try {
     const serviceRates = await storage.getServiceRates(organizationId);
     
-    // Group service rates by category and format for the prompt
-    const groupedRates: Record<string, Array<{name: string, rate: string}>> = {};
+    // Build JSON array of service rates for easier AI parsing
     serviceRates.forEach(rate => {
-      if (!groupedRates[rate.category]) {
-        groupedRates[rate.category] = [];
-      }
       if (rate.hourlyRate) {
-        groupedRates[rate.category].push({
-          name: rate.serviceName,
-          rate: `$${rate.hourlyRate}/hour`
+        serviceRatesJson.push({
+          service: rate.serviceName,
+          hourlyRate: parseFloat(rate.hourlyRate),
+          category: rate.category
         });
       }
     });
     
-    // Format service rates for the prompt
-    if (Object.keys(groupedRates).length > 0) {
+    // Format service rates both as text and JSON for the prompt
+    if (serviceRatesJson.length > 0) {
+      // Text format (human-readable)
+      const groupedRates: Record<string, Array<{name: string, rate: string}>> = {};
+      serviceRates.forEach(rate => {
+        if (!groupedRates[rate.category]) {
+          groupedRates[rate.category] = [];
+        }
+        if (rate.hourlyRate) {
+          groupedRates[rate.category].push({
+            name: rate.serviceName,
+            rate: `$${rate.hourlyRate}/hour`
+          });
+        }
+      });
+      
       for (const [category, rates] of Object.entries(groupedRates)) {
         serviceRatesText += `\n**${category}:**\n`;
         rates.forEach(rate => {
           serviceRatesText += `- ${rate.name}: ${rate.rate}\n`;
         });
       }
+      
+      // Add JSON format for structured parsing
+      serviceRatesText += `\n**JSON FORMAT (for exact matching):**\n\`\`\`json\n${JSON.stringify(serviceRatesJson, null, 2)}\n\`\`\`\n`;
     } else {
       // Fallback to a generic message if no rates are configured
       serviceRatesText = "\n(Service rates not configured - please contact your administrator to set up pricing)\n";
@@ -638,12 +653,19 @@ For Dignity of Risk table use this exact format:
   </tbody>
 </table>
 
-For Goals format exactly like this using SMARTA principles:
+For Goals format EXACTLY like this using SMARTA principles:
 <p><strong>GOAL 1</strong> Goal: …</p>
 <p>Abilities and considerations (risks): …</p>
 <p>How will we do this? (Tasks): …</p>
-<p>Who is responsible?: When will it be done?: How much will it cost?: …</p>
+<p>Who is responsible?: … When will it be done?: … How much will it cost?: [Service Name] at $X/hour ($Y/month)</p>
 <p>Service Category: Clinical Care / Independence Support / Everyday Living</p>
+
+CRITICAL PRICING FORMAT REQUIREMENT:
+The "How much will it cost?" line MUST include the EXACT format: "$X/hour ($Y/month)" where:
+- $X is the hourly rate from the service rates list above
+- $Y is the monthly cost (hourly rate × hours per week × 4.33 weeks)
+- NEVER leave this blank or use narrative text - ALWAYS include the dollar amounts
+- Example: "How much will it cost?: Personal Care at $85/hour ($1,102/month) for 3 hours weekly"
 
 ## SMARTA Goal-Setting Principles (CRITICAL for Support at Home compliance)
 All goals MUST follow SMARTA framework:

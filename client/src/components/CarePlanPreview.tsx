@@ -75,9 +75,11 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
           paraCount++;
         }
         
-        // Find all hourly rates in this goal section
-        const hourlyMatches = [...goalText.matchAll(/\$(\d+(?:\.\d{1,2})?)\/hour/g)];
-        const monthlyMatches = [...goalText.matchAll(/\$(\d+(?:,\d{3})*(?:\.\d{1,2})?)\/month/g)];
+        // Find all hourly rates in this goal section (flexible regex for variations)
+        // Matches: $180/hour, $180 per hour, ($180/hour), etc.
+        const hourlyMatches = [...goalText.matchAll(/\$(\d+(?:\.\d{1,2})?)\s*(?:\/|per\s+)hour/gi)];
+        // Matches: $360/month, $1,082.50/month, ($360/month), $360 per month, etc.
+        const monthlyMatches = [...goalText.matchAll(/\$(\d+(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:\/|per\s+)month/gi)];
         
         // Match up hourly and monthly rates (assuming they appear in order)
         const pairCount = Math.min(hourlyMatches.length, monthlyMatches.length);
