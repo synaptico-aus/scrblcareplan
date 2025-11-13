@@ -701,16 +701,18 @@ CRITICAL: For the "My Goals" section, apply SMARTA principles AND provider servi
 
 **MANDATORY Provider Service Specifications:**
 Every goal MUST specify:
-- Which of your provider's services will be used (Personal Care, Domestic Assistance, Allied Health, etc.)
-- Exact hourly rate ($85, $121, $148.50, $180/hour)
+- Which of your provider's services will be used from the list below
+- ONLY use the EXACT hourly rates from the service rates list provided above - DO NOT make up or guess rates
 - Frequency (daily, weekly, fortnightly)
 - Monthly cost calculation
 - Service category (Clinical Care/Independence Support/Everyday Living)
 
-Examples of properly formatted goals:
-"I will receive Personal Care assistance from your provider's support workers 3 times weekly (3 hours each, $85/hour, $1020/month) to shower and dress independently by March 2025 under the Independence Support category."
+CRITICAL: You MUST use ONLY the rates from the service rates list above. If a rate is not provided for a service (shows as blank), do NOT include pricing for that service in the goal.
 
-"I will have Domestic Assistance from your provider for 2 hours fortnightly ($85/hour, $340/month) to maintain my home including cleaning and laundry under the Everyday Living category."
+Examples of properly formatted goals (using rates from the service list above):
+"I will receive Personal Care assistance from your provider's support workers 3 times weekly (3 hours each, [use actual rate from list]/hour, [calculated total]/month) to shower and dress independently by March 2025 under the Independence Support category."
+
+"I will have Domestic Assistance from your provider for 2 hours fortnightly ([use actual rate from list]/hour, [calculated total]/month) to maintain my home including cleaning and laundry under the Everyday Living category."
 
 Create comprehensive care plan sections based on the information provided in the transcript. Use first-person "I" statements and build narratives from the assessment discussion. For goals, extract what the client wants to achieve and frame using BOTH SMARTA principles AND specific provider service alignment. Only use the fallback sentence for sections where no relevant information was discussed.`
         }

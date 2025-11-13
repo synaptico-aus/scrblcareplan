@@ -44,63 +44,97 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
     const quarterlyBudget = budgetData.quarterlyAmount;
     const availableBudget = quarterlyBudget * 0.9; // 90% available for care
 
-    // Extract service costs from HTML goals section
-    const serviceMatches = html.match(/\$\d+\/hour.*?\$\d+\/month/g) || [];
+    // Extract service costs from HTML by parsing with DOMParser
+    // This robustly handles HTML with any formatting, tags, or whitespace
     const services: Array<{name: string; hourlyRate: number; monthlyRate: number}> = [];
     
-    serviceMatches.forEach(match => {
-      const hourlyMatch = match.match(/\$(\d+)\/hour/);
-      const monthlyMatch = match.match(/\$(\d+)\/month/);
-      if (hourlyMatch && monthlyMatch) {
-        // Get broader context to find service category and description
-        const matchIndex = html.indexOf(match);
-        const context = html.substring(matchIndex - 500, matchIndex + 500);
-        let serviceName = "Care Service";
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Find all paragraphs that contain GOAL markers (case-insensitive, allows punctuation)
+      const allParagraphs = Array.from(doc.querySelectorAll('p'));
+      const goalParagraphs = allParagraphs.filter(p => {
+        const text = p.textContent || '';
+        return /\bGOAL\s+\d+\b/i.test(text);
+      });
+      
+      goalParagraphs.forEach((goalP, index) => {
+        // Collect text from this goal paragraph and the next few paragraphs
+        // (typically goals span 3-5 paragraphs: goal statement, abilities, tasks, responsibilities, category)
+        let goalText = goalP.textContent || '';
+        let currentP = goalP.nextElementSibling;
+        let paraCount = 0;
         
-        // Look for Service Category patterns first
-        if (context.includes("Service Category: Clinical Care")) {
-          if (context.includes("physiotherap") || context.includes("Physiotherap")) {
-            serviceName = "Physiotherapy";
-          } else if (context.includes("podiatr") || context.includes("Podiatr")) {
-            serviceName = "Podiatry";
-          } else if (context.includes("Allied Health") || context.includes("allied health")) {
-            serviceName = "Allied Health Therapy";
-          } else {
-            serviceName = "Clinical Care";
-          }
-        } else if (context.includes("Service Category: Everyday Living")) {
-          if (context.includes("Domestic Assistance") || context.includes("domestic assistance")) {
-            serviceName = "Domestic Assistance";
-          } else if (context.includes("Personal Care") || context.includes("personal care")) {
-            serviceName = "Personal Care";
-          } else {
-            serviceName = "Everyday Living";
-          }
-        } else if (context.includes("Service Category: Social Support") || context.includes("Service Category: Independence Support")) {
-          if (context.includes("Social Support/Shopping") || context.includes("shopping")) {
-            serviceName = "Social Support - Shopping";
-          } else if (context.includes("Community Access") || context.includes("community access")) {
-            serviceName = "Social Support - Community Access";
-          } else if (context.includes("transport") || context.includes("Transport")) {
-            serviceName = "Social Support - Transport";
-          } else {
-            serviceName = "Social Support";
-          }
+        while (currentP && paraCount < 6) {
+          const text = currentP.textContent || '';
+          // Stop if we hit the next GOAL
+          if (/\bGOAL\s+\d+\b/i.test(text)) break;
+          goalText += ' ' + text;
+          currentP = currentP.nextElementSibling;
+          paraCount++;
         }
-        // Fallback to basic keyword matching if Service Category not found
-        else if (context.includes("Personal Care")) serviceName = "Personal Care";
-        else if (context.includes("Domestic Assistance")) serviceName = "Domestic Assistance";
-        else if (context.includes("Allied Health")) serviceName = "Allied Health Therapy";
-        else if (context.includes("Social Support")) serviceName = "Social Support";
-        else if (context.includes("Nursing")) serviceName = "Nursing Care";
         
-        services.push({
-          name: serviceName,
-          hourlyRate: parseInt(hourlyMatch[1]),
-          monthlyRate: parseInt(monthlyMatch[1])
-        });
-      }
-    });
+        // Find all hourly rates in this goal section
+        const hourlyMatches = [...goalText.matchAll(/\$(\d+(?:\.\d{1,2})?)\/hour/g)];
+        const monthlyMatches = [...goalText.matchAll(/\$(\d+(?:,\d{3})*(?:\.\d{1,2})?)\/month/g)];
+        
+        // Match up hourly and monthly rates (assuming they appear in order)
+        const pairCount = Math.min(hourlyMatches.length, monthlyMatches.length);
+        
+        for (let i = 0; i < pairCount; i++) {
+          const hourlyRate = parseFloat(hourlyMatches[i][1]);
+          const monthlyRate = parseFloat(monthlyMatches[i][1].replace(/,/g, ''));
+          
+          let serviceName = "Care Service";
+          
+          // Look for Service Category patterns first
+          if (goalText.includes("Service Category: Clinical Care") || goalText.includes("Clinical Care")) {
+            if (/physiotherap/i.test(goalText)) {
+              serviceName = "Physiotherapy";
+            } else if (/podiatr/i.test(goalText)) {
+              serviceName = "Podiatry";
+            } else if (/allied health/i.test(goalText)) {
+              serviceName = "Allied Health Therapy";
+            } else {
+              serviceName = "Clinical Care";
+            }
+          } else if (goalText.includes("Service Category: Everyday Living") || goalText.includes("Everyday Living")) {
+            if (/domestic assistance/i.test(goalText)) {
+              serviceName = "Domestic Assistance";
+            } else if (/personal care/i.test(goalText)) {
+              serviceName = "Personal Care";
+            } else {
+              serviceName = "Everyday Living";
+            }
+          } else if (/Service Category:.*(?:Social Support|Independence Support)/i.test(goalText)) {
+            if (/shopping/i.test(goalText)) {
+              serviceName = "Social Support - Shopping";
+            } else if (/community access/i.test(goalText)) {
+              serviceName = "Social Support - Community Access";
+            } else if (/transport/i.test(goalText)) {
+              serviceName = "Social Support - Transport";
+            } else {
+              serviceName = "Social Support";
+            }
+          }
+          // Fallback to basic keyword matching
+          else if (/personal care/i.test(goalText)) serviceName = "Personal Care";
+          else if (/domestic assistance/i.test(goalText)) serviceName = "Domestic Assistance";
+          else if (/allied health/i.test(goalText)) serviceName = "Allied Health Therapy";
+          else if (/social support/i.test(goalText)) serviceName = "Social Support";
+          else if (/nursing/i.test(goalText)) serviceName = "Nursing Care";
+          
+          services.push({
+            name: serviceName,
+            hourlyRate,
+            monthlyRate
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error parsing HTML for budget calculation:', error);
+    }
 
     const totalMonthlyCost = services.reduce((sum, service) => sum + service.monthlyRate, 0);
     const quarterlyEstimate = totalMonthlyCost * 3;
