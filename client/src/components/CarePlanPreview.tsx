@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Download, FileText, Printer, Clock, DollarSign, ChevronDown, ChevronUp, FileType } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Download, FileText, Printer, Clock, FileType } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { ExtractedFacts, fundingLevels } from "@shared/schema";
+import { ExtractedFacts } from "@shared/schema";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
 import scrblLogo from "@/assets/scrbl-logo.png";
@@ -16,143 +15,13 @@ interface CarePlanPreviewProps {
   extractedFacts: ExtractedFacts | null;
   generationStartTime: number | null;
   generationTime: number | null;
-  fundingType: string;
-  fundingLevel: string;
   onPrint: () => void;
 }
 
-export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, generationStartTime, generationTime, fundingType, fundingLevel, onPrint }: CarePlanPreviewProps) {
+export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, generationStartTime, generationTime, onPrint }: CarePlanPreviewProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [progress, setProgress] = useState(0);
-  const [isBudgetOpen, setIsBudgetOpen] = useState(false);
   const { toast } = useToast();
-
-  // Budget calculation function
-  const calculateBudgetEstimate = () => {
-    if (!html || !fundingType || !fundingLevel) return null;
-
-    let budgetData: { name: string; quarterlyAmount: number } | undefined;
-    
-    if (fundingType === "hcp" && fundingLevel in fundingLevels.hcp) {
-      budgetData = fundingLevels.hcp[fundingLevel as keyof typeof fundingLevels.hcp];
-    } else if (fundingType === "sah" && fundingLevel in fundingLevels.sah) {
-      budgetData = fundingLevels.sah[fundingLevel as keyof typeof fundingLevels.sah];
-    }
-    
-    if (!budgetData) return null;
-
-    const quarterlyBudget = budgetData.quarterlyAmount;
-    const availableBudget = quarterlyBudget * 0.9; // 90% available for care
-
-    // Extract service costs from HTML by parsing with DOMParser
-    // This robustly handles HTML with any formatting, tags, or whitespace
-    const services: Array<{name: string; hourlyRate: number; monthlyRate: number}> = [];
-    
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      
-      // Find all paragraphs that contain GOAL markers (case-insensitive, allows punctuation)
-      const allParagraphs = Array.from(doc.querySelectorAll('p'));
-      const goalParagraphs = allParagraphs.filter(p => {
-        const text = p.textContent || '';
-        return /\bGOAL\s+\d+\b/i.test(text);
-      });
-      
-      goalParagraphs.forEach((goalP, index) => {
-        // Collect text from this goal paragraph and the next few paragraphs
-        // (typically goals span 3-5 paragraphs: goal statement, abilities, tasks, responsibilities, category)
-        let goalText = goalP.textContent || '';
-        let currentP = goalP.nextElementSibling;
-        let paraCount = 0;
-        
-        while (currentP && paraCount < 6) {
-          const text = currentP.textContent || '';
-          // Stop if we hit the next GOAL
-          if (/\bGOAL\s+\d+\b/i.test(text)) break;
-          goalText += ' ' + text;
-          currentP = currentP.nextElementSibling;
-          paraCount++;
-        }
-        
-        // Find all hourly rates in this goal section (flexible regex for variations)
-        // Matches: $180/hour, $180 per hour, ($180/hour), etc.
-        const hourlyMatches = [...goalText.matchAll(/\$(\d+(?:\.\d{1,2})?)\s*(?:\/|per\s+)hour/gi)];
-        // Matches: $360/month, $1,082.50/month, ($360/month), $360 per month, etc.
-        const monthlyMatches = [...goalText.matchAll(/\$(\d+(?:,\d{3})*(?:\.\d{1,2})?)\s*(?:\/|per\s+)month/gi)];
-        
-        // Match up hourly and monthly rates (assuming they appear in order)
-        const pairCount = Math.min(hourlyMatches.length, monthlyMatches.length);
-        
-        for (let i = 0; i < pairCount; i++) {
-          const hourlyRate = parseFloat(hourlyMatches[i][1]);
-          const monthlyRate = parseFloat(monthlyMatches[i][1].replace(/,/g, ''));
-          
-          let serviceName = "Care Service";
-          
-          // Look for Service Category patterns first
-          if (goalText.includes("Service Category: Clinical Care") || goalText.includes("Clinical Care")) {
-            if (/physiotherap/i.test(goalText)) {
-              serviceName = "Physiotherapy";
-            } else if (/podiatr/i.test(goalText)) {
-              serviceName = "Podiatry";
-            } else if (/allied health/i.test(goalText)) {
-              serviceName = "Allied Health Therapy";
-            } else {
-              serviceName = "Clinical Care";
-            }
-          } else if (goalText.includes("Service Category: Everyday Living") || goalText.includes("Everyday Living")) {
-            if (/domestic assistance/i.test(goalText)) {
-              serviceName = "Domestic Assistance";
-            } else if (/personal care/i.test(goalText)) {
-              serviceName = "Personal Care";
-            } else {
-              serviceName = "Everyday Living";
-            }
-          } else if (/Service Category:.*(?:Social Support|Independence Support)/i.test(goalText)) {
-            if (/shopping/i.test(goalText)) {
-              serviceName = "Social Support - Shopping";
-            } else if (/community access/i.test(goalText)) {
-              serviceName = "Social Support - Community Access";
-            } else if (/transport/i.test(goalText)) {
-              serviceName = "Social Support - Transport";
-            } else {
-              serviceName = "Social Support";
-            }
-          }
-          // Fallback to basic keyword matching
-          else if (/personal care/i.test(goalText)) serviceName = "Personal Care";
-          else if (/domestic assistance/i.test(goalText)) serviceName = "Domestic Assistance";
-          else if (/allied health/i.test(goalText)) serviceName = "Allied Health Therapy";
-          else if (/social support/i.test(goalText)) serviceName = "Social Support";
-          else if (/nursing/i.test(goalText)) serviceName = "Nursing Care";
-          
-          services.push({
-            name: serviceName,
-            hourlyRate,
-            monthlyRate
-          });
-        }
-      });
-    } catch (error) {
-      console.error('Error parsing HTML for budget calculation:', error);
-    }
-
-    const totalMonthlyCost = services.reduce((sum, service) => sum + service.monthlyRate, 0);
-    const quarterlyEstimate = totalMonthlyCost * 3;
-
-    return {
-      quarterlyBudget,
-      availableBudget,
-      services,
-      totalMonthlyCost,
-      quarterlyEstimate,
-      remainingBudget: availableBudget - quarterlyEstimate,
-      utilizationPercentage: (quarterlyEstimate / availableBudget) * 100
-    };
-  };
-
-  const budgetEstimate = calculateBudgetEstimate();
 
   // Timer for elapsed time during generation
   useEffect(() => {
@@ -317,86 +186,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
         </div>
       </div>
 
-
-      {/* Budget Estimation Section */}
-      {html && budgetEstimate && (
-        <Collapsible open={isBudgetOpen} onOpenChange={setIsBudgetOpen}>
-          <div className="p-4 border-b border-border bg-accent/5">
-            <CollapsibleTrigger asChild>
-              <Button
-                variant="ghost"
-                className="w-full justify-between p-0 h-auto hover:bg-transparent"
-                data-testid="button-toggle-budget"
-              >
-                <h3 className="text-md font-semibold flex items-center">
-                  <DollarSign className="text-primary mr-2 h-4 w-4" />
-                  Budget Estimation (90% of Quarterly Allocation)
-                </h3>
-                {isBudgetOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              </Button>
-            </CollapsibleTrigger>
-            
-            <CollapsibleContent className="mt-3">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Budget Summary */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h4 className="font-medium text-sm text-muted-foreground mb-3">Budget Summary</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Quarterly Budget:</span>
-                  <span className="font-medium">${budgetEstimate.quarterlyBudget.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Available for Care (90%):</span>
-                  <span className="font-medium">${budgetEstimate.availableBudget.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Estimated Quarterly Cost:</span>
-                  <span className="font-medium">${budgetEstimate.quarterlyEstimate.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span>Remaining Budget:</span>
-                  <span className={`font-medium ${budgetEstimate.remainingBudget >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    ${budgetEstimate.remainingBudget.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Budget Utilization:</span>
-                  <span className={`font-medium ${budgetEstimate.utilizationPercentage > 100 ? 'text-red-600' : 'text-green-600'}`}>
-                    {budgetEstimate.utilizationPercentage.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Service Breakdown */}
-            <div className="bg-card border border-border rounded-lg p-4">
-              <h4 className="font-medium text-sm text-muted-foreground mb-3">Service Breakdown</h4>
-              <div className="space-y-2">
-                {budgetEstimate.services.map((service, index) => (
-                  <div key={index} className="flex justify-between items-center text-sm">
-                    <div>
-                      <div className="font-medium">{service.name}</div>
-                      <div className="text-xs text-muted-foreground">${service.hourlyRate}/hour</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">${service.monthlyRate}/month</div>
-                      <div className="text-xs text-muted-foreground">${(service.monthlyRate * 3).toLocaleString()}/quarter</div>
-                    </div>
-                  </div>
-                ))}
-                {budgetEstimate.services.length === 0 && (
-                  <p className="text-sm text-muted-foreground">No services with pricing found in goals</p>
-                )}
-              </div>
-            </div>
-          </div>
-            </CollapsibleContent>
-          </div>
-        </Collapsible>
-      )}
-      
       <div className="flex-1 overflow-y-auto p-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
