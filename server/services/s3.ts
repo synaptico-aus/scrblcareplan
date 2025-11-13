@@ -61,8 +61,6 @@ export async function uploadFile(
 
     const command = new PutObjectCommand(params);
     await s3Client.send(command);
-    
-    console.log(`File uploaded successfully to S3: ${key}`);
   } catch (error) {
     console.error(`Error uploading file to S3 (key: ${key}):`, error);
     throw new Error(
@@ -86,7 +84,6 @@ export async function getFile(key: string): Promise<Buffer> {
     }
 
     const buffer = await streamToBuffer(response.Body as Readable);
-    console.log(`File retrieved successfully from S3: ${key}`);
     
     return buffer;
   } catch (error) {
@@ -111,8 +108,6 @@ export async function deleteFile(key: string): Promise<void> {
 
     const command = new DeleteObjectCommand(params);
     await s3Client.send(command);
-    
-    console.log(`File deleted successfully from S3: ${key}`);
   } catch (error) {
     console.error(`Error deleting file from S3 (key: ${key}):`, error);
     throw new Error(
@@ -132,8 +127,6 @@ export async function listFiles(prefix?: string): Promise<string[]> {
     const response = await s3Client.send(command);
 
     const keys = response.Contents?.map((item) => item.Key).filter((key): key is string => !!key) || [];
-    
-    console.log(`Listed ${keys.length} files from S3${prefix ? ` with prefix: ${prefix}` : ''}`);
     
     return keys;
   } catch (error) {

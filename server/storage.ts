@@ -49,25 +49,6 @@ export interface IStorage {
   seedDefaultServiceRates(organizationId: string): Promise<ServiceRate[]>;
 }
 
-export class MemStorage implements IStorage {
-  private organizations: Map<string, Organization>;
-  private users: Map<string, User>;
-  private careAnalyses: Map<string, CareAnalysis>;
-  private savedCarePlans: Map<string, SavedCarePlan>;
-  private clientDocuments: Map<string, ClientDocument>;
-  private clientFolderAliases: Map<string, ClientFolderAlias>;
-  private serviceRates: Map<string, ServiceRate>;
-
-  constructor() {
-    this.organizations = new Map();
-    this.users = new Map();
-    this.careAnalyses = new Map();
-    this.savedCarePlans = new Map();
-    this.clientDocuments = new Map();
-    this.clientFolderAliases = new Map();
-    this.serviceRates = new Map();
-  }
-
   async createOrganization(org: InsertOrganization): Promise<Organization> {
     const id = randomUUID();
     const organization: Organization = {

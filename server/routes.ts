@@ -99,7 +99,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Login failed" });
       }
       if (!user) {
-        console.log("Authentication failed:", info);
         return res.status(401).json({ message: info?.message || "Invalid email or password" });
       }
 
@@ -399,13 +398,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { url } = nottaUrlSchema.parse(req.body);
       
-      console.log(`Attempting to extract transcript from Notta.AI URL: ${url}`);
-      
       // First try simple HTTP fetch for better deployment compatibility
       let transcript = null;
       
       try {
-        console.log('Trying enhanced HTTP fetch first...');
         const response = await fetch(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -420,7 +416,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (response.ok) {
           const html = await response.text();
-          console.log(`Fetched HTML content: ${html.length} characters`);
           
           // Enhanced transcript extraction patterns
           const patterns = [
@@ -450,7 +445,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 .replace(/\\"/g, '"')
                 .replace(/\\\//g, '/')
                 .substring(0, 10000); // Limit length
-              console.log('Successfully extracted transcript via enhanced HTTP fetch');
               break;
             }
           }
@@ -468,18 +462,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (bodyContent.length > 200) {
                 transcript = bodyContent.substring(0, 5000);
-                console.log('Extracted text content from body');
               }
             }
           }
         }
       } catch (fetchError) {
-        console.log('HTTP fetch failed:', (fetchError as Error).message);
-      }
-      
-      // If HTTP fetch didn't work, provide helpful guidance
-      if (!transcript) {
-        console.log('HTTP fetch could not extract transcript content');
+        // HTTP fetch failed, will try alternative extraction method
       }
       
       if (!transcript) {
@@ -654,8 +642,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Estimate processing time to determine if async processing is needed
       const transcriptLength = transcript.length;
       const estimatedSeconds = Math.ceil(transcriptLength / 300); // Conservative estimate
-      
-      console.log(`Transcript length: ${transcriptLength} characters, estimated processing: ${estimatedSeconds} seconds`);
 
       if (estimatedSeconds > 90) {
         // Long transcript - use async processing
@@ -775,8 +761,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           useAsync: true
         });
       }
-
-      console.log(`Starting streaming generation - transcript: ${transcriptLength} chars, estimated: ${estimatedSeconds}s`);
 
       // Send initial update with proper delays for visibility
       eventEmitter.emit('generation-update', {
@@ -1152,7 +1136,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (s3Key) {
         try {
           await deleteFile(s3Key);
-          console.log(`Cleaned up orphaned S3 object: ${s3Key}`);
         } catch (cleanupError) {
           console.error(`Failed to clean up S3 object ${s3Key}:`, cleanupError);
         }
@@ -1428,8 +1411,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     eventEmitter: any
   ) {
     try {
-      console.log(`Starting async job ${jobId} for client: ${clientName}`);
-      
       // Update job progress
       asyncJobs.set(jobId, {
         ...asyncJobs.get(jobId),
@@ -1563,8 +1544,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           analysisId: analysis.id
         }
       });
-
-      console.log(`Async job ${jobId} completed successfully`);
 
     } catch (error) {
       console.error(`Async job ${jobId} processing error:`, error);

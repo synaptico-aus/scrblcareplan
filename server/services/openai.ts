@@ -28,8 +28,6 @@ function chunkTranscript(transcript: string, maxTokens: number = 120000): string
     return [transcript];
   }
   
-  console.log(`Long transcript detected: ${estimatedTokens} estimated tokens, splitting into chunks`);
-  
   // Preprocess transcript to remove timestamps and clean up
   const cleanedTranscript = preprocessTranscript(transcript);
   
@@ -70,7 +68,6 @@ function chunkTranscript(transcript: string, maxTokens: number = 120000): string
     start = chunkEnd - overlapSize;
   }
   
-  console.log(`Split transcript into ${chunks.length} chunks with average size: ${Math.round(chunks.reduce((sum, c) => sum + c.length, 0) / chunks.length)} characters`);
   return chunks;
 }
 
@@ -117,7 +114,6 @@ function findSpeakerBreak(text: string, minPos: number, maxPos: number): number 
 
 export async function extractFactsFromTranscript(transcript: string, clientName: string, progressCallback?: (progress: number, stage: string) => void) {
   const startTime = Date.now();
-  console.log(`Starting fact extraction for client: ${clientName}, transcript length: ${transcript.length} characters`);
   
   progressCallback?.(5, 'Analyzing transcript structure');
   
@@ -127,14 +123,9 @@ export async function extractFactsFromTranscript(transcript: string, clientName:
     const chunks = chunkTranscript(transcript, 120000); // GPT-5 context limit
     
     if (chunks.length > 1) {
-      console.log(`Large transcript detected - processing in ${chunks.length} chunks`);
-      
       // Process chunks and merge results with progress tracking
       const allFacts = [];
       for (let i = 0; i < chunks.length; i++) {
-        const startTime = Date.now();
-        console.log(`Processing fact extraction chunk ${i + 1}/${chunks.length} (${chunks[i].length} chars)`);
-        
         try {
           // Report progress for each chunk
           const chunkProgress = 15 + (i / chunks.length) * 70; // 15% to 85% range
@@ -142,9 +133,6 @@ export async function extractFactsFromTranscript(transcript: string, clientName:
           
           const chunkFacts = await extractFactsFromChunk(chunks[i], clientName, i + 1, chunks.length);
           allFacts.push(chunkFacts);
-          
-          const chunkTime = Date.now() - startTime;
-          console.log(`Chunk ${i + 1}/${chunks.length} completed in ${chunkTime}ms`);
         } catch (error) {
           console.error(`Error processing chunk ${i + 1}/${chunks.length}:`, error);
           // Continue with other chunks - don't fail entire extraction for one chunk
@@ -160,7 +148,6 @@ export async function extractFactsFromTranscript(transcript: string, clientName:
       
       // Merge all facts from chunks with enhanced deduplication
       progressCallback?.(90, 'Merging and deduplicating extracted facts');
-      console.log(`Merging facts from ${allFacts.length} chunks`);
       const mergedFacts = mergeFacts(allFacts);
       progressCallback?.(100, 'Fact extraction complete');
       return mergedFacts;
@@ -231,8 +218,6 @@ Build comprehensive facts from the information discussed, not just isolated deta
     });
 
     const result = JSON.parse(response.choices[0].message.content || "{}");
-    const duration = Date.now() - startTime;
-    console.log(`Fact extraction completed in ${duration}ms`);
     
     progressCallback?.(100, 'Fact extraction complete');
     return result;
@@ -327,7 +312,6 @@ Build comprehensive facts from the information discussed in this chunk.`
 
 // Enhanced helper function to merge facts from multiple chunks with better deduplication
 function mergeFacts(factsList: any[]): any {
-  console.log(`Merging facts from ${factsList.length} chunks`);
   
   const merged = {
     clientDetails: { name: null, language: null, interpreterRequired: null },
@@ -429,7 +413,6 @@ function mergeFacts(factsList: any[]): any {
     }
   });
   
-  console.log(`Facts merging complete - extracted ${merged.risks.length} unique risks, ${merged.medical.equipment.length} pieces of equipment`);
   return merged;
 }
 
@@ -488,7 +471,6 @@ function getSeverityScore(severity: string | null): number {
 
 export async function generateCarePlanHtml(transcript: string, clientName: string, organizationId: string, progressCallback?: (progress: number, stage: string) => void) {
   const startTime = Date.now();
-  console.log(`Starting care plan generation for client: ${clientName}, transcript length: ${transcript.length} characters`);
   
   // Fetch service rates for this organization with fallback
   let serviceRatesText = "";
@@ -550,19 +532,14 @@ export async function generateCarePlanHtml(transcript: string, clientName: strin
     
     const estimatedTokens = estimateTokenCount(transcript);
     if (estimatedTokens > 120000) {
-      console.log(`Very long transcript detected (${estimatedTokens} estimated tokens, ${Math.floor(transcript.length/1000)}k chars) - creating comprehensive summary`);
-      
       // For extremely long transcripts (80+ minutes), use multi-pass summarization
       progressCallback?.(20, 'Creating comprehensive summary of long transcript');
       if (estimatedTokens > 200000) {
-        console.log('Using multi-pass summarization for extremely long transcript');
         processedTranscript = await multiPassSummarize(transcript, clientName);
       } else {
         processedTranscript = await summarizeTranscript(transcript, clientName);
       }
       progressCallback?.(40, 'Transcript summarization complete');
-      
-      console.log(`Transcript processed: ${transcript.length} → ${processedTranscript.length} characters (${Math.round((processedTranscript.length/transcript.length)*100)}% of original)`);
     }
     
     progressCallback?.(50, 'Generating Gold Standard Care Plan with AI');
@@ -744,8 +721,6 @@ Create comprehensive care plan sections based on the information provided in the
     });
 
     const result = response.choices[0].message.content || "";
-    const duration = Date.now() - startTime;
-    console.log(`Care plan generation completed in ${duration}ms, output length: ${result.length} characters`);
     
     progressCallback?.(100, 'Care plan generation complete');
     return result;
@@ -771,8 +746,6 @@ Create comprehensive care plan sections based on the information provided in the
 
 // Helper function to summarize very long transcripts
 async function summarizeTranscript(transcript: string, clientName: string): Promise<string> {
-  console.log('Creating transcript summary for care plan generation...');
-  
   const response = await openai.chat.completions.create({
     model: "gpt-5",
     messages: [
@@ -811,15 +784,11 @@ ${transcript}`
 
 // Multi-pass summarization for extremely long transcripts (80+ minute assessments)
 async function multiPassSummarize(transcript: string, clientName: string): Promise<string> {
-  console.log('Starting multi-pass summarization for extremely long transcript...');
-  
   // First pass: Split into logical sections and summarize each
   const sections = splitIntoSections(transcript);
-  console.log(`Split transcript into ${sections.length} sections for processing`);
   
   const sectionSummaries = [];
   for (let i = 0; i < sections.length; i++) {
-    console.log(`Summarizing section ${i + 1}/${sections.length} (${sections[i].length} chars)`);
     
     const sectionSummary = await openai.chat.completions.create({
       model: "gpt-5",
@@ -840,12 +809,9 @@ async function multiPassSummarize(transcript: string, clientName: string): Promi
   
   // Second pass: Combine section summaries into final comprehensive summary
   const combinedSummary = sectionSummaries.join('\n\n---\n\n');
-  console.log(`Combining ${sectionSummaries.length} section summaries (${combinedSummary.length} chars total)`);
   
   if (estimateTokenCount(combinedSummary) > 100000) {
     // Still too long, need final condensation
-    console.log('Combined summary still too long, performing final condensation');
-    
     const finalSummary = await openai.chat.completions.create({
       model: "gpt-5",
       messages: [

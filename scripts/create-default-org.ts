@@ -5,6 +5,10 @@ import { eq } from 'drizzle-orm';
 
 async function createDefaultOrganization() {
   try {
+    if (!process.env.ADMIN_PASSWORD) {
+      throw new Error('ADMIN_PASSWORD environment variable is required. Usage: ADMIN_PASSWORD=your-secure-password tsx scripts/create-default-org.ts');
+    }
+
     // Check if Salveo HomeCare organization already exists
     const existing = await db
       .select()
@@ -40,8 +44,8 @@ async function createDefaultOrganization() {
     if (existingUser.length > 0) {
       console.log('Admin user already exists:', existingUser[0].email);
     } else {
-      // Hash the password
-      const passwordHash = await bcrypt.hash('***123abcSCRBL', 10);
+      // Hash the password from environment variable
+      const passwordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 10);
 
       // Create admin user
       const [newUser] = await db
