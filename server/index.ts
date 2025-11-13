@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPg from "connect-pg-simple";
 import passport from "passport";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -28,19 +29,33 @@ if (process.env.NODE_ENV === 'production') {
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
-// Session configuration
-app.use(
-  session({
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    },
-  })
-);
+// Session configuration with PostgreSQL store (if DATABASE_URL is available)
+const sessionConfig: session.SessionOptions = {
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+};
+
+// Use PostgreSQL store if DATABASE_URL is available, otherwise use in-memory store
+if (process.env.DATABASE_URL) {
+  const PgStore = connectPg(session);
+  sessionConfig.store = new PgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: true, // Automatically create sessions table
+    ttl: 24 * 60 * 60, // 24 hours (in seconds)
+    tableName: "sessions",
+  });
+  log('Using PostgreSQL session store');
+} else {
+  log('Using in-memory session store (sessions will not persist across restarts)');
+}
+
+app.use(session(sessionConfig));
 
 // Initialize Passport
 setupPassport();
