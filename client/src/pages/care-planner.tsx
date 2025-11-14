@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import DOMPurify from "dompurify";
 import scrblLogo from "@/assets/scrbl-logo.png";
 
 export default function CarePlanner() {
@@ -401,12 +402,18 @@ export default function CarePlanner() {
 
   const handlePrint = () => {
     if (html) {
+      // Sanitize HTML and escape clientName to prevent XSS
+      const sanitizedHtml = DOMPurify.sanitize(html);
+      const div = document.createElement('div');
+      div.textContent = clientName;
+      const escapedClientName = div.innerHTML;
+      
       const printWindow = window.open('', '_blank');
       if (printWindow) {
         printWindow.document.write(`
           <html>
             <head>
-              <title>Care Plan - ${clientName}</title>
+              <title>Care Plan - ${escapedClientName}</title>
               <style>
                 body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
                 h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
@@ -419,7 +426,7 @@ export default function CarePlanner() {
               </style>
             </head>
             <body>
-              ${html}
+              ${sanitizedHtml}
             </body>
           </html>
         `);

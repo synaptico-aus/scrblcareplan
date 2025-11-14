@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Download, FileText, Printer, Clock, FileType } from "lucide-react";
@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ExtractedFacts } from "@shared/schema";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
+import DOMPurify from "dompurify";
 import scrblLogo from "@/assets/scrbl-logo.png";
 
 interface CarePlanPreviewProps {
@@ -22,6 +23,14 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const [elapsedTime, setElapsedTime] = useState(0);
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
+
+  // Sanitize HTML content and escape clientName to prevent XSS
+  const sanitizedHtml = useMemo(() => html ? DOMPurify.sanitize(html) : null, [html]);
+  const escapedClientName = useMemo(() => {
+    const div = document.createElement('div');
+    div.textContent = clientName;
+    return div.innerHTML;
+  }, [clientName]);
 
   // Timer for elapsed time during generation
   useEffect(() => {
@@ -48,13 +57,13 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
 
 
   const handleExportToPDF = () => {
-    if (!html) return;
+    if (!sanitizedHtml) return;
     
-    // Create a complete HTML document with Scrbl logo
+    // Create a complete HTML document with Scrbl logo (using sanitized content)
     const htmlWithLogo = `
       <html>
         <head>
-          <title>Care Plan - ${clientName}</title>
+          <title>Care Plan - ${escapedClientName}</title>
           <style>
             body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
             .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
@@ -72,7 +81,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
           <div class="logo-header">
             <img src="${scrblLogo}" alt="Scrbl Logo" />
           </div>
-          ${html}
+          ${sanitizedHtml}
         </body>
       </html>
     `;
@@ -82,7 +91,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
     
     const opt = {
       margin: 1,
-      filename: `${clientName || 'care-plan'}-${new Date().toISOString().split('T')[0]}.pdf`,
+      filename: `${escapedClientName || 'care-plan'}-${new Date().toISOString().split('T')[0]}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2 },
       jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
@@ -97,13 +106,13 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   };
 
   const handleExportToWord = () => {
-    if (!html) return;
+    if (!sanitizedHtml) return;
     
-    // Create a complete HTML document with Scrbl logo for Word
+    // Create a complete HTML document with Scrbl logo for Word (using sanitized content)
     const htmlWithLogo = `
       <html>
         <head>
-          <title>Care Plan - ${clientName}</title>
+          <title>Care Plan - ${escapedClientName}</title>
           <meta charset="utf-8">
           <style>
             body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
@@ -121,7 +130,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
           <div class="logo-header">
             <h2>Scrbl - Digital Care Plan Agent</h2>
           </div>
-          ${html}
+          ${sanitizedHtml}
         </body>
       </html>
     `;
@@ -130,7 +139,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${clientName || 'care-plan'}-${new Date().toISOString().split('T')[0]}.doc`;
+    link.download = `${escapedClientName || 'care-plan'}-${new Date().toISOString().split('T')[0]}.doc`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -154,7 +163,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
             <Button
               variant="outline"
               onClick={onPrint}
-              disabled={!html}
+              disabled={!sanitizedHtml}
               data-testid="button-print"
               size="sm"
               className="w-full sm:w-auto"
@@ -164,7 +173,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
             </Button>
             <Button
               onClick={handleExportToPDF}
-              disabled={!html}
+              disabled={!sanitizedHtml}
               className="bg-red-500 text-white hover:bg-red-600 w-full sm:w-auto"
               data-testid="button-export-pdf"
               size="sm"
@@ -174,7 +183,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
             </Button>
             <Button
               onClick={handleExportToWord}
-              disabled={!html}
+              disabled={!sanitizedHtml}
               className="bg-blue-500 text-white hover:bg-blue-600 w-full sm:w-auto"
               data-testid="button-export-word"
               size="sm"
@@ -204,7 +213,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
               </div>
             </div>
           </div>
-        ) : html ? (
+        ) : sanitizedHtml ? (
           <div className="max-w-4xl mx-auto care-plan-document bg-white shadow-lg rounded-lg p-8" data-testid="care-plan-content">
             {/* Generation Time Header */}
             {generationTime && (
@@ -217,7 +226,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
             )}
             
             <div 
-              dangerouslySetInnerHTML={{ __html: html }}
+              dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
             />
           </div>
         ) : (
