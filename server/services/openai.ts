@@ -599,13 +599,13 @@ Your job: read a full assessment transcript between a care partner and a client/
 12. Emergency Contacts & Instructions
 13. My Goals (render each goal exactly as specified)
 14. Budget and Service Classifications
-    CRITICAL: Include a complete pricing table showing ALL available services and rates from the provider service list above.
+    CRITICAL: ONLY list the specific services that are mentioned in the Goals section above.
     Format as:
-    <strong>Available Services and Pricing:</strong>
-    [List all services grouped by category with their hourly rates from the service rates provided above]
+    <strong>Services Required for This Care Plan:</strong>
+    [Extract and list ONLY the services that appear in the Goals section, grouped by category with their hourly rates]
     
     Then include:
-    - Service Category: Clinical Care (100% government funded) / Independence Support / Everyday Living
+    - Service Category: [List the relevant categories based on the services used in goals]
     - Quarterly Budget Allocation
     - Classification Level (1-8 under Support at Home)
 15. Care Plan Consent and Distribution
