@@ -599,6 +599,12 @@ Your job: read a full assessment transcript between a care partner and a client/
 12. Emergency Contacts & Instructions
 13. My Goals (render each goal exactly as specified)
 14. Budget and Service Classifications
+    CRITICAL: Include a complete pricing table showing ALL available services and rates from the provider service list above.
+    Format as:
+    <strong>Available Services and Pricing:</strong>
+    [List all services grouped by category with their hourly rates from the service rates provided above]
+    
+    Then include:
     - Service Category: Clinical Care (100% government funded) / Independence Support / Everyday Living
     - Quarterly Budget Allocation
     - Classification Level (1-8 under Support at Home)
