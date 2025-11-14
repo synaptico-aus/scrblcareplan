@@ -90,8 +90,6 @@ export default function CarePlanner() {
         const response = await apiRequest("GET", `/api/job-status/${jobId}`);
         const jobData = await response.json();
         
-        console.log(`Poll attempt ${attempts}: Job status`, jobData);
-        
         setAsyncProgress(jobData.progress || 0);
         
         if (jobData.status === 'completed') {
@@ -222,11 +220,8 @@ export default function CarePlanner() {
         const transcriptLength = transcript.length;
         const estimatedSeconds = Math.ceil(transcriptLength / 300);
         
-        console.log(`Transcript: ${transcriptLength} chars, estimated: ${estimatedSeconds}s`);
-        
         if (estimatedSeconds > 90) {
           // Long transcript - use async processing
-          console.log('Using async processing for long transcript');
           setIsAsyncProcessing(true);
           setAsyncProgress(0);
           
@@ -251,7 +246,6 @@ export default function CarePlanner() {
           }
         } else {
           // Short transcript - use streaming
-          console.log('Using streaming for normal transcript');
           const response = await apiRequest("POST", "/api/chat-parity-stream", {
             clientName,
             transcript,
@@ -288,7 +282,6 @@ export default function CarePlanner() {
     onSuccess: (data) => {
       // Skip normal processing if this is an async job
       if (data.isAsync) {
-        console.log('Async job started, skipping normal success handling');
         toast({
           title: "Long Transcript Detected",
           description: "Processing in background to avoid timeout. You'll be notified when complete.",
