@@ -291,8 +291,9 @@ export default function SavedPlans() {
       </html>
     `;
     
-    const element = document.createElement('div');
-    element.innerHTML = htmlWithLogo;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlWithLogo, 'text/html');
+    const element = doc.body;
     
     const opt = {
       margin: 1,
