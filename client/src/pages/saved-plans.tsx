@@ -13,6 +13,7 @@ import { SavedCarePlan, ExtractedFacts, ClientDocument, ClientFolderAlias } from
 import scrblLogo from "@/assets/scrbl-logo.png";
 // @ts-ignore
 import html2pdf from "html2pdf.js";
+import DOMPurify from "dompurify";
 import { ObjectUploader } from "@/components/ObjectUploader";
 
 // HTML escape function to prevent XSS
@@ -264,6 +265,9 @@ export default function SavedPlans() {
   };
 
   const handleExportToPDF = (plan: SavedCarePlan) => {
+    // Sanitize HTML content to prevent XSS
+    const sanitizedHtml = DOMPurify.sanitize(plan.html as string);
+    
     // Create a complete HTML document with Scrbl logo
     const htmlWithLogo = `
       <html>
@@ -286,7 +290,7 @@ export default function SavedPlans() {
           <div class="logo-header">
             <img src="${scrblLogo}" alt="Scrbl Logo" />
           </div>
-          ${plan.html}
+          ${sanitizedHtml}
         </body>
       </html>
     `;
@@ -312,6 +316,9 @@ export default function SavedPlans() {
   };
 
   const handleExportToWord = (plan: SavedCarePlan) => {
+    // Sanitize HTML content to prevent XSS
+    const sanitizedHtml = DOMPurify.sanitize(plan.html as string);
+    
     // Create a complete HTML document with Scrbl logo for Word
     const htmlWithLogo = `
       <html>
@@ -334,7 +341,7 @@ export default function SavedPlans() {
           <div class="logo-header">
             <h2>Scrbl - Digital Care Plan Agent</h2>
           </div>
-          ${plan.html}
+          ${sanitizedHtml}
         </body>
       </html>
     `;
@@ -610,7 +617,7 @@ export default function SavedPlans() {
             </div>
             
             <div 
-              dangerouslySetInnerHTML={{ __html: selectedPlan.html as string }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedPlan.html as string) }}
             />
           </div>
         </div>
