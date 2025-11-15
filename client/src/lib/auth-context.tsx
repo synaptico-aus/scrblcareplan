@@ -12,10 +12,22 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   impersonation: ImpersonationInfo;
+  isProfileComplete: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refetchUser: () => Promise<void>;
   stopImpersonation: () => Promise<void>;
+}
+
+function checkProfileComplete(user: User | null): boolean {
+  if (!user) return false;
+  return !!(
+    user.firstName &&
+    user.lastName &&
+    user.email &&
+    user.company &&
+    user.phoneNumber
+  );
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [impersonation, setImpersonation] = useState<ImpersonationInfo>({ isImpersonating: false });
+  const [isProfileComplete, setIsProfileComplete] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -37,14 +50,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.isAuthenticated && data.user) {
         setUser(data.user);
         setImpersonation(data.impersonation || { isImpersonating: false });
+        setIsProfileComplete(checkProfileComplete(data.user));
       } else {
         setUser(null);
         setImpersonation({ isImpersonating: false });
+        setIsProfileComplete(false);
       }
     } catch (error) {
       console.error("Auth check failed:", error);
       setUser(null);
       setImpersonation({ isImpersonating: false });
+      setIsProfileComplete(false);
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, impersonation, login, logout, refetchUser, stopImpersonation }}>
+    <AuthContext.Provider value={{ user, isLoading, impersonation, isProfileComplete, login, logout, refetchUser, stopImpersonation }}>
       {children}
     </AuthContext.Provider>
   );

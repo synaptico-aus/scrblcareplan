@@ -115,6 +115,12 @@ export const updateUserProfileSchema = createInsertSchema(users).pick({
   email: true,
   company: true,
   phoneNumber: true,
+}).required({
+  firstName: true,
+  lastName: true,
+  email: true,
+  company: true,
+  phoneNumber: true,
 });
 
 export const insertCareAnalysisSchema = createInsertSchema(careAnalyses).pick({
