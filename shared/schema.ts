@@ -18,6 +18,11 @@ export const sessions = pgTable(
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  subscriptionStatus: varchar("subscription_status"),
+  subscriptionPlan: varchar("subscription_plan"),
+  trialEndsAt: timestamp("trial_ends_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
