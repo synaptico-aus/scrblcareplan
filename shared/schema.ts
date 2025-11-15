@@ -95,6 +95,25 @@ export const serviceRates = pgTable("service_rates", {
   index("idx_service_rates_org").on(table.organizationId),
 ]);
 
+export const organizationBillingProfiles = pgTable("organization_billing_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").unique().notNull().references(() => organizations.id),
+  contactName: text("contact_name"),
+  companyName: text("company_name"),
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  suburb: text("suburb"),
+  state: text("state"),
+  postcode: text("postcode"),
+  email: text("email"),
+  phone: text("phone"),
+  abn: text("abn"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_billing_org").on(table.organizationId),
+]);
+
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({
   id: true,
   createdAt: true,
@@ -175,6 +194,29 @@ export const insertServiceRateSchema = createInsertSchema(serviceRates).omit({
 export const updateServiceRateSchema = insertServiceRateSchema.pick({
   hourlyRate: true,
 });
+
+export const insertBillingProfileSchema = createInsertSchema(organizationBillingProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  organizationId: true,
+}).extend({
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  phone: z.string()
+    .regex(/^(\+?61|0)[2-478](?:[ -]?[0-9]){8}$/, "Invalid Australian phone number")
+    .optional()
+    .or(z.literal("")),
+  abn: z.string()
+    .regex(/^\d{11}$/, "ABN must be 11 digits")
+    .optional()
+    .or(z.literal("")),
+  postcode: z.string()
+    .regex(/^\d{4}$/, "Postcode must be 4 digits")
+    .optional()
+    .or(z.literal("")),
+});
+
+export const updateBillingProfileSchema = insertBillingProfileSchema;
 
 export const DEFAULT_SERVICES = [
   { serviceName: "Registered nurse", category: "Clinical/Nursing" },
@@ -289,3 +331,6 @@ export type ChatParityRequest = z.infer<typeof chatParityRequestSchema>;
 export type ServiceRate = typeof serviceRates.$inferSelect;
 export type InsertServiceRate = z.infer<typeof insertServiceRateSchema>;
 export type UpdateServiceRate = z.infer<typeof updateServiceRateSchema>;
+export type BillingProfile = typeof organizationBillingProfiles.$inferSelect;
+export type InsertBillingProfile = z.infer<typeof insertBillingProfileSchema>;
+export type UpdateBillingProfile = z.infer<typeof updateBillingProfileSchema>;
