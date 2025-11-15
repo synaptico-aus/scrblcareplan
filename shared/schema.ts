@@ -14,17 +14,17 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// Organizations table for multi-tenancy with Stripe subscription support  
+// Organizations table for multi-tenancy with Stripe subscription support
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status").default("trial"), // trial, active, canceled, past_due, incomplete
   subscriptionPlan: varchar("subscription_plan"), // basic, pro, enterprise
   trialEndsAt: timestamp("trial_ends_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // User storage table with authentication and organization membership

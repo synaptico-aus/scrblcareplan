@@ -145,7 +145,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const session = req.session as any;
       
       // Get organization subscription status
-      const organization = await storage.getOrganization(user.organizationId);
+      let organization = null;
+      try {
+        organization = await storage.getOrganization(user.organizationId);
+      } catch (error) {
+        console.error("Error fetching organization:", error);
+        // Continue without organization data if there's an error
+      }
       
       res.json({
         isAuthenticated: true,
@@ -162,9 +168,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         organization: organization ? {
           id: organization.id,
           name: organization.name,
-          subscriptionStatus: organization.subscriptionStatus,
-          subscriptionPlan: organization.subscriptionPlan,
-          stripeCustomerId: organization.stripeCustomerId
+          subscriptionStatus: organization.subscriptionStatus || null,
+          subscriptionPlan: organization.subscriptionPlan || null,
+          stripeCustomerId: organization.stripeCustomerId || null
         } : null,
         impersonation: session.impersonatedUserId ? {
           isImpersonating: true,
