@@ -557,7 +557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template } = validatedData;
       const organizationId = getOrganizationId(req);
-      const userId = req.user!.id;
+      const userId = (req.user as User).id;
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -680,7 +680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template, sessionId } = validatedData;
-      const userId = req.user!.id;
+      const userId = (req.user as User).id;
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -788,7 +788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template, sessionId } = validatedData;
-      const userId = req.user!.id;
+      const userId = (req.user as User).id;
       const organizationId = getOrganizationId(req);
 
       if (template !== "gold-standard") {
@@ -966,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript } = validatedData;
-      const userId = req.user!.id;
+      const userId = (req.user as User).id;
       const organizationId = getOrganizationId(req);
 
       // Check user's monthly plan limit
@@ -1584,7 +1584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { hourlyRate } = rateSchema.parse(req.body);
       
       const updated = await storage.updateServiceRate(organizationId, id, { 
-        hourlyRate 
+        hourlyRate: hourlyRate !== null ? String(hourlyRate) : null
       });
       
       if (updated) {
