@@ -2,13 +2,180 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, BookOpen, Shield, FileText, Users } from "lucide-react";
+import { ArrowLeft, BookOpen, Shield, FileText, Users, Download } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import scrblLogo from "@assets/scrbl-logo.png";
 import { MarkdownUserGuide } from "@/components/MarkdownUserGuide";
+import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { useState } from "react";
 
 export default function Settings() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportUserGuide = async () => {
+    try {
+      setIsExporting(true);
+      
+      // Fetch the markdown content
+      const response = await fetch('/api/user-guide');
+      if (!response.ok) {
+        throw new Error('Failed to fetch user guide');
+      }
+      const markdownContent = await response.text();
+      
+      // Convert markdown to HTML using a temporary div
+      const tempDiv = document.createElement('div');
+      const ReactDOMServer = await import('react-dom/server');
+      const htmlContent = ReactDOMServer.renderToString(
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {markdownContent}
+        </ReactMarkdown>
+      );
+      
+      // Create the full HTML document
+      const fullHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SCRBL 2.0 User Guide</title>
+  <style>
+    body {
+      font-family: 'Times New Roman', serif;
+      margin: 40px;
+      line-height: 1.6;
+      color: #000;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #ddd;
+    }
+    h1 {
+      font-size: 24pt;
+      font-weight: bold;
+      margin-top: 20px;
+      margin-bottom: 10px;
+      color: #000;
+    }
+    h2 {
+      font-size: 18pt;
+      font-weight: bold;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      color: #000;
+    }
+    h3 {
+      font-size: 14pt;
+      font-weight: bold;
+      margin-top: 12px;
+      margin-bottom: 6px;
+      color: #000;
+    }
+    h4 {
+      font-size: 12pt;
+      font-weight: bold;
+      margin-top: 10px;
+      margin-bottom: 4px;
+      color: #000;
+    }
+    p {
+      margin-bottom: 10px;
+    }
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 10px;
+    }
+    li {
+      margin-bottom: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f0f0f0;
+      font-weight: bold;
+    }
+    code {
+      background-color: #f4f4f4;
+      padding: 2px 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 10pt;
+    }
+    pre {
+      background-color: #f4f4f4;
+      padding: 10px;
+      border: 1px solid #ddd;
+      overflow-x: auto;
+    }
+    blockquote {
+      border-left: 4px solid #ddd;
+      padding-left: 10px;
+      margin-left: 0;
+      font-style: italic;
+      color: #666;
+    }
+    strong {
+      font-weight: bold;
+    }
+    em {
+      font-style: italic;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #ddd;
+      margin: 20px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>SCRBL 2.0</h1>
+    <p>AI Assisted Care Plan Drafts in Minutes</p>
+    <h2>User Guide</h2>
+  </div>
+  ${htmlContent}
+</body>
+</html>`;
+
+      // Create blob and download
+      const blob = new Blob([fullHtml], { type: 'application/msword' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `SCRBL-User-Guide-${new Date().toISOString().split('T')[0]}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export Complete",
+        description: "User guide has been exported to Word",
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export user guide. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -74,13 +241,26 @@ export default function Settings() {
           {/* Complete User Guide */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center">
-                <BookOpen className="mr-2 h-5 w-5" />
-                Complete User Guide & Training Manual
-              </CardTitle>
-              <CardDescription>
-                Comprehensive guide for users and AI agent training | Version 2.0 | November 2024
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <BookOpen className="mr-2 h-5 w-5" />
+                    Complete User Guide & Training Manual
+                  </CardTitle>
+                  <CardDescription>
+                    Comprehensive guide for users and AI agent training | Version 2.0 | November 2024
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={handleExportUserGuide}
+                  disabled={isExporting}
+                  size="sm"
+                  data-testid="button-export-user-guide"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {isExporting ? "Exporting..." : "Export to Word"}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {/* Scrollable container with max height */}
