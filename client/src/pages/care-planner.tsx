@@ -9,8 +9,9 @@ import { ExtractedFacts } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { Settings, Shield, FileText, Bot, Loader2, LogOut, User, Users, UserCog, ExternalLink } from "lucide-react";
+import { Settings, Shield, FileText, Bot, Loader2, LogOut, User, Users, UserCog, ExternalLink, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,7 +43,7 @@ export default function CarePlanner() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user, logout, impersonation, stopImpersonation } = useAuth();
+  const { user, logout, impersonation, stopImpersonation, isProfileComplete } = useAuth();
   const [, setLocation] = useLocation();
 
   const handleLogout = async () => {
@@ -453,6 +454,31 @@ export default function CarePlanner() {
           </div>
         </div>
       )}
+
+      {/* Profile Incomplete Warning */}
+      {!isProfileComplete && (
+        <div className="bg-orange-500 dark:bg-orange-600 text-white px-4 py-3" data-testid="banner-profile-incomplete">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5" />
+              <div>
+                <p className="font-medium">Complete Your Profile to Generate Care Plans</p>
+                <p className="text-sm opacity-90">Please fill in all required account information before generating care plans.</p>
+              </div>
+            </div>
+            <Link href="/settings">
+              <Button
+                variant="secondary"
+                size="sm"
+                data-testid="button-complete-profile"
+                className="bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Complete Profile
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
       
       {/* Header */}
       <header className="bg-card border-b border-border px-4 sm:px-6 py-3 sm:py-4">
@@ -566,6 +592,7 @@ export default function CarePlanner() {
           onFetchFromNotta={handleFetchFromNotta}
           isLoading={generateMutation.isPending || isAsyncProcessing}
           isFetchingNotta={isFetchingNotta}
+          isProfileComplete={isProfileComplete}
         />
 
         {/* Agent Updates - Show only when generating with AI */}

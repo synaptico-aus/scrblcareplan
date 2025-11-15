@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Settings, Link2, ChevronDown, ChevronUp } from "lucide-react";
 import { fundingLevels } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CarePlanFormProps {
   clientName: string;
@@ -25,6 +26,7 @@ interface CarePlanFormProps {
   onFetchFromNotta: () => void;
   isLoading: boolean;
   isFetchingNotta: boolean;
+  isProfileComplete: boolean;
 }
 
 export function CarePlanForm({
@@ -43,7 +45,8 @@ export function CarePlanForm({
   onGenerate,
   onFetchFromNotta,
   isLoading,
-  isFetchingNotta
+  isFetchingNotta,
+  isProfileComplete
 }: CarePlanFormProps) {
   const [isNottaOpen, setIsNottaOpen] = useState(false);
   
@@ -226,27 +229,40 @@ I can't find out. I think the words are in the end...`}
         </div>
         
         <div className="mt-4 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-          <Button
-            data-testid="button-generate-care-plan"
-            className="flex-1"
-            onClick={onGenerate}
-            disabled={isLoading || isFetchingNotta || !clientName.trim() || !transcript.trim()}
-            size="lg"
-          >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Generating...
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                </svg>
-                Generate Care Plan
-              </>
-            )}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex-1">
+                  <Button
+                    data-testid="button-generate-care-plan"
+                    className="w-full"
+                    onClick={onGenerate}
+                    disabled={!isProfileComplete || isLoading || isFetchingNotta || !clientName.trim() || !transcript.trim()}
+                    size="lg"
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                        </svg>
+                        Generate Care Plan
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </TooltipTrigger>
+              {!isProfileComplete && (
+                <TooltipContent>
+                  <p>Please complete your profile before generating care plans</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
           <Button
             data-testid="button-upload-file"
             variant="outline"
