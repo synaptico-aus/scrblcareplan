@@ -200,29 +200,31 @@ export const updateServiceRateSchema = insertServiceRateSchema.pick({
   hourlyRate: true,
 });
 
+// Helper to convert empty strings to null for optional fields
+const emptyToNull = <T extends z.ZodTypeAny>(schema: T) => 
+  z.preprocess(v => v === "" ? null : v, schema.nullable().optional());
+
 export const insertBillingProfileSchema = createInsertSchema(organizationBillingProfiles).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   organizationId: true,
 }).extend({
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  phone: z.string()
+  contactName: emptyToNull(z.string().min(2, "Contact name must be at least 2 characters")),
+  companyName: emptyToNull(z.string().min(2, "Company name must be at least 2 characters")),
+  addressLine1: emptyToNull(z.string().min(3, "Address must be at least 3 characters")),
+  addressLine2: emptyToNull(z.string()),
+  suburb: emptyToNull(z.string().min(2, "Suburb must be at least 2 characters")),
+  state: emptyToNull(z.string().min(2, "State must be at least 2 characters")),
+  postcode: emptyToNull(z.string().regex(/^\d{4}$/, "Postcode must be 4 digits")),
+  email: emptyToNull(z.string().email("Invalid email address")),
+  phone: emptyToNull(z.string()
     .max(25, "Phone number too long")
     .regex(/^[\d\s\-\+\(\)]+$/, "Phone number can only contain digits, spaces, dashes, plus sign, and parentheses")
     .refine((val) => val.replace(/[\s\-\+\(\)]/g, '').length >= 6, {
       message: "Phone number must contain at least 6 digits",
-    })
-    .optional()
-    .or(z.literal("")),
-  abn: z.string()
-    .regex(/^\d{11}$/, "ABN must be 11 digits")
-    .optional()
-    .or(z.literal("")),
-  postcode: z.string()
-    .regex(/^\d{4}$/, "Postcode must be 4 digits")
-    .optional()
-    .or(z.literal("")),
+    })),
+  abn: emptyToNull(z.string().regex(/^\d{11}$/, "ABN must be 11 digits")),
 });
 
 export const updateBillingProfileSchema = insertBillingProfileSchema;

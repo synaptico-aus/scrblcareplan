@@ -239,7 +239,7 @@ function BillingInformationCard() {
                   <FormItem>
                     <FormLabel>Postcode</FormLabel>
                     <FormControl>
-                      <Input placeholder="2000" {...field} data-testid="input-postcode" />
+                      <Input placeholder="2000" {...field} value={field.value || ''} data-testid="input-postcode" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -255,7 +255,7 @@ function BillingInformationCard() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="billing@example.com" {...field} data-testid="input-email" />
+                      <Input type="email" placeholder="billing@example.com" {...field} value={field.value || ''} data-testid="input-email" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -269,7 +269,7 @@ function BillingInformationCard() {
                   <FormItem>
                     <FormLabel>Phone</FormLabel>
                     <FormControl>
-                      <Input placeholder="0400 000 000" {...field} data-testid="input-phone" />
+                      <Input placeholder="0400 000 000" {...field} value={field.value || ''} data-testid="input-phone" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -284,7 +284,7 @@ function BillingInformationCard() {
                 <FormItem>
                   <FormLabel>ABN (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="12 345 678 901" {...field} data-testid="input-abn" />
+                    <Input placeholder="12 345 678 901" {...field} value={field.value || ''} data-testid="input-abn" />
                   </FormControl>
                   <FormDescription>
                     Australian Business Number (11 digits)
