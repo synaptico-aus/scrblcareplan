@@ -44,64 +44,75 @@ export default function Settings() {
   <meta charset="utf-8">
   <title>SCRBL 2.0 User Guide</title>
   <style>
+    @page {
+      margin: 0.5in;
+    }
     body {
-      font-family: 'Times New Roman', serif;
-      margin: 40px;
-      line-height: 1.6;
+      font-family: Calibri, Arial, sans-serif;
+      margin: 0.5in;
+      line-height: 1.4;
       color: #000;
+      font-size: 11pt;
     }
     .header {
       text-align: center;
-      margin-bottom: 30px;
-      padding-bottom: 20px;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
       border-bottom: 2px solid #ddd;
     }
     h1 {
-      font-size: 24pt;
-      font-weight: bold;
-      margin-top: 20px;
-      margin-bottom: 10px;
-      color: #000;
-    }
-    h2 {
-      font-size: 18pt;
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 20pt;
       font-weight: bold;
       margin-top: 16px;
       margin-bottom: 8px;
       color: #000;
     }
-    h3 {
-      font-size: 14pt;
+    h2 {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 16pt;
       font-weight: bold;
-      margin-top: 12px;
+      margin-top: 14px;
       margin-bottom: 6px;
       color: #000;
     }
+    h3 {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 13pt;
+      font-weight: bold;
+      margin-top: 12px;
+      margin-bottom: 5px;
+      color: #000;
+    }
     h4 {
-      font-size: 12pt;
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 11pt;
       font-weight: bold;
       margin-top: 10px;
       margin-bottom: 4px;
       color: #000;
     }
     p {
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+      font-size: 11pt;
     }
     ul, ol {
-      margin-left: 20px;
-      margin-bottom: 10px;
+      margin-left: 18px;
+      margin-bottom: 8px;
     }
     li {
-      margin-bottom: 4px;
+      margin-bottom: 3px;
+      font-size: 11pt;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 10px 0;
+      margin: 8px 0;
+      font-size: 10pt;
     }
     th, td {
       border: 1px solid #000;
-      padding: 8px;
+      padding: 6px;
       text-align: left;
     }
     th {
@@ -111,17 +122,18 @@ export default function Settings() {
     code {
       background-color: #f4f4f4;
       padding: 2px 4px;
-      font-family: 'Courier New', monospace;
+      font-family: 'Courier New', Consolas, monospace;
       font-size: 10pt;
     }
     pre {
       background-color: #f4f4f4;
-      padding: 10px;
+      padding: 8px;
       border: 1px solid #ddd;
       overflow-x: auto;
+      font-size: 9pt;
     }
     blockquote {
-      border-left: 4px solid #ddd;
+      border-left: 3px solid #ddd;
       padding-left: 10px;
       margin-left: 0;
       font-style: italic;
@@ -136,7 +148,7 @@ export default function Settings() {
     hr {
       border: none;
       border-top: 1px solid #ddd;
-      margin: 20px 0;
+      margin: 15px 0;
     }
   </style>
 </head>
