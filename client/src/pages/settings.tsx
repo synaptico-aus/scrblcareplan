@@ -153,7 +153,7 @@ function BillingInformationCard() {
                   <FormItem>
                     <FormLabel>Contact Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Smith" {...field} data-testid="input-contact-name" />
+                      <Input placeholder="John Smith" {...field} value={field.value || ''} data-testid="input-contact-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -167,7 +167,7 @@ function BillingInformationCard() {
                   <FormItem>
                     <FormLabel>Company/Organization Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="ABC Care Services" {...field} data-testid="input-company-name" />
+                      <Input placeholder="ABC Care Services" {...field} value={field.value || ''} data-testid="input-company-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -182,7 +182,7 @@ function BillingInformationCard() {
                 <FormItem>
                   <FormLabel>Address Line 1</FormLabel>
                   <FormControl>
-                    <Input placeholder="123 Main Street" {...field} data-testid="input-address-line1" />
+                    <Input placeholder="123 Main Street" {...field} value={field.value || ''} data-testid="input-address-line1" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -196,7 +196,7 @@ function BillingInformationCard() {
                 <FormItem>
                   <FormLabel>Address Line 2 (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Suite 456" {...field} data-testid="input-address-line2" />
+                    <Input placeholder="Suite 456" {...field} value={field.value || ''} data-testid="input-address-line2" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -211,7 +211,7 @@ function BillingInformationCard() {
                   <FormItem>
                     <FormLabel>Suburb</FormLabel>
                     <FormControl>
-                      <Input placeholder="Sydney" {...field} data-testid="input-suburb" />
+                      <Input placeholder="Sydney" {...field} value={field.value || ''} data-testid="input-suburb" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -225,7 +225,7 @@ function BillingInformationCard() {
                   <FormItem>
                     <FormLabel>State</FormLabel>
                     <FormControl>
-                      <Input placeholder="NSW" {...field} data-testid="input-state" />
+                      <Input placeholder="NSW" {...field} value={field.value || ''} data-testid="input-state" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

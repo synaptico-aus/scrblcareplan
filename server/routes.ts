@@ -1421,7 +1421,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { insertBillingProfileSchema } = await import("@shared/schema");
       
       const validatedData = insertBillingProfileSchema.parse(req.body);
-      const profile = await storage.createBillingProfile(organizationId, validatedData);
+      
+      // Normalize empty strings to null for optional fields to maintain DB consistency
+      const normalizedData = {
+        ...validatedData,
+        contactName: validatedData.contactName || null,
+        companyName: validatedData.companyName || null,
+        addressLine1: validatedData.addressLine1 || null,
+        addressLine2: validatedData.addressLine2 || null,
+        suburb: validatedData.suburb || null,
+        state: validatedData.state || null,
+        postcode: validatedData.postcode || null,
+        email: validatedData.email || null,
+        phone: validatedData.phone || null,
+        abn: validatedData.abn || null,
+      };
+      
+      const profile = await storage.createBillingProfile(organizationId, normalizedData);
       
       res.status(201).json(profile);
     } catch (error) {
@@ -1439,7 +1455,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { updateBillingProfileSchema } = await import("@shared/schema");
       
       const validatedData = updateBillingProfileSchema.parse(req.body);
-      const updated = await storage.updateBillingProfile(organizationId, validatedData);
+      
+      // Normalize empty strings to null for optional fields to maintain DB consistency
+      const normalizedData = {
+        ...validatedData,
+        contactName: validatedData.contactName || null,
+        companyName: validatedData.companyName || null,
+        addressLine1: validatedData.addressLine1 || null,
+        addressLine2: validatedData.addressLine2 || null,
+        suburb: validatedData.suburb || null,
+        state: validatedData.state || null,
+        postcode: validatedData.postcode || null,
+        email: validatedData.email || null,
+        phone: validatedData.phone || null,
+        abn: validatedData.abn || null,
+      };
+      
+      const updated = await storage.updateBillingProfile(organizationId, normalizedData);
       
       if (updated) {
         res.json(updated);

@@ -208,7 +208,11 @@ export const insertBillingProfileSchema = createInsertSchema(organizationBilling
 }).extend({
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
   phone: z.string()
-    .regex(/^(\+?61|0)[2-478](?:[ -]?[0-9]){8}$/, "Invalid Australian phone number")
+    .max(25, "Phone number too long")
+    .regex(/^[\d\s\-\+\(\)]+$/, "Phone number can only contain digits, spaces, dashes, plus sign, and parentheses")
+    .refine((val) => val.replace(/[\s\-\+\(\)]/g, '').length >= 6, {
+      message: "Phone number must contain at least 6 digits",
+    })
     .optional()
     .or(z.literal("")),
   abn: z.string()
