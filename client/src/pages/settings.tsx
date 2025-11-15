@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, BookOpen, Shield, FileText, Users, Download } from "lucide-react";
+import { ArrowLeft, BookOpen, Shield, FileText, Users, Download, Save } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import scrblLogo from "@assets/scrbl-logo.png";
 import { MarkdownUserGuide } from "@/components/MarkdownUserGuide";
@@ -10,11 +10,64 @@ import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { updateUserProfileSchema, type UpdateUserProfile } from "@shared/schema";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
+
+  const form = useForm<UpdateUserProfile>({
+    resolver: zodResolver(updateUserProfileSchema),
+    defaultValues: {
+      firstName: user?.firstName || "",
+      lastName: user?.lastName || "",
+      email: user?.email || "",
+      company: user?.company || "",
+      phoneNumber: user?.phoneNumber || "",
+    },
+  });
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: UpdateUserProfile) => {
+      const response = await fetch("/api/auth/me", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to update profile");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: UpdateUserProfile) => {
+    updateProfileMutation.mutate(data);
+  };
 
   const handleExportUserGuide = async () => {
     try {
@@ -224,29 +277,109 @@ export default function Settings() {
                 <Users className="mr-2 h-5 w-5" />
                 Account Information
               </CardTitle>
-              <CardDescription>Your user details and role</CardDescription>
+              <CardDescription>Update your profile information</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div>
-                <span className="text-sm font-medium text-muted-foreground">Name:</span>
-                <p className="text-base">{user?.firstName} {user?.lastName}</p>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-muted-foreground">Email:</span>
-                <p className="text-base">{user?.email}</p>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-muted-foreground">Role:</span>
-                <p className="text-base capitalize">{user?.role}</p>
-              </div>
-              {user?.monthlyPlanLimit !== null && user?.monthlyPlanLimit !== undefined && (
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Monthly Plan Limit:</span>
-                  <p className="text-base">
-                    {user.plansGeneratedThisMonth || 0} of {user.monthlyPlanLimit} plans used this month
-                  </p>
-                </div>
-              )}
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John" {...field} value={field.value || ""} data-testid="input-first-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Doe" {...field} value={field.value || ""} data-testid="input-last-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="john.doe@example.com" {...field} data-testid="input-email" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="company"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Acme Care Services" {...field} value={field.value || ""} data-testid="input-company" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+61 2 1234 5678" {...field} value={field.value || ""} data-testid="input-phone-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Separator className="my-4" />
+
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">Role:</span>
+                      <p className="text-base capitalize">{user?.role}</p>
+                    </div>
+                    {user?.monthlyPlanLimit !== null && user?.monthlyPlanLimit !== undefined && (
+                      <div>
+                        <span className="text-sm font-medium text-muted-foreground">Monthly Plan Limit:</span>
+                        <p className="text-base">
+                          {user.plansGeneratedThisMonth || 0} of {user.monthlyPlanLimit} plans used this month
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    disabled={updateProfileMutation.isPending}
+                    data-testid="button-save-profile"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </form>
+              </Form>
             </CardContent>
           </Card>
 

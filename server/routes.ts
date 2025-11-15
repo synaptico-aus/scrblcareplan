@@ -6,7 +6,7 @@ import bcrypt from "bcrypt";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { requireAuth, requireAdmin, requireSuperAdmin, getOrganizationId } from "./middleware/auth";
-import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, loginSchema, signupSchema, createUserSchema, updateUserLimitSchema, type User } from "@shared/schema";
+import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, updateUserProfileSchema, loginSchema, signupSchema, createUserSchema, updateUserLimitSchema, type User } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
 import { z } from "zod";
@@ -142,6 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          company: user.company,
+          phoneNumber: user.phoneNumber,
           role: user.role,
           organizationId: user.organizationId,
           monthlyPlanLimit: user.monthlyPlanLimit,
@@ -157,6 +159,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } else {
       res.json({ isAuthenticated: false });
+    }
+  });
+
+  app.patch("/api/auth/me", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const profileData = updateUserProfileSchema.parse(req.body);
+      
+      const updatedUser = await storage.updateUserProfile(user.id, profileData);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json({
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+          company: updatedUser.company,
+          phoneNumber: updatedUser.phoneNumber,
+          role: updatedUser.role,
+          organizationId: updatedUser.organizationId,
+          monthlyPlanLimit: updatedUser.monthlyPlanLimit,
+          plansGeneratedThisMonth: updatedUser.plansGeneratedThisMonth
+        }
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid profile data", errors: error.errors });
+      }
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
     }
   });
 

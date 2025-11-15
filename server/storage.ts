@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Organization, type InsertOrganization, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, type ServiceRate, type InsertServiceRate, type UpdateServiceRate, users, organizations, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases, serviceRates, DEFAULT_SERVICES } from "@shared/schema";
+import { type User, type InsertUser, type UpdateUserProfile, type Organization, type InsertOrganization, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, type ServiceRate, type InsertServiceRate, type UpdateServiceRate, users, organizations, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases, serviceRates, DEFAULT_SERVICES } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, sql, and } from "drizzle-orm";
@@ -15,6 +15,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getUsersByOrganization(organizationId: string): Promise<User[]>;
   getAllUsers(): Promise<User[]>;
+  updateUserProfile(userId: string, profile: UpdateUserProfile): Promise<User | undefined>;
   updateUserLimit(userId: string, monthlyPlanLimit: number | null): Promise<User | undefined>;
   incrementUserPlanCount(userId: string): Promise<void>;
   checkAndResetUserPlanCount(userId: string): Promise<{ canGenerate: boolean; remainingPlans: number | null }>;
@@ -91,6 +92,18 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
+  }
+
+  async updateUserProfile(userId: string, profile: UpdateUserProfile): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        ...profile,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
   }
 
   async updateUserLimit(userId: string, monthlyPlanLimit: number | null): Promise<User | undefined> {

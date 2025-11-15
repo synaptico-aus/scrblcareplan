@@ -29,6 +29,8 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash").notNull(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  company: varchar("company"),
+  phoneNumber: varchar("phone_number"),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   role: varchar("role").notNull().default("user"), // "super_admin", "admin", or "user"
   monthlyPlanLimit: integer("monthly_plan_limit"), // null = unlimited
@@ -105,6 +107,14 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const updateUserProfileSchema = createInsertSchema(users).pick({
+  firstName: true,
+  lastName: true,
+  email: true,
+  company: true,
+  phoneNumber: true,
 });
 
 export const insertCareAnalysisSchema = createInsertSchema(careAnalyses).pick({
@@ -273,6 +283,7 @@ export const updateUserLimitSchema = z.object({
 export type Organization = typeof organizations.$inferSelect;
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateUserProfile = z.infer<typeof updateUserProfileSchema>;
 export type User = typeof users.$inferSelect;
 export type CareAnalysis = typeof careAnalyses.$inferSelect;
 export type InsertCareAnalysis = z.infer<typeof insertCareAnalysisSchema>;
