@@ -288,7 +288,7 @@ export default function Settings() {
                       name="firstName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>First Name</FormLabel>
+                          <FormLabel>First Name <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input placeholder="John" {...field} value={field.value || ""} data-testid="input-first-name" />
                           </FormControl>
@@ -301,7 +301,7 @@ export default function Settings() {
                       name="lastName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Last Name</FormLabel>
+                          <FormLabel>Last Name <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <Input placeholder="Doe" {...field} value={field.value || ""} data-testid="input-last-name" />
                           </FormControl>
@@ -316,7 +316,7 @@ export default function Settings() {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>Email <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="john.doe@example.com" {...field} data-testid="input-email" />
                         </FormControl>
@@ -330,7 +330,7 @@ export default function Settings() {
                     name="company"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company</FormLabel>
+                        <FormLabel>Company <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input placeholder="Acme Care Services" {...field} value={field.value || ""} data-testid="input-company" />
                         </FormControl>
@@ -344,7 +344,7 @@ export default function Settings() {
                     name="phoneNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone Number</FormLabel>
+                        <FormLabel>Phone Number <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
                           <Input placeholder="+61 2 1234 5678" {...field} value={field.value || ""} data-testid="input-phone-number" />
                         </FormControl>

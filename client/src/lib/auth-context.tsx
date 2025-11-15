@@ -79,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await response.json();
     setUser(data.user);
+    setIsProfileComplete(checkProfileComplete(data.user));
   };
 
   const logout = async () => {
