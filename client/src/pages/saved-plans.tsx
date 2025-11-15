@@ -272,7 +272,7 @@ export default function SavedPlans() {
     const htmlWithLogo = `
       <html>
         <head>
-          <title>Care Plan - ${escapeHtml(plan.clientName)}</title>
+          <title>Care Plan Draft - ${escapeHtml(plan.clientName)}</title>
           <style>
             body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
             .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
@@ -323,7 +323,7 @@ export default function SavedPlans() {
     const htmlWithLogo = `
       <html>
         <head>
-          <title>Care Plan - ${escapeHtml(plan.clientName)}</title>
+          <title>Care Plan Draft - ${escapeHtml(plan.clientName)}</title>
           <meta charset="utf-8">
           <style>
             body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
@@ -339,7 +339,7 @@ export default function SavedPlans() {
         </head>
         <body>
           <div class="logo-header">
-            <h2>Scrbl - AI Assisted Care Plan Drafts in Minutes</h2>
+            <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
           </div>
           ${sanitizedHtml}
         </body>

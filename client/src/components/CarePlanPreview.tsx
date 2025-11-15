@@ -63,7 +63,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
     const htmlWithLogo = `
       <html>
         <head>
-          <title>Care Plan - ${escapedClientName}</title>
+          <title>Care Plan Draft - ${escapedClientName}</title>
           <style>
             body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
             .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
@@ -112,7 +112,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
     const htmlWithLogo = `
       <html>
         <head>
-          <title>Care Plan - ${escapedClientName}</title>
+          <title>Care Plan Draft - ${escapedClientName}</title>
           <meta charset="utf-8">
           <style>
             body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
@@ -128,7 +128,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
         </head>
         <body>
           <div class="logo-header">
-            <h2>Scrbl - AI Assisted Care Plan Drafts in Minutes</h2>
+            <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
           </div>
           ${sanitizedHtml}
         </body>
