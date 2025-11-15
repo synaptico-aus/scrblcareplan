@@ -9,6 +9,8 @@ const sourcePool = new Pool({
 });
 
 // Target database (AWS RDS)
+// NOTE: SSL certificate verification is disabled for development/migration.
+// For production, configure proper SSL certificates and set rejectUnauthorized: true
 const targetPool = new Pool({
   connectionString: `postgresql://${process.env.AWS_RDS_USER}:${process.env.AWS_RDS_PASSWORD}@${process.env.AWS_RDS_HOST}:${process.env.AWS_RDS_PORT}/${process.env.AWS_RDS_DATABASE}`,
   ssl: { rejectUnauthorized: false }
