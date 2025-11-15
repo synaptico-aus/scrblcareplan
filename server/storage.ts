@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Organization, type InsertOrganization, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, type ServiceRate, type InsertServiceRate, type UpdateServiceRate, users, organizations, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases, serviceRates, DEFAULT_SERVICES } from "@shared/schema";
+import { type User, type InsertUser, type Organization, type InsertOrganization, type CareAnalysis, type InsertCareAnalysis, type SavedCarePlan, type InsertSavedCarePlan, type ClientDocument, type InsertClientDocument, type ClientFolderAlias, type InsertClientFolderAlias, type UpdateClientFolderAlias, type ServiceRate, type InsertServiceRate, type UpdateServiceRate, type BillingProfile, type InsertBillingProfile, type UpdateBillingProfile, users, organizations, careAnalyses, savedCarePlans, clientDocuments, clientFolderAliases, serviceRates, organizationBillingProfiles, DEFAULT_SERVICES } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, sql, and } from "drizzle-orm";
@@ -47,6 +47,11 @@ export interface IStorage {
   getServiceRates(organizationId: string): Promise<ServiceRate[]>;
   updateServiceRate(organizationId: string, serviceId: string, update: UpdateServiceRate): Promise<ServiceRate | undefined>;
   seedDefaultServiceRates(organizationId: string): Promise<ServiceRate[]>;
+  
+  // Billing profile operations (organization-scoped)
+  getBillingProfile(organizationId: string): Promise<BillingProfile | undefined>;
+  createBillingProfile(organizationId: string, profile: InsertBillingProfile): Promise<BillingProfile>;
+  updateBillingProfile(organizationId: string, update: UpdateBillingProfile): Promise<BillingProfile | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -340,6 +345,32 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return seededRates;
+  }
+
+  async getBillingProfile(organizationId: string): Promise<BillingProfile | undefined> {
+    const [profile] = await db.select().from(organizationBillingProfiles)
+      .where(eq(organizationBillingProfiles.organizationId, organizationId));
+    return profile || undefined;
+  }
+
+  async createBillingProfile(organizationId: string, profile: InsertBillingProfile): Promise<BillingProfile> {
+    const [created] = await db
+      .insert(organizationBillingProfiles)
+      .values({ ...profile, organizationId })
+      .returning();
+    return created;
+  }
+
+  async updateBillingProfile(organizationId: string, update: UpdateBillingProfile): Promise<BillingProfile | undefined> {
+    const [updated] = await db
+      .update(organizationBillingProfiles)
+      .set({
+        ...update,
+        updatedAt: new Date(),
+      })
+      .where(eq(organizationBillingProfiles.organizationId, organizationId))
+      .returning();
+    return updated || undefined;
   }
 }
 
