@@ -1632,7 +1632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Serve public user guide (sanitized, no proprietary information)
-  app.get("/api/user-guide", async (req, res) => {
+  app.get("/api/user-guide", requireAuth, async (req, res) => {
     try {
       const fs = await import('fs/promises');
       const path = await import('path');
@@ -1643,6 +1643,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reading USER_GUIDE_PUBLIC.md:", error);
       res.status(500).json({ message: "Failed to load user guide" });
+    }
+  });
+
+  // Serve security documentation for clients (authenticated users only)
+  app.get("/api/security-docs", requireAuth, async (req, res) => {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const securityPath = path.join(process.cwd(), 'SECURITY_DOCUMENTATION.md');
+      const content = await fs.readFile(securityPath, 'utf-8');
+      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+      res.send(content);
+    } catch (error) {
+      console.error("Error reading SECURITY_DOCUMENTATION.md:", error);
+      res.status(500).json({ message: "Failed to load security documentation" });
     }
   });
 
