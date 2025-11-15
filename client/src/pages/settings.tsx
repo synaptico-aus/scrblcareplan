@@ -19,7 +19,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, refetchUser } = useAuth();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
 
@@ -49,8 +49,9 @@ export default function Settings() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      await refetchUser();
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",

@@ -5,7 +5,7 @@ import passport from "passport";
 import bcrypt from "bcrypt";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { requireAuth, requireAdmin, requireSuperAdmin, getOrganizationId } from "./middleware/auth";
+import { requireAuth, requireAdmin, requireSuperAdmin, requireProfileComplete, getOrganizationId } from "./middleware/auth";
 import { chatParityRequestSchema, insertSavedCarePlanSchema, insertClientDocumentSchema, insertClientFolderAliasSchema, updateClientFolderAliasSchema, updateUserProfileSchema, loginSchema, signupSchema, createUserSchema, updateUserLimitSchema, type User } from "@shared/schema";
 import { extractFactsFromTranscript, generateCarePlanHtml } from "./services/openai";
 import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./services/carePlanGenerator";
@@ -173,19 +173,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
       
-      res.json({
-        user: {
-          id: updatedUser.id,
-          email: updatedUser.email,
-          firstName: updatedUser.firstName,
-          lastName: updatedUser.lastName,
-          company: updatedUser.company,
-          phoneNumber: updatedUser.phoneNumber,
-          role: updatedUser.role,
-          organizationId: updatedUser.organizationId,
-          monthlyPlanLimit: updatedUser.monthlyPlanLimit,
-          plansGeneratedThisMonth: updatedUser.plansGeneratedThisMonth
+      // Re-fetch the complete user object from storage to ensure all fields are present for session serialization
+      const fullUser = await storage.getUser(user.id);
+      
+      if (!fullUser) {
+        console.error("User not found after profile update:", user.id);
+        return res.status(500).json({ message: "Profile updated but user retrieval failed" });
+      }
+      
+      // Update session with fresh user data
+      req.login(fullUser, (err) => {
+        if (err) {
+          console.error("Session update error after profile update:", err);
+          return res.status(500).json({ message: "Profile updated but session refresh failed" });
         }
+        
+        console.log(`Profile updated successfully for user ${fullUser.id}, session refreshed`);
+        
+        res.json({
+          user: {
+            id: fullUser.id,
+            email: fullUser.email,
+            firstName: fullUser.firstName,
+            lastName: fullUser.lastName,
+            company: fullUser.company,
+            phoneNumber: fullUser.phoneNumber,
+            role: fullUser.role,
+            organizationId: fullUser.organizationId,
+            monthlyPlanLimit: fullUser.monthlyPlanLimit,
+            plansGeneratedThisMonth: fullUser.plansGeneratedThisMonth
+          }
+        });
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -522,7 +540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/chat-parity", requireAuth, async (req, res) => {
+  app.post("/api/chat-parity", requireAuth, requireProfileComplete, async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template } = validatedData;
@@ -646,7 +664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const asyncJobs = new Map();
 
   // Async processing endpoint for long transcripts
-  app.post("/api/chat-parity-async", requireAuth, async (req, res) => {
+  app.post("/api/chat-parity-async", requireAuth, requireProfileComplete, async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template, sessionId } = validatedData;
@@ -932,7 +950,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/offline-analysis", requireAuth, async (req, res) => {
+  app.post("/api/offline-analysis", requireAuth, requireProfileComplete, async (req, res) => {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript } = validatedData;
