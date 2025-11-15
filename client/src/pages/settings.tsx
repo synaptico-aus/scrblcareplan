@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, BookOpen, Shield, FileText, Users } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import scrblLogo from "@assets/scrbl-logo.png";
-import { UserGuideContent } from "@/components/UserGuideContent";
+import { MarkdownUserGuide } from "@/components/MarkdownUserGuide";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -85,7 +85,7 @@ export default function Settings() {
             <CardContent>
               {/* Scrollable container with max height */}
               <div className="max-h-[800px] overflow-y-auto border border-border rounded-lg p-6">
-                <UserGuideContent userRole={user?.role} />
+                <MarkdownUserGuide />
               </div>
             </CardContent>
           </Card>
