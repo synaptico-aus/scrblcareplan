@@ -464,7 +464,7 @@ export default function CarePlanner() {
               className="h-8 sm:h-10 w-auto"
             />
             <div>
-              <h1 className="text-lg sm:text-xl font-semibold text-foreground">scrbl_v2</h1>
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground">SCRBL 2.0</h1>
               <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Digital Care Plan Agent</p>
             </div>
           </div>

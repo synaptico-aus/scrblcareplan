@@ -54,7 +54,7 @@ export default function Register() {
 
       toast({
         title: "Registration successful",
-        description: `Welcome to scrbl_v2, ${data.firstName}!`,
+        description: `Welcome to SCRBL 2.0, ${data.firstName}!`,
       });
 
       // Small delay to ensure state is updated before redirect

@@ -38,7 +38,7 @@ export default function Login() {
       await login(data.email, data.password);
       toast({
         title: "Login successful",
-        description: "Welcome to scrbl_v2",
+        description: "Welcome to SCRBL 2.0",
       });
       // Small delay to ensure state is updated before redirect
       setTimeout(() => {
@@ -61,7 +61,7 @@ export default function Login() {
               className="h-12 w-auto"
             />
           </div>
-          <CardTitle className="text-2xl font-semibold">scrbl_v2</CardTitle>
+          <CardTitle className="text-2xl font-semibold">SCRBL 2.0</CardTitle>
           <CardDescription>
             Digital Care Plan Agent
           </CardDescription>
