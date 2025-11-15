@@ -8,13 +8,6 @@
       "when": 1762985812956,
       "tag": "0000_colorful_deadpool",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1763211416056,
-      "tag": "0001_add_billing_profiles",
-      "breakpoints": true
     }
   ]
 }

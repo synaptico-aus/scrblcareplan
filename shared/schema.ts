@@ -18,11 +18,6 @@ export const sessions = pgTable(
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
-  stripeCustomerId: varchar("stripe_customer_id"),
-  stripeSubscriptionId: varchar("stripe_subscription_id"),
-  subscriptionStatus: varchar("subscription_status"),
-  subscriptionPlan: varchar("subscription_plan"),
-  trialEndsAt: timestamp("trial_ends_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -98,25 +93,6 @@ export const serviceRates = pgTable("service_rates", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("idx_service_rates_org").on(table.organizationId),
-]);
-
-export const organizationBillingProfiles = pgTable("organization_billing_profiles", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  organizationId: varchar("organization_id").unique().notNull().references(() => organizations.id),
-  contactName: text("contact_name"),
-  companyName: text("company_name"),
-  addressLine1: text("address_line1"),
-  addressLine2: text("address_line2"),
-  suburb: text("suburb"),
-  state: text("state"),
-  postcode: text("postcode"),
-  email: text("email"),
-  phone: text("phone"),
-  abn: text("abn"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-}, (table) => [
-  index("idx_billing_org").on(table.organizationId),
 ]);
 
 export const insertOrganizationSchema = createInsertSchema(organizations).omit({
@@ -199,35 +175,6 @@ export const insertServiceRateSchema = createInsertSchema(serviceRates).omit({
 export const updateServiceRateSchema = insertServiceRateSchema.pick({
   hourlyRate: true,
 });
-
-// Helper to convert empty strings to null for optional fields
-const emptyToNull = <T extends z.ZodTypeAny>(schema: T) => 
-  z.preprocess(v => v === "" ? null : v, schema.nullable().optional());
-
-export const insertBillingProfileSchema = createInsertSchema(organizationBillingProfiles).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-  organizationId: true,
-}).extend({
-  contactName: emptyToNull(z.string().min(2, "Contact name must be at least 2 characters")),
-  companyName: emptyToNull(z.string().min(2, "Company name must be at least 2 characters")),
-  addressLine1: emptyToNull(z.string().min(3, "Address must be at least 3 characters")),
-  addressLine2: emptyToNull(z.string()),
-  suburb: emptyToNull(z.string().min(2, "Suburb must be at least 2 characters")),
-  state: emptyToNull(z.string().min(2, "State must be at least 2 characters")),
-  postcode: emptyToNull(z.string().regex(/^\d{4}$/, "Postcode must be 4 digits")),
-  email: emptyToNull(z.string().email("Invalid email address")),
-  phone: emptyToNull(z.string()
-    .max(25, "Phone number too long")
-    .regex(/^[\d\s\-\+\(\)]+$/, "Phone number can only contain digits, spaces, dashes, plus sign, and parentheses")
-    .refine((val) => val.replace(/[\s\-\+\(\)]/g, '').length >= 6, {
-      message: "Phone number must contain at least 6 digits",
-    })),
-  abn: emptyToNull(z.string().regex(/^\d{11}$/, "ABN must be 11 digits")),
-});
-
-export const updateBillingProfileSchema = insertBillingProfileSchema;
 
 export const DEFAULT_SERVICES = [
   { serviceName: "Registered nurse", category: "Clinical/Nursing" },
@@ -342,6 +289,3 @@ export type ChatParityRequest = z.infer<typeof chatParityRequestSchema>;
 export type ServiceRate = typeof serviceRates.$inferSelect;
 export type InsertServiceRate = z.infer<typeof insertServiceRateSchema>;
 export type UpdateServiceRate = z.infer<typeof updateServiceRateSchema>;
-export type BillingProfile = typeof organizationBillingProfiles.$inferSelect;
-export type InsertBillingProfile = z.infer<typeof insertBillingProfileSchema>;
-export type UpdateBillingProfile = z.infer<typeof updateBillingProfileSchema>;

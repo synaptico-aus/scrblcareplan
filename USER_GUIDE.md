@@ -2696,7 +2696,7 @@ SCRBL 2.0 is designed to comply with the Australian Privacy Act 1988, particular
 **Why We Collect It**:
 - User authentication and access control
 - Care plan generation and storage
-- Usage monitoring and plan limits
+- Service billing and usage tracking
 - Compliance and audit purposes
 
 **Legal Basis**: Consent (users agree to terms when registering)
