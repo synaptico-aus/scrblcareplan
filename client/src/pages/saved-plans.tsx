@@ -339,7 +339,7 @@ export default function SavedPlans() {
         </head>
         <body>
           <div class="logo-header">
-            <h2>Scrbl - Digital Care Plan Agent</h2>
+            <h2>Scrbl - AI Assisted Care Plan Drafts in Minutes</h2>
           </div>
           ${sanitizedHtml}
         </body>

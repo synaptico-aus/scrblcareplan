@@ -128,7 +128,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
         </head>
         <body>
           <div class="logo-header">
-            <h2>Scrbl - Digital Care Plan Agent</h2>
+            <h2>Scrbl - AI Assisted Care Plan Drafts in Minutes</h2>
           </div>
           ${sanitizedHtml}
         </body>

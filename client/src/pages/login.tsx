@@ -63,7 +63,7 @@ export default function Login() {
           </div>
           <CardTitle className="text-2xl font-semibold">SCRBL 2.0</CardTitle>
           <CardDescription>
-            Digital Care Plan Agent
+            AI Assisted Care Plan Drafts in Minutes
           </CardDescription>
         </CardHeader>
         <CardContent>
