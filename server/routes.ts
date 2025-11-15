@@ -13,6 +13,7 @@ import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
 import { uploadFile, getFile, deleteFile, listFiles } from "./services/s3";
 import multer from "multer";
+import JSZip from "jszip";
 
 // Event emitter for real-time updates
 const eventEmitter = new EventEmitter();
@@ -1112,6 +1113,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error deleting saved care plan:", error);
       res.status(500).json({ 
         message: "Failed to delete saved care plan" 
+      });
+    }
+  });
+
+  // Rate limiter for bulk export (prevent resource exhaustion)
+  const exportAllRateLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 3, // Max 3 exports per 5 minutes per IP
+    message: "Too many export requests, please try again later",
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Bulk export all care plans as ZIP
+  app.get("/api/saved-care-plans/export-all", requireAuth, exportAllRateLimiter, async (req, res) => {
+    try {
+      const organizationId = getOrganizationId(req);
+      const savedCarePlans = await storage.getSavedCarePlans(organizationId);
+      
+      if (!savedCarePlans || savedCarePlans.length === 0) {
+        return res.status(404).json({ 
+          message: "No care plans found to export" 
+        });
+      }
+
+      // Limit maximum number of plans to prevent memory exhaustion
+      const MAX_PLANS_PER_EXPORT = 100;
+      if (savedCarePlans.length > MAX_PLANS_PER_EXPORT) {
+        return res.status(400).json({ 
+          message: `Cannot export more than ${MAX_PLANS_PER_EXPORT} care plans at once. Please contact support for bulk export assistance.` 
+        });
+      }
+
+      const zip = new JSZip();
+      
+      // Helper function to escape HTML
+      const escapeHtml = (text: string | null | undefined): string => {
+        if (!text) return '';
+        return String(text)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      };
+
+      // Helper function to sanitize filename (prevent directory traversal)
+      const sanitizeFilename = (filename: string): string => {
+        return filename
+          .replace(/[^a-zA-Z0-9\s\-_]/g, '') // Remove special characters
+          .replace(/\s+/g, '-') // Replace spaces with hyphens
+          .substring(0, 100); // Limit length
+      };
+
+      // Add each care plan as a Word document to the ZIP
+      for (const plan of savedCarePlans) {
+        const htmlContent = `
+          <html>
+            <head>
+              <title>Care Plan Draft - ${escapeHtml(plan.clientName)}</title>
+              <meta charset="utf-8">
+              <style>
+                body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
+                .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
+                h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
+                h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
+                h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
+                p { margin-bottom: 6pt; }
+                table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
+                th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
+                th { background-color: #f0f0f0; }
+              </style>
+            </head>
+            <body>
+              <div class="logo-header">
+                <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
+              </div>
+              ${plan.html}
+            </body>
+          </html>
+        `;
+        
+        const safeClientName = sanitizeFilename(plan.clientName || 'care-plan');
+        const fileDate = new Date(plan.saveDate).toISOString().split('T')[0];
+        const fileName = `${safeClientName}-${fileDate}.doc`;
+        zip.file(fileName, htmlContent);
+      }
+
+      // Generate ZIP file
+      const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+      
+      // Set headers for ZIP download
+      const timestamp = new Date().toISOString().split('T')[0];
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename=all-care-plans-${timestamp}.zip`);
+      res.send(zipBuffer);
+      
+    } catch (error) {
+      console.error("Error exporting all care plans:", error);
+      res.status(500).json({ 
+        message: "Failed to export care plans" 
       });
     }
   });
