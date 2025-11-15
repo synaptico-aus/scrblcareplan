@@ -1398,6 +1398,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Billing Profile endpoints (Admin only)
+  app.get("/api/billing-profile", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const organizationId = getOrganizationId(req);
+      const profile = await storage.getBillingProfile(organizationId);
+      
+      if (profile) {
+        res.json(profile);
+      } else {
+        res.status(404).json({ error: "Billing profile not found" });
+      }
+    } catch (error) {
+      console.error("Error fetching billing profile:", error);
+      res.status(500).json({ error: "Failed to fetch billing profile" });
+    }
+  });
+
+  app.post("/api/billing-profile", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const organizationId = getOrganizationId(req);
+      const { insertBillingProfileSchema } = await import("@shared/schema");
+      
+      const validatedData = insertBillingProfileSchema.parse(req.body);
+      const profile = await storage.createBillingProfile(organizationId, validatedData);
+      
+      res.status(201).json(profile);
+    } catch (error) {
+      console.error("Error creating billing profile:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid billing profile data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create billing profile" });
+    }
+  });
+
+  app.put("/api/billing-profile", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const organizationId = getOrganizationId(req);
+      const { updateBillingProfileSchema } = await import("@shared/schema");
+      
+      const validatedData = updateBillingProfileSchema.parse(req.body);
+      const updated = await storage.updateBillingProfile(organizationId, validatedData);
+      
+      if (updated) {
+        res.json(updated);
+      } else {
+        res.status(404).json({ error: "Billing profile not found" });
+      }
+    } catch (error) {
+      console.error("Error updating billing profile:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid billing profile data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update billing profile" });
+    }
+  });
+
   const httpServer = createServer(app);
   // Async job processing function
   async function processAsyncJob(
