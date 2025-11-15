@@ -1125,8 +1125,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .substring(0, 100); // Limit length
       };
 
+      // Helper function to generate extracted facts HTML
+      const generateFactsHtml = (facts: any): string => {
+        if (!facts) return '';
+        
+        return `
+          <div style="margin-bottom: 30px; padding: 20px; border: 1px solid #ddd;">
+            <h2 style="font-size: 16pt; font-weight: bold; margin-bottom: 15px;">Extracted Facts</h2>
+            
+            <div style="margin-bottom: 20px;">
+              <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Client Details</h3>
+              <p><strong>Name:</strong> ${escapeHtml(facts.clientDetails?.name) || "Not documented"}</p>
+              <p><strong>Language:</strong> ${escapeHtml(facts.clientDetails?.language) || "Not documented"}</p>
+              <p><strong>Interpreter Required:</strong> ${facts.clientDetails?.interpreterRequired !== undefined ? (facts.clientDetails?.interpreterRequired ? "Yes" : "No") : "Not documented"}</p>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Medical Information</h3>
+              <p><strong>GP:</strong> ${escapeHtml(facts.medical?.gp) || "Not documented"}</p>
+              <p><strong>Pharmacy:</strong> ${escapeHtml(facts.medical?.pharmacy) || "Not documented"}</p>
+              <p><strong>Medications:</strong> ${escapeHtml(facts.medical?.medications) || "Not documented"}</p>
+              <p><strong>Allergies:</strong> ${escapeHtml(facts.medical?.allergies) || "Not documented"}</p>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Support Network</h3>
+              <p><strong>Primary Contact:</strong> ${escapeHtml(facts.support?.primaryContact) || "Not documented"}</p>
+              <p><strong>Secondary Contact:</strong> ${escapeHtml(facts.support?.secondaryContact) || "Not documented"}</p>
+              <p><strong>Living Arrangement:</strong> ${escapeHtml(facts.support?.livingArrangement) || "Not documented"}</p>
+            </div>
+          </div>
+        `;
+      };
+
       // Add each care plan as a Word document to the ZIP
       for (const plan of savedCarePlans) {
+        const factsSectionHtml = plan.extractedFacts ? generateFactsHtml(plan.extractedFacts) : '';
+        
         const htmlContent = `
           <html>
             <head>
@@ -1148,6 +1183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               <div class="logo-header">
                 <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
               </div>
+              ${factsSectionHtml}
               ${plan.html}
             </body>
           </html>

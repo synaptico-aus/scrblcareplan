@@ -319,6 +319,8 @@ export default function SavedPlans() {
   const handleExportToWord = (plan: SavedCarePlan) => {
     // Sanitize HTML content to prevent XSS
     const sanitizedHtml = DOMPurify.sanitize(plan.html as string);
+    const facts = plan.extractedFacts as ExtractedFacts;
+    const factsSectionHtml = facts ? generateFactsHtml(facts) : '';
     
     // Create a complete HTML document with Scrbl logo for Word
     const htmlWithLogo = `
@@ -342,6 +344,7 @@ export default function SavedPlans() {
           <div class="logo-header">
             <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
           </div>
+          ${factsSectionHtml}
           ${sanitizedHtml}
         </body>
       </html>
