@@ -9,6 +9,7 @@ import CarePlanner from "@/pages/care-planner";
 import SavedPlans from "@/pages/saved-plans";
 import AdminDashboard from "@/pages/admin";
 import Settings from "@/pages/settings";
+import Subscribe from "@/pages/subscribe";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import NotFound from "@/pages/not-found";
@@ -21,6 +22,11 @@ function App() {
           <Switch>
             <Route path="/login" component={Login} />
             <Route path="/register" component={Register} />
+            <Route path="/subscribe">
+              <ProtectedRoute>
+                <Subscribe />
+              </ProtectedRoute>
+            </Route>
             <Route path="/">
               <ProtectedRoute>
                 <CarePlanner />

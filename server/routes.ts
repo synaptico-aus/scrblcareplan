@@ -12,6 +12,7 @@ import { generateOfflineFactsExtraction, generateOfflineCarePlan } from "./servi
 import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
 import { uploadFile, getFile, deleteFile, listFiles } from "./services/s3";
+import { createSubscription, createBillingPortalSession, constructWebhookEvent } from "./services/stripe";
 import multer from "multer";
 
 // Event emitter for real-time updates
@@ -54,7 +55,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const passwordHash = await bcrypt.hash(password, 10);
 
-      const organization = await storage.createOrganization({ name: organizationName });
+      // Create organization with 7-day trial
+      const trialEndsAt = new Date();
+      trialEndsAt.setDate(trialEndsAt.getDate() + 7); // 7-day trial
+      
+      const organization = await storage.createOrganization({ 
+        name: organizationName,
+        subscriptionStatus: "trial",
+        trialEndsAt
+      });
 
       const user = await storage.createUser({
         email,
@@ -130,10 +139,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/auth/me", (req, res) => {
+  app.get("/api/auth/me", async (req, res) => {
     if (req.isAuthenticated()) {
       const user = req.user as User;
       const session = req.session as any;
+      
+      // Get organization subscription status
+      const organization = await storage.getOrganization(user.organizationId);
       
       res.json({
         isAuthenticated: true,
@@ -147,6 +159,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           monthlyPlanLimit: user.monthlyPlanLimit,
           plansGeneratedThisMonth: user.plansGeneratedThisMonth
         },
+        organization: organization ? {
+          id: organization.id,
+          name: organization.name,
+          subscriptionStatus: organization.subscriptionStatus,
+          subscriptionPlan: organization.subscriptionPlan,
+          stripeCustomerId: organization.stripeCustomerId
+        } : null,
         impersonation: session.impersonatedUserId ? {
           isImpersonating: true,
           impersonatorId: session.impersonatorId,
@@ -157,6 +176,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } else {
       res.json({ isAuthenticated: false });
+    }
+  });
+
+  // Stripe subscription routes
+  app.post("/api/subscription/create", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const organization = await storage.getOrganization(user.organizationId);
+      
+      if (!organization) {
+        return res.status(404).json({ message: "Organization not found" });
+      }
+
+      // Check if organization already has an active subscription
+      if (organization.stripeSubscriptionId && organization.subscriptionStatus === 'active') {
+        return res.status(400).json({ message: "Organization already has an active subscription" });
+      }
+
+      const { priceId } = req.body;
+      if (!priceId) {
+        return res.status(400).json({ message: "Price ID is required" });
+      }
+
+      const result = await createSubscription({
+        organizationId: organization.id,
+        organizationName: organization.name,
+        email: user.email,
+        priceId
+      });
+
+      // Update organization with Stripe IDs
+      await storage.updateOrganizationSubscription(organization.id, {
+        stripeCustomerId: result.customerId,
+        stripeSubscriptionId: result.subscriptionId,
+        subscriptionStatus: 'incomplete'
+      });
+
+      res.json({
+        clientSecret: result.clientSecret,
+        subscriptionId: result.subscriptionId
+      });
+    } catch (error) {
+      console.error("Error creating subscription:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to create subscription"
+      });
+    }
+  });
+
+  app.post("/api/subscription/billing-portal", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const organization = await storage.getOrganization(user.organizationId);
+      
+      if (!organization || !organization.stripeCustomerId) {
+        return res.status(404).json({ message: "No subscription found" });
+      }
+
+      const returnUrl = `${req.protocol}://${req.get('host')}/settings`;
+      const portalUrl = await createBillingPortalSession(organization.stripeCustomerId, returnUrl);
+
+      res.json({ url: portalUrl });
+    } catch (error) {
+      console.error("Error creating billing portal session:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to create billing portal session"
+      });
+    }
+  });
+
+  // Stripe webhook endpoint (must be raw body)
+  app.post("/api/webhooks/stripe", async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    
+    if (!sig) {
+      return res.status(400).send('Missing Stripe signature');
+    }
+
+    try {
+      const rawBody = (req as any).rawBody || JSON.stringify(req.body);
+      const event = await constructWebhookEvent(rawBody, sig as string);
+
+      // Handle the event
+      switch (event.type) {
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated': {
+          const subscription = event.data.object as any;
+          const organizationId = subscription.metadata?.organizationId;
+          
+          if (organizationId) {
+            await storage.updateOrganizationSubscription(organizationId, {
+              subscriptionStatus: subscription.status,
+              stripeSubscriptionId: subscription.id
+            });
+          }
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as any;
+          const organizationId = subscription.metadata?.organizationId;
+          
+          if (organizationId) {
+            await storage.updateOrganizationSubscription(organizationId, {
+              subscriptionStatus: 'canceled'
+            });
+          }
+          break;
+        }
+
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object as any;
+          if (invoice.subscription) {
+            // Mark subscription as active on successful payment
+            const subscription = invoice.subscription;
+            const customer = invoice.customer;
+            
+            // Find organization by customer ID
+            // Note: We'll need to add a method to find org by Stripe customer ID
+            // For now, subscription status will be updated by subscription.updated event
+          }
+          break;
+        }
+
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object as any;
+          if (invoice.subscription) {
+            // Handle failed payment - subscription will go to past_due
+          }
+          break;
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error("Webhook error:", error);
+      res.status(400).send(`Webhook Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   });
 
