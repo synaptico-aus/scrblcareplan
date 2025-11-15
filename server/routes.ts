@@ -1075,48 +1075,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/saved-care-plans/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const organizationId = getOrganizationId(req);
-      const savedCarePlan = await storage.getSavedCarePlan(organizationId, id);
-      
-      if (!savedCarePlan) {
-        return res.status(404).json({ 
-          message: "Saved care plan not found" 
-        });
-      }
-
-      res.json(savedCarePlan);
-    } catch (error) {
-      console.error("Error fetching saved care plan:", error);
-      res.status(500).json({ 
-        message: "Failed to fetch saved care plan" 
-      });
-    }
-  });
-
-  app.delete("/api/saved-care-plans/:id", requireAuth, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const organizationId = getOrganizationId(req);
-      const deleted = await storage.deleteSavedCarePlan(organizationId, id);
-      
-      if (!deleted) {
-        return res.status(404).json({ 
-          message: "Saved care plan not found" 
-        });
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error deleting saved care plan:", error);
-      res.status(500).json({ 
-        message: "Failed to delete saved care plan" 
-      });
-    }
-  });
-
   // Rate limiter for bulk export (prevent resource exhaustion)
   const exportAllRateLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes
@@ -1126,7 +1084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     legacyHeaders: false,
   });
 
-  // Bulk export all care plans as ZIP
+  // Bulk export all care plans as ZIP (must be BEFORE :id route to match correctly)
   app.get("/api/saved-care-plans/export-all", requireAuth, exportAllRateLimiter, async (req, res) => {
     try {
       const organizationId = getOrganizationId(req);
@@ -1214,6 +1172,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error exporting all care plans:", error);
       res.status(500).json({ 
         message: "Failed to export care plans" 
+      });
+    }
+  });
+
+  app.get("/api/saved-care-plans/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const organizationId = getOrganizationId(req);
+      const savedCarePlan = await storage.getSavedCarePlan(organizationId, id);
+      
+      if (!savedCarePlan) {
+        return res.status(404).json({ 
+          message: "Saved care plan not found" 
+        });
+      }
+
+      res.json(savedCarePlan);
+    } catch (error) {
+      console.error("Error fetching saved care plan:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch saved care plan" 
+      });
+    }
+  });
+
+  app.delete("/api/saved-care-plans/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const organizationId = getOrganizationId(req);
+      const deleted = await storage.deleteSavedCarePlan(organizationId, id);
+      
+      if (!deleted) {
+        return res.status(404).json({ 
+          message: "Saved care plan not found" 
+        });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting saved care plan:", error);
+      res.status(500).json({ 
+        message: "Failed to delete saved care plan" 
       });
     }
   });
