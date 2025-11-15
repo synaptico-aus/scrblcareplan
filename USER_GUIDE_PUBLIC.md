@@ -1,7 +1,7 @@
 # SCRBL 2.0 User Guide
 
 **Version**: 2.0  
-**Last Updated**: November 2024  
+**Last Updated**: November 2025  
 **For**: Care professionals using SCRBL 2.0 for Australian aged care
 
 ---
@@ -64,6 +64,43 @@ The first person to register for an organization becomes an administrator automa
 3. Click "Login"
 
 You'll be directed to the Care Planner page where you can start creating care plans.
+
+### Completing Your Profile
+
+**Important**: Before you can generate care plans, you must complete your profile with all required information.
+
+**Required Profile Information:**
+
+- First Name *
+- Last Name *
+- Email Address *
+- Company/Organization *
+- Phone Number *
+
+**How to Complete Your Profile:**
+
+1. Click your name in the top-right corner
+2. Select "Settings & Help" from the dropdown menu
+3. Scroll to the "Your Profile" section
+4. Fill in all fields marked with an asterisk (*)
+5. Click "Save Changes"
+
+**What Happens If My Profile Is Incomplete?**
+
+If you try to generate a care plan without completing your profile:
+- You'll see a warning banner at the top of the Care Planner page
+- The "Generate Care Plan" button will be disabled
+- A tooltip will explain that you need to complete your profile first
+- Click "Complete Your Profile" in the warning banner to go directly to Settings
+
+Once you've saved all required information, the warning will disappear immediately and you'll be able to generate care plans.
+
+**Why Is This Required?**
+
+Complete profile information ensures:
+- Care plans include accurate contact information for the care professional
+- Your organization can track which team member created each plan
+- Compliance with quality assurance and accountability requirements
 
 ---
 
@@ -282,6 +319,14 @@ You can limit how many care plans a user can generate per month:
 - Long, detailed transcripts take longer to process
 - Wait patiently - the system is working
 - If it takes longer than 5 minutes, try refreshing the page and generating again
+
+**The "Generate Care Plan" button is disabled**
+- You need to complete your profile before you can generate care plans
+- Look for a warning banner at the top of the page
+- Click "Complete Your Profile" in the warning banner
+- Fill in all required fields (marked with *): First Name, Last Name, Email, Company, Phone Number
+- Click "Save Changes"
+- The button will become enabled immediately after saving
 
 **I can't find a saved care plan**
 - Clear the search box to see all plans
