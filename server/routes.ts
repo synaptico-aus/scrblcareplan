@@ -1566,17 +1566,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
-  // Serve USER_GUIDE.md file
+  // Serve public user guide (sanitized, no proprietary information)
   app.get("/api/user-guide", async (req, res) => {
     try {
       const fs = await import('fs/promises');
       const path = await import('path');
-      const guidePath = path.join(process.cwd(), 'USER_GUIDE.md');
+      const guidePath = path.join(process.cwd(), 'USER_GUIDE_PUBLIC.md');
       const content = await fs.readFile(guidePath, 'utf-8');
       res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
       res.send(content);
     } catch (error) {
-      console.error("Error reading USER_GUIDE.md:", error);
+      console.error("Error reading USER_GUIDE_PUBLIC.md:", error);
       res.status(500).json({ message: "Failed to load user guide" });
     }
   });

@@ -99,6 +99,27 @@ The backend implements a service-oriented architecture with separate services fo
 
 The application is designed to be deployed on Replit with specific configuration for the development environment, including runtime error overlays and cartographer integration for enhanced debugging.
 
+## Documentation
+
+### User Guide Files
+
+The application maintains two separate user guide files:
+
+1. **USER_GUIDE_PUBLIC.md** (Public-facing)
+   - Served via `/api/user-guide` endpoint
+   - Displayed in Settings & Help page
+   - User-focused documentation for care professionals and administrators
+   - Contains: How to use the app, troubleshooting, admin features, compliance information
+   - **Does NOT contain**: Technical implementation details, codebase information, API prompts, database schemas, or proprietary information
+
+2. **USER_GUIDE.md** (Internal/Development)
+   - Complete technical documentation (3,535 lines, 105KB)
+   - For development team and AI agent training only
+   - Contains: Detailed technical specifications, API references, database schemas, example prompts, codebase architecture
+   - **NOT exposed** to end users or public-facing interfaces
+
+This separation ensures that users get helpful documentation while protecting proprietary implementation details from being exposed.
+
 ## Deployment
 
 ### AWS RDS Migration
