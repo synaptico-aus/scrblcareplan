@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import CarePlanner from "@/pages/care-planner";
 import SavedPlans from "@/pages/saved-plans";
 import AdminDashboard from "@/pages/admin";
+import Settings from "@/pages/settings";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import NotFound from "@/pages/not-found";
@@ -38,6 +39,11 @@ function App() {
             <Route path="/admin">
               <ProtectedRoute>
                 <AdminDashboard />
+              </ProtectedRoute>
+            </Route>
+            <Route path="/settings">
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             </Route>
             <Route component={NotFound} />

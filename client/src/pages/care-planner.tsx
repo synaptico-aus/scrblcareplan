@@ -530,6 +530,13 @@ export default function CarePlanner() {
                     <DropdownMenuSeparator />
                   </>
                 )}
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" data-testid="link-settings">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings & Help</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
