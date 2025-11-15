@@ -8,17 +8,8 @@ interface ImpersonationInfo {
   impersonatedUserId?: string;
 }
 
-interface Organization {
-  id: string;
-  name: string;
-  subscriptionStatus: string | null;
-  subscriptionPlan: string | null;
-  stripeCustomerId: string | null;
-}
-
 interface AuthContextType {
   user: User | null;
-  organization: Organization | null;
   isLoading: boolean;
   impersonation: ImpersonationInfo;
   login: (email: string, password: string) => Promise<void>;
@@ -31,7 +22,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [organization, setOrganization] = useState<Organization | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [impersonation, setImpersonation] = useState<ImpersonationInfo>({ isImpersonating: false });
 
@@ -46,17 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (data.isAuthenticated && data.user) {
         setUser(data.user);
-        setOrganization(data.organization || null);
         setImpersonation(data.impersonation || { isImpersonating: false });
       } else {
         setUser(null);
-        setOrganization(null);
         setImpersonation({ isImpersonating: false });
       }
     } catch (error) {
       console.error("Auth check failed:", error);
       setUser(null);
-      setOrganization(null);
       setImpersonation({ isImpersonating: false });
     } finally {
       setIsLoading(false);
@@ -109,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, organization, isLoading, impersonation, login, logout, refetchUser, stopImpersonation }}>
+    <AuthContext.Provider value={{ user, isLoading, impersonation, login, logout, refetchUser, stopImpersonation }}>
       {children}
     </AuthContext.Provider>
   );

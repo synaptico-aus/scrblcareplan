@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, BookOpen, Shield, FileText, Users, Download, CreditCard } from "lucide-react";
+import { ArrowLeft, BookOpen, Shield, FileText, Users, Download } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import scrblLogo from "@assets/scrbl-logo.png";
 import { MarkdownUserGuide } from "@/components/MarkdownUserGuide";
@@ -10,13 +10,11 @@ import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useState } from "react";
-import { apiRequest } from "@/lib/queryClient";
 
 export default function Settings() {
-  const { user, organization } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
-  const [isLoadingBillingPortal, setIsLoadingBillingPortal] = useState(false);
 
   const handleExportUserGuide = async () => {
     try {
@@ -191,26 +189,6 @@ export default function Settings() {
     }
   };
 
-  const handleManageBilling = async () => {
-    try {
-      setIsLoadingBillingPortal(true);
-      const response = await apiRequest("POST", "/api/billing-portal", {});
-      const data = await response.json();
-      
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to open billing portal. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingBillingPortal(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -271,69 +249,6 @@ export default function Settings() {
               )}
             </CardContent>
           </Card>
-
-          {/* Subscription Information */}
-          {organization && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <CreditCard className="mr-2 h-5 w-5" />
-                  Subscription
-                </CardTitle>
-                <CardDescription>Your organization's subscription details</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Organization:</span>
-                  <p className="text-base">{organization.name}</p>
-                </div>
-                <div>
-                  <span className="text-sm font-medium text-muted-foreground">Status:</span>
-                  <p className="text-base">
-                    {organization.subscriptionStatus === "active" && (
-                      <span className="text-green-600 dark:text-green-400 font-medium">Active</span>
-                    )}
-                    {organization.subscriptionStatus === "trial" && (
-                      <span className="text-blue-600 dark:text-blue-400 font-medium">Trial</span>
-                    )}
-                    {organization.subscriptionStatus === "canceled" && (
-                      <span className="text-red-600 dark:text-red-400 font-medium">Canceled</span>
-                    )}
-                    {!organization.subscriptionStatus && (
-                      <span className="text-gray-600 dark:text-gray-400">No subscription</span>
-                    )}
-                  </p>
-                </div>
-                {organization.subscriptionPlan && (
-                  <div>
-                    <span className="text-sm font-medium text-muted-foreground">Plan:</span>
-                    <p className="text-base capitalize">{organization.subscriptionPlan}</p>
-                  </div>
-                )}
-                {organization.stripeCustomerId && (
-                  <div className="pt-2">
-                    <Button
-                      onClick={handleManageBilling}
-                      disabled={isLoadingBillingPortal}
-                      variant="outline"
-                      data-testid="button-manage-billing"
-                    >
-                      {isLoadingBillingPortal ? "Loading..." : "Manage Billing"}
-                    </Button>
-                  </div>
-                )}
-                {!organization.stripeCustomerId && organization.subscriptionStatus === "trial" && (
-                  <div className="pt-2">
-                    <Link href="/subscribe">
-                      <Button data-testid="button-upgrade-subscription">
-                        Upgrade Subscription
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {/* Complete User Guide */}
           <Card>

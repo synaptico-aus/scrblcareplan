@@ -7,12 +7,6 @@ export interface IStorage {
   // Organization operations
   createOrganization(org: InsertOrganization): Promise<Organization>;
   getOrganization(id: string): Promise<Organization | undefined>;
-  updateOrganizationSubscription(organizationId: string, data: {
-    stripeCustomerId?: string;
-    stripeSubscriptionId?: string;
-    subscriptionStatus?: string;
-    subscriptionPlan?: string;
-  }): Promise<Organization | undefined>;
   
   // User operations
   getUser(id: string): Promise<User | undefined>;
@@ -66,23 +60,6 @@ export class DatabaseStorage implements IStorage {
 
   async getOrganization(id: string): Promise<Organization | undefined> {
     const [organization] = await db.select().from(organizations).where(eq(organizations.id, id));
-    return organization || undefined;
-  }
-
-  async updateOrganizationSubscription(organizationId: string, data: {
-    stripeCustomerId?: string;
-    stripeSubscriptionId?: string;
-    subscriptionStatus?: string;
-    subscriptionPlan?: string;
-  }): Promise<Organization | undefined> {
-    const [organization] = await db
-      .update(organizations)
-      .set({
-        ...data,
-        updatedAt: new Date()
-      })
-      .where(eq(organizations.id, organizationId))
-      .returning();
     return organization || undefined;
   }
 

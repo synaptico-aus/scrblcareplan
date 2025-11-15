@@ -5,7 +5,6 @@ import { CarePlanForm } from "@/components/CarePlanForm";
 import { FactsPanel } from "@/components/FactsPanel";
 import { CarePlanPreview } from "@/components/CarePlanPreview";
 import { AgentUpdates } from "@/components/AgentUpdates";
-import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { ExtractedFacts } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -454,11 +453,6 @@ export default function CarePlanner() {
           </div>
         </div>
       )}
-
-      {/* Subscription Banner */}
-      <div className="px-4 pt-3">
-        <SubscriptionBanner />
-      </div>
       
       {/* Header */}
       <header className="bg-card border-b border-border px-4 sm:px-6 py-3 sm:py-4">
