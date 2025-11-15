@@ -190,7 +190,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md w-full">
               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-lg font-medium text-foreground">Generating Care Plan...</p>
+              <p className="text-lg font-medium text-foreground">Generating Draft Care Plan, Do Not Refresh or Leave the Page...</p>
               <p className="text-sm text-muted-foreground mt-2">Processing transcript with AI</p>
               
               {/* Progress Bar */}
