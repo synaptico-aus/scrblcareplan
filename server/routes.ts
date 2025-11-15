@@ -335,9 +335,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const organizationId = getOrganizationId(req);
       
       // Super admins can see all users across all organizations
-      const users = user.role === "super_admin" 
+      let users = user.role === "super_admin" 
         ? await storage.getAllUsers()
         : await storage.getUsersByOrganization(organizationId);
+      
+      // Regular admins can only see users with the same email domain
+      if (user.role === "admin") {
+        const adminEmailDomain = user.email.split('@')[1]?.toLowerCase();
+        if (adminEmailDomain) {
+          users = users.filter(u => {
+            const userEmailDomain = u.email.split('@')[1]?.toLowerCase();
+            return userEmailDomain === adminEmailDomain;
+          });
+        }
+      }
       
       // Fetch organization names for all users
       const usersWithOrgNames = await Promise.all(
