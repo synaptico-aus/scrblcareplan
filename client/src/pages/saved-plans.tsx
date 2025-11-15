@@ -454,15 +454,6 @@ export default function SavedPlans() {
                 Print
               </Button>
               <Button
-                onClick={() => handleExportToPDF(selectedPlan)}
-                className="bg-red-500 text-white hover:bg-red-600 w-full sm:w-auto"
-                data-testid="button-export-pdf"
-                size="sm"
-              >
-                <FileType className="h-4 w-4 mr-2" />
-                Export to PDF
-              </Button>
-              <Button
                 onClick={() => handleExportToWord(selectedPlan)}
                 className="bg-blue-500 text-white hover:bg-blue-600 w-full sm:w-auto"
                 data-testid="button-export-word"

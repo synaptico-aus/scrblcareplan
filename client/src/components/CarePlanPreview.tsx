@@ -172,16 +172,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
               <span className="sm:inline">Print</span>
             </Button>
             <Button
-              onClick={handleExportToPDF}
-              disabled={!sanitizedHtml}
-              className="bg-red-500 text-white hover:bg-red-600 w-full sm:w-auto"
-              data-testid="button-export-pdf"
-              size="sm"
-            >
-              <FileType className="h-4 w-4 sm:mr-2" />
-              <span className="sm:inline">Export to PDF</span>
-            </Button>
-            <Button
               onClick={handleExportToWord}
               disabled={!sanitizedHtml}
               className="bg-blue-500 text-white hover:bg-blue-600 w-full sm:w-auto"
