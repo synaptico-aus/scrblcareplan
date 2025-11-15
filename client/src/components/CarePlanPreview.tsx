@@ -227,8 +227,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-2">Ready to Generate</h3>
               <p className="text-muted-foreground mb-4 max-w-md">
-                Enter client information and transcript to generate a Gold Standard Care Plan
-                compliant with Australian Aged Care Standards.
+                Once your enter your transcript Scrbl 2.0 will generate you an accurate first draft care plan, ready for your team to review, edit and send  to your client.
               </p>
               <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 max-w-md mx-auto">
                 <div className="flex items-center justify-center space-x-2 mb-2">
