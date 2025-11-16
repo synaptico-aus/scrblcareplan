@@ -1,3 +1,26 @@
+/**
+ * Default Organization Setup Script
+ * 
+ * ⚠️ DEVELOPMENT/DEPLOYMENT TOOL ONLY ⚠️
+ * 
+ * This script creates the default organization and admin user for initial setup.
+ * It should NOT be included in production builds or deployed to production servers.
+ * 
+ * Purpose:
+ * - Create default "Salveo HomeCare" organization
+ * - Create admin user (carl@salveocare.com.au)
+ * - Migrate existing data to the default organization
+ * 
+ * Usage:
+ * ADMIN_PASSWORD=your-secure-password tsx scripts/create-default-org.ts
+ * 
+ * Security Notice:
+ * - Contains hardcoded email addresses and organization names
+ * - Requires ADMIN_PASSWORD environment variable (never commit passwords)
+ * - Only use for initial database setup or development environments
+ * - For production, use the signup flow to create organizations
+ */
+
 import bcrypt from 'bcrypt';
 import { db } from '../server/db.js';
 import { organizations, users } from '../shared/schema.js';

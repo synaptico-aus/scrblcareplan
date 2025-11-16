@@ -1,3 +1,27 @@
+/**
+ * AWS RDS Migration Script
+ * 
+ * ⚠️ DEVELOPMENT/DEPLOYMENT TOOL ONLY ⚠️
+ * 
+ * This script is used for one-time database migration from Neon to AWS RDS (Sydney region).
+ * It should NOT be included in production builds or deployed to production servers.
+ * 
+ * Purpose:
+ * - Export data from development database (Neon)
+ * - Create schema in production database (AWS RDS Sydney)
+ * - Import data to production database
+ * - Verify migration integrity
+ * 
+ * Usage:
+ * Set environment variables for both source and target databases, then run:
+ * AWS_RDS_USER=xxx AWS_RDS_PASSWORD=xxx AWS_RDS_HOST=xxx AWS_RDS_PORT=5432 AWS_RDS_DATABASE=xxx tsx scripts/migrate-to-aws-rds.ts
+ * 
+ * Security Notice:
+ * - Never commit database credentials to version control
+ * - Always test on staging data before production migration
+ * - Keep backup-data.json secure (contains sensitive data)
+ */
+
 import pkg from 'pg';
 const { Pool } = pkg;
 import * as fs from 'fs';
