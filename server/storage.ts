@@ -164,7 +164,7 @@ export class DatabaseStorage implements IStorage {
     const remaining = user.monthlyPlanLimit - (user.plansGeneratedThisMonth || 0);
     return {
       canGenerate: remaining > 0,
-      remainingPlans: remaining
+      remainingPlans: Math.max(remaining, 0)
     };
   }
 
