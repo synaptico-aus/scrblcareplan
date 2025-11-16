@@ -192,10 +192,20 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
                 <FileText className="h-12 w-12 text-primary" />
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-2">Ready to Generate</h3>
-              <p className="text-muted-foreground mb-4 max-w-md">
-                Enter client information and transcript to generate a Gold Standard Care Plan
-                compliant with Australian Aged Care Standards.
-              </p>
+              <div className="text-muted-foreground mb-4 max-w-2xl space-y-3">
+                <p>
+                  I'm Scrbl an AI-powered assistant that turns your assessment transcripts into structured, compliant first-draft care plans for the Support at Home Program.
+                </p>
+                <p>
+                  I analyses the transcript, extracts the client's goals, risks, abilities, needs, preferences, and safety considerations, and then produces a clear, narrative, first-person draft that follows a gold standard care plan structure.
+                </p>
+                <p>
+                  I don't replace judgement, I help make your work more efficient. You'll still review, edit, and approve the final plan, while I complete up to 90% of the initial drafting, ensuring consistency, accuracy, and significant time savings.
+                </p>
+                <p className="font-medium">
+                  I help your team spend less time writing and more time caring.
+                </p>
+              </div>
               <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 max-w-md mx-auto">
                 <div className="flex items-center justify-center space-x-2 mb-2">
                   <div className="w-3 h-3 bg-accent rounded-full"></div>
