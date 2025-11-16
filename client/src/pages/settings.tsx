@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, BookOpen, Shield, FileText, Users, Download, Save } from "lucide-react";
+import { ArrowLeft, BookOpen, Shield, FileText, Users, Download, Save, Clock, TrendingUp, Award } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import scrblLogo from "@assets/scrbl-logo.png";
 import { MarkdownUserGuide } from "@/components/MarkdownUserGuide";
@@ -15,13 +15,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { updateUserProfileSchema, type UpdateUserProfile } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Settings() {
   const { user, refetchUser } = useAuth();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
+
+  const { data: stats, isLoading: statsLoading } = useQuery<{
+    totalPlans: number;
+    timeSavedPerPlan: number;
+    totalTimeSaved: number;
+  }>({
+    queryKey: ['/api/care-plan-stats'],
+  });
 
   const form = useForm<UpdateUserProfile>({
     resolver: zodResolver(updateUserProfileSchema),
@@ -271,6 +279,66 @@ export default function Settings() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="space-y-6">
+          {/* Time Savings Dashboard */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center text-sm font-medium">
+                  <FileText className="mr-2 h-4 w-4 text-primary" />
+                  Total Care Plans
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <div className="h-8 bg-muted animate-pulse rounded" />
+                ) : (
+                  <div className="text-2xl font-bold">{stats?.totalPlans || 0}</div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Plans generated with Scrbl</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center text-sm font-medium">
+                  <Clock className="mr-2 h-4 w-4 text-primary" />
+                  Time Saved Per Plan
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <div className="h-8 bg-muted animate-pulse rounded" />
+                ) : (
+                  <div className="text-2xl font-bold">{stats?.timeSavedPerPlan || 114} min</div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">120 min manual vs ~6 min AI</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center text-sm font-medium">
+                  <TrendingUp className="mr-2 h-4 w-4 text-primary" />
+                  Total Time Saved
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {statsLoading ? (
+                  <div className="h-8 bg-muted animate-pulse rounded" />
+                ) : (
+                  <div>
+                    <div className="text-2xl font-bold">
+                      {Math.floor((stats?.totalTimeSaved || 0) / 60)} hrs {(stats?.totalTimeSaved || 0) % 60} min
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {stats?.totalTimeSaved || 0} minutes across all plans
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
           {/* User Info */}
           <Card>
             <CardHeader>

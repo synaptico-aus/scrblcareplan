@@ -1116,6 +1116,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/care-plan-stats", requireAuth, async (req, res) => {
+    try {
+      const organizationId = getOrganizationId(req);
+      const savedCarePlans = await storage.getSavedCarePlans(organizationId);
+      
+      res.json({
+        totalPlans: savedCarePlans.length,
+        timeSavedPerPlan: 114, // 120 min manual - 6 min AI = 114 min saved
+        totalTimeSaved: savedCarePlans.length * 114
+      });
+    } catch (error) {
+      console.error("Error fetching care plan stats:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch care plan statistics" 
+      });
+    }
+  });
+
   // Object storage routes for document uploads
   app.post("/api/objects/upload", requireAuth, async (req, res) => {
     try {
