@@ -344,7 +344,7 @@ export class DatabaseStorage implements IStorage {
       organizationId,
       serviceName: service.serviceName,
       category: service.category,
-      hourlyRate: null,
+      hourlyRate: "0.00",
     }));
     
     const seededRates = await db
