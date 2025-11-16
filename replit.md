@@ -122,6 +122,16 @@ This separation ensures that users get helpful documentation while protecting pr
 
 ## Recent Updates
 
+### Pre-Deployment Cleanup (November 2025)
+- **Code Audit**: Comprehensive pre-deployment security and code quality audit completed
+  - Removed unused file: `server/replitAuth.ts` (170 lines of dead code for unused OAuth integration)
+  - Verified all environment variables use proper security practices
+  - Confirmed multi-tenant data isolation at database level
+  - Validated no hardcoded secrets or test data in production paths
+  - See `PRE_DEPLOYMENT_AUDIT.md` for complete audit report
+- **Jotform AI Agent**: Added Jotform AI chat widget for user support
+- **Word Export Formatting**: Updated to Calibri 10pt font with 0.3 inch margins for maximum content density
+
 ### Word Export Feature Unification (November 2025)
 - **Shared Export Utility**: Created centralized Word export functionality in `client/src/lib/word-export.ts`
   - `escapeHtml()`: HTML escaping for XSS protection
