@@ -102,7 +102,7 @@ function findSpeakerBreak(text: string, minPos: number, maxPos: number): number 
   ];
   
   for (const pattern of speakerPatterns) {
-    const matches = [...text.slice(minPos, maxPos).matchAll(pattern)];
+    const matches = Array.from(text.slice(minPos, maxPos).matchAll(pattern));
     if (matches.length > 0) {
       // Return position of first match after minPos
       return minPos + matches[0].index! + matches[0][0].length;
@@ -314,11 +314,11 @@ Build comprehensive facts from the information discussed in this chunk.`
 function mergeFacts(factsList: any[]): any {
   
   const merged = {
-    clientDetails: { name: null, language: null, interpreterRequired: null },
-    medical: { gp: null, pharmacy: null, equipment: [] as string[], medications: null, allergies: null },
-    support: { primaryContact: null, secondaryContact: null, livingArrangement: null },
+    clientDetails: { name: null as string | null, language: null as string | null, interpreterRequired: null as boolean | null },
+    medical: { gp: null as string | null, pharmacy: null as string | null, equipment: [] as string[], medications: null as string | null, allergies: null as string | null },
+    support: { primaryContact: null as string | null, secondaryContact: null as string | null, livingArrangement: null as string | null },
     risks: [] as any[],
-    preferences: { workerPreferences: null, serviceDeliveryPreferences: null, culturalConsiderations: null }
+    preferences: { workerPreferences: null as string | null, serviceDeliveryPreferences: null as string | null, culturalConsiderations: null as string | null }
   };
   
   // Track confidence scores for better merging decisions
@@ -452,7 +452,7 @@ function areSimilarRisks(risk1: any, risk2: any): boolean {
   if (type1 === type2) return true;
   
   // Similar descriptions (basic similarity check)
-  const commonWords = desc1.split(' ').filter(word => 
+  const commonWords = desc1.split(' ').filter((word: string) => 
     word.length > 3 && desc2.includes(word)
   );
   
