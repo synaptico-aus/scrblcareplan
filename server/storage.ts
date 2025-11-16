@@ -24,7 +24,6 @@ export interface IStorage {
   createCareAnalysis(organizationId: string, analysis: InsertCareAnalysis & { extractedFacts?: any; generatedHtml?: string }): Promise<CareAnalysis>;
   getCareAnalysis(organizationId: string, id: string): Promise<CareAnalysis | undefined>;
   getCareAnalysesByClient(organizationId: string, clientName: string): Promise<CareAnalysis[]>;
-  deleteTranscript(organizationId: string, analysisId: string): Promise<void>;
   
   // Saved care plan operations (organization-scoped)
   createSavedCarePlan(organizationId: string, carePlan: InsertSavedCarePlan): Promise<SavedCarePlan>;
@@ -193,13 +192,6 @@ export class DatabaseStorage implements IStorage {
   async getCareAnalysesByClient(organizationId: string, clientName: string): Promise<CareAnalysis[]> {
     return await db.select().from(careAnalyses)
       .where(and(eq(careAnalyses.clientName, clientName), eq(careAnalyses.organizationId, organizationId)));
-  }
-
-  async deleteTranscript(organizationId: string, analysisId: string): Promise<void> {
-    await db
-      .update(careAnalyses)
-      .set({ transcript: null })
-      .where(and(eq(careAnalyses.id, analysisId), eq(careAnalyses.organizationId, organizationId)));
   }
 
   async createSavedCarePlan(organizationId: string, carePlan: InsertSavedCarePlan): Promise<SavedCarePlan> {

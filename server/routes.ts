@@ -591,9 +591,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         generatedHtml,
       });
 
-      // Delete transcript for privacy (keep only facts and HTML)
-      await storage.deleteTranscript(organizationId, analysis.id);
-
       // Increment user's plan count after successful generation
       await storage.incrementUserPlanCount(userId);
 
@@ -995,9 +992,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         extractedFacts,
         generatedHtml,
       });
-
-      // Delete transcript for privacy (keep only facts and HTML)
-      await storage.deleteTranscript(organizationId, analysis.id);
 
       // Increment user's plan count after successful generation
       await storage.incrementUserPlanCount(userId);
@@ -1723,9 +1717,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         extractedFacts,
         generatedHtml,
       });
-
-      // Delete transcript for privacy (keep only facts and HTML)
-      await storage.deleteTranscript(organizationId, analysis.id);
 
       // Increment user's plan count after successful generation
       await storage.incrementUserPlanCount(userId);

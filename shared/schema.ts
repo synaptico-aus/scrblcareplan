@@ -44,7 +44,7 @@ export const careAnalyses = pgTable("care_analyses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   clientName: text("client_name").notNull(),
-  transcript: text("transcript"), // Nullable - deleted after generation for privacy
+  transcript: text("transcript").notNull(),
   extractedFacts: jsonb("extracted_facts"),
   generatedHtml: text("generated_html"),
   processingMode: text("processing_mode").notNull().default("ai"),

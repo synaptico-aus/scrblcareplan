@@ -41,17 +41,11 @@ The backend implements a service-oriented architecture with separate services fo
 - **Database Schema**: Drizzle ORM configured with the following tables:
   - **organizations**: Multi-tenant organization management
   - **users**: User accounts with email/password authentication, organization membership, and role-based access
-  - **care_analyses**: AI-generated analyses with extracted facts and HTML (organization-scoped). Transcripts are automatically deleted after processing for enhanced privacy.
+  - **care_analyses**: Care plan transcripts and AI-generated analyses (organization-scoped)
   - **saved_care_plans**: Saved care plans with extracted facts and HTML (organization-scoped)
   - **client_documents**: Client file attachments stored in object storage (organization-scoped)
   - **client_folder_aliases**: Display name mappings for client folders (organization-scoped)
   - **sessions**: PostgreSQL-backed session storage for authentication
-
-### Privacy Enhancement
-- **Automatic Transcript Deletion**: Raw assessment transcripts are automatically deleted immediately after care plan generation
-- **Data Retention**: Only AI-extracted structured facts and generated care plan HTML are retained for clinical records
-- **Compliance**: Maintains audit trails and clinical documentation while minimizing storage of sensitive raw data
-- **Implementation**: Transcript field in care_analyses table is nullable; deleteTranscript() called after all generation modes (sync AI, async AI, offline)
 
 ### Authentication and Authorization
 - **Authentication System**: Multi-tenant Passport.js local strategy with bcrypt password hashing (10 rounds)
