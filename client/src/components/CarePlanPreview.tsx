@@ -197,7 +197,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
                   I'm Scrbl an AI-powered assistant that turns your assessment transcripts into structured, compliant first-draft care plans for the Support at Home Program.
                 </p>
                 <p>
-                  I analyses the transcript, extracts the client's goals, risks, abilities, needs, preferences, and safety considerations, and then produces a clear, narrative, first-person draft that follows a gold standard care plan structure.
+                  I analyse the transcript, extract the client's goals, risks, abilities, needs, preferences, safety considerations, then I produce a clear, narrative, first-person draft that follows a gold standard care plan structure.
                 </p>
                 <p>
                   I don't replace judgement, I help make your work more efficient. You'll still review, edit, and approve the final plan, while I complete up to 90% of the initial drafting, ensuring consistency, accuracy, and significant time savings.
