@@ -183,8 +183,8 @@ export default function Landing() {
                     95% Time Savings
                   </div>
                   <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
-                    Transform Assessment Notes into{" "}
-                    <span className="text-primary">Gold Standard</span> Care Plans
+                    The Only Care Plan Generator tailored to the new{" "}
+                    <span className="text-primary">Support at Home Program</span> in Australia.
                   </h2>
                   <p className="text-xl text-muted-foreground max-w-2xl">
                     Generate compliant, professionally formatted care plans in 6 minutes instead of 2 hours. 
