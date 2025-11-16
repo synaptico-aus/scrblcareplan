@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth-context";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import Landing from "@/pages/landing";
 import CarePlanner from "@/pages/care-planner";
 import SavedPlans from "@/pages/saved-plans";
 import AdminDashboard from "@/pages/admin";
@@ -19,13 +20,10 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Switch>
+            <Route path="/" component={Landing} />
             <Route path="/login" component={Login} />
             <Route path="/register" component={Register} />
-            <Route path="/">
-              <ProtectedRoute>
-                <CarePlanner />
-              </ProtectedRoute>
-            </Route>
+            <Route path="/signup" component={Register} />
             <Route path="/care-planner">
               <ProtectedRoute>
                 <CarePlanner />
