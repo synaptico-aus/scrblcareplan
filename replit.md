@@ -120,6 +120,23 @@ The application maintains two separate user guide files:
 
 This separation ensures that users get helpful documentation while protecting proprietary implementation details from being exposed.
 
+## Recent Updates
+
+### Word Export Feature Unification (November 2025)
+- **Shared Export Utility**: Created centralized Word export functionality in `client/src/lib/word-export.ts`
+  - `escapeHtml()`: HTML escaping for XSS protection
+  - `formatExtractedFactsForWord()`: Generates structured HTML tables for extracted facts
+  - `exportToWord()`: Main export function with SCRBL branding
+- **Extracted Facts in Word Export**: All Word exports now include a comprehensive extracted facts summary with:
+  - Client details (name, language, interpreter requirements)
+  - Medical information (GP, pharmacy, medications, allergies, equipment)
+  - Support network (primary/secondary contacts, living arrangement)
+  - Risk assessment (color-coded severity levels)
+  - Preferences (worker, service delivery, cultural considerations)
+- **API-Level Normalization**: extractedFacts from database (stored as JSONB) are normalized to parsed objects when loaded via API
+- **Consistent Behavior**: Both new and saved care plans export identically with full extracted facts
+- **Security**: All user-controlled fields HTML-escaped before Word export to prevent XSS vulnerabilities
+
 ## Deployment
 
 ### AWS RDS Migration
