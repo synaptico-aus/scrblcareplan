@@ -85,8 +85,6 @@ export default function Landing() {
     "Support at Home Program and HCP package support",
     "Risk assessment with color-coded severity levels",
     "Client document management with secure cloud storage",
-    "Multi-user collaboration within your organization",
-    "Complete audit trail and version history",
     "Australian data hosting (AWS Sydney region)"
   ];
 
