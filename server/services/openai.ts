@@ -123,28 +123,28 @@ export async function extractFactsFromTranscript(transcript: string, clientName:
     const chunks = chunkTranscript(transcript, 120000); // GPT-5 context limit
     
     if (chunks.length > 1) {
-      // Process chunks and merge results with progress tracking
-      const allFacts = [];
-      for (let i = 0; i < chunks.length; i++) {
+      // Process all chunks in parallel for faster extraction
+      progressCallback?.(15, `Processing ${chunks.length} chunks in parallel`);
+      
+      const chunkPromises = chunks.map(async (chunk, i) => {
         try {
-          // Report progress for each chunk
-          const chunkProgress = 15 + (i / chunks.length) * 70; // 15% to 85% range
-          progressCallback?.(chunkProgress, `Extracting facts from chunk ${i + 1}/${chunks.length}`);
-          
-          const chunkFacts = await extractFactsFromChunk(chunks[i], clientName, i + 1, chunks.length);
-          allFacts.push(chunkFacts);
+          return await extractFactsFromChunk(chunk, clientName, i + 1, chunks.length);
         } catch (error) {
           console.error(`Error processing chunk ${i + 1}/${chunks.length}:`, error);
-          // Continue with other chunks - don't fail entire extraction for one chunk
-          allFacts.push({
+          // Return empty facts object if chunk fails - don't fail entire extraction
+          return {
             clientDetails: { name: clientName, language: null, interpreterRequired: null },
             medical: { gp: null, pharmacy: null, equipment: [], medications: null, allergies: null },
             support: { primaryContact: null, secondaryContact: null, livingArrangement: null },
             risks: [],
             preferences: { workerPreferences: null, serviceDeliveryPreferences: null, culturalConsiderations: null }
-          });
+          };
         }
-      }
+      });
+      
+      // Wait for all chunks to complete in parallel
+      progressCallback?.(50, `Waiting for ${chunks.length} parallel extractions to complete`);
+      const allFacts = await Promise.all(chunkPromises);
       
       // Merge all facts from chunks with enhanced deduplication
       progressCallback?.(90, 'Merging and deduplicating extracted facts');
