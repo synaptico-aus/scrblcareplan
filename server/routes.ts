@@ -63,6 +63,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName,
         organizationId: organization.id,
         role: "admin",
+        monthlyPlanLimit: 3,
+        plansGeneratedThisMonth: 0,
+        limitResetDate: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
       });
 
       req.login(user, (err) => {
@@ -568,9 +571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limitCheck = await storage.checkAndResetUserPlanCount(userId);
       if (!limitCheck.canGenerate) {
         return res.status(403).json({
-          message: limitCheck.remainingPlans === 0 
-            ? "You have reached your monthly care plan generation limit. Please contact your administrator."
-            : "You have exceeded your monthly care plan generation limit.",
+          message: "You have reached your care plan generation limit. Please use the chat support at the bottom right of the screen to request an upgrade.",
           remainingPlans: limitCheck.remainingPlans
         });
       }
@@ -697,9 +698,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limitCheck = await storage.checkAndResetUserPlanCount(userId);
       if (!limitCheck.canGenerate) {
         return res.status(403).json({
-          message: limitCheck.remainingPlans === 0 
-            ? "You have reached your monthly care plan generation limit. Please contact your administrator."
-            : "You have exceeded your monthly care plan generation limit.",
+          message: "You have reached your care plan generation limit. Please use the chat support at the bottom right of the screen to request an upgrade.",
           remainingPlans: limitCheck.remainingPlans
         });
       }
@@ -806,9 +805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limitCheck = await storage.checkAndResetUserPlanCount(userId);
       if (!limitCheck.canGenerate) {
         return res.status(403).json({
-          message: limitCheck.remainingPlans === 0 
-            ? "You have reached your monthly care plan generation limit. Please contact your administrator."
-            : "You have exceeded your monthly care plan generation limit.",
+          message: "You have reached your care plan generation limit. Please use the chat support at the bottom right of the screen to request an upgrade.",
           remainingPlans: limitCheck.remainingPlans
         });
       }
@@ -972,9 +969,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const limitCheck = await storage.checkAndResetUserPlanCount(userId);
       if (!limitCheck.canGenerate) {
         return res.status(403).json({
-          message: limitCheck.remainingPlans === 0 
-            ? "You have reached your monthly care plan generation limit. Please contact your administrator."
-            : "You have exceeded your monthly care plan generation limit.",
+          message: "You have reached your care plan generation limit. Please use the chat support at the bottom right of the screen to request an upgrade.",
           remainingPlans: limitCheck.remainingPlans
         });
       }
