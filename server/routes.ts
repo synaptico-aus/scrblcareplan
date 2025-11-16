@@ -1664,5 +1664,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve privacy policy
+  app.get("/api/privacy-policy", async (req, res) => {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const policyPath = path.join(process.cwd(), 'PRIVACY_POLICY.md');
+      const content = await fs.readFile(policyPath, 'utf-8');
+      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+      res.send(content);
+    } catch (error) {
+      console.error("Error reading PRIVACY_POLICY.md:", error);
+      res.status(500).json({ message: "Failed to load privacy policy" });
+    }
+  });
+
   return httpServer;
 }

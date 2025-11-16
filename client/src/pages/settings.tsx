@@ -6,6 +6,7 @@ import { ArrowLeft, BookOpen, Shield, FileText, Users, Download, Save, Clock, Tr
 import { useAuth } from "@/lib/auth-context";
 import scrblLogo from "@assets/scrbl-logo.png";
 import { MarkdownUserGuide } from "@/components/MarkdownUserGuide";
+import { MarkdownPrivacyPolicy } from "@/components/MarkdownPrivacyPolicy";
 import { useToast } from "@/hooks/use-toast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -22,6 +23,7 @@ export default function Settings() {
   const { user, refetchUser } = useAuth();
   const { toast } = useToast();
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingPrivacy, setIsExportingPrivacy] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<{
     totalPlans: number;
@@ -251,6 +253,178 @@ export default function Settings() {
     }
   };
 
+  const handleExportPrivacyPolicy = async () => {
+    try {
+      setIsExportingPrivacy(true);
+      
+      // Fetch the markdown content
+      const response = await fetch('/api/privacy-policy');
+      if (!response.ok) {
+        throw new Error('Failed to fetch privacy policy');
+      }
+      const markdownContent = await response.text();
+      
+      // Convert markdown to HTML
+      const ReactDOMServer = await import('react-dom/server');
+      const htmlContent = ReactDOMServer.renderToString(
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {markdownContent}
+        </ReactMarkdown>
+      );
+      
+      // Create the full HTML document
+      const fullHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SCRBL 2.0 Privacy & Security Policy</title>
+  <style>
+    @page {
+      margin: 0.5in;
+    }
+    body {
+      font-family: Calibri, Arial, sans-serif;
+      margin: 0.5in;
+      line-height: 1.4;
+      color: #000;
+      font-size: 11pt;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #ddd;
+    }
+    h1 {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 20pt;
+      font-weight: bold;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      color: #000;
+    }
+    h2 {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 16pt;
+      font-weight: bold;
+      margin-top: 14px;
+      margin-bottom: 6px;
+      color: #000;
+    }
+    h3 {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 13pt;
+      font-weight: bold;
+      margin-top: 12px;
+      margin-bottom: 5px;
+      color: #000;
+    }
+    h4 {
+      font-family: Calibri, Arial, sans-serif;
+      font-size: 11pt;
+      font-weight: bold;
+      margin-top: 10px;
+      margin-bottom: 4px;
+      color: #000;
+    }
+    p {
+      margin-bottom: 8px;
+      font-size: 11pt;
+    }
+    ul, ol {
+      margin-left: 18px;
+      margin-bottom: 8px;
+    }
+    li {
+      margin-bottom: 3px;
+      font-size: 11pt;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 8px 0;
+      font-size: 10pt;
+    }
+    th, td {
+      border: 1px solid #000;
+      padding: 6px;
+      text-align: left;
+    }
+    th {
+      background-color: #f0f0f0;
+      font-weight: bold;
+    }
+    code {
+      background-color: #f4f4f4;
+      padding: 2px 4px;
+      font-family: 'Courier New', Consolas, monospace;
+      font-size: 10pt;
+    }
+    pre {
+      background-color: #f4f4f4;
+      padding: 8px;
+      border: 1px solid #ddd;
+      overflow-x: auto;
+      font-size: 9pt;
+    }
+    blockquote {
+      border-left: 3px solid #ddd;
+      padding-left: 10px;
+      margin-left: 0;
+      font-style: italic;
+      color: #666;
+    }
+    strong {
+      font-weight: bold;
+    }
+    em {
+      font-style: italic;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #ddd;
+      margin: 15px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>SCRBL 2.0</h1>
+    <p>AI Assisted Care Plan Drafts in Minutes</p>
+    <h2>Privacy & Security Policy</h2>
+  </div>
+  ${htmlContent}
+</body>
+</html>`;
+
+      // Create blob and download
+      const blob = new Blob([fullHtml], { type: 'application/msword' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `SCRBL-Privacy-Policy-${new Date().toISOString().split('T')[0]}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Export Complete",
+        description: "Privacy policy has been exported to Word",
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export privacy policy. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingPrivacy(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -449,6 +623,37 @@ export default function Settings() {
                   </Button>
                 </form>
               </Form>
+            </CardContent>
+          </Card>
+
+          {/* Privacy & Security Policy */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center">
+                    <Shield className="mr-2 h-5 w-5" />
+                    Privacy & Security Policy
+                  </CardTitle>
+                  <CardDescription>
+                    Complete privacy policy and data security information | Version 2.0 | November 2025
+                  </CardDescription>
+                </div>
+                <Button
+                  onClick={handleExportPrivacyPolicy}
+                  disabled={isExportingPrivacy}
+                  size="sm"
+                  data-testid="button-export-privacy-policy"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {isExportingPrivacy ? "Exporting..." : "Export to Word"}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="max-h-[800px] overflow-y-auto border border-border rounded-lg p-6">
+                <MarkdownPrivacyPolicy />
+              </div>
             </CardContent>
           </Card>
 
