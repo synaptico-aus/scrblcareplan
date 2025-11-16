@@ -9,17 +9,6 @@ import html2pdf from "html2pdf.js";
 import DOMPurify from "dompurify";
 import scrblLogo from "@/assets/scrbl-logo.png";
 
-// HTML escape function to prevent XSS
-function escapeHtml(unsafe: string | null | undefined): string {
-  if (!unsafe) return '';
-  return String(unsafe)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
 interface CarePlanPreviewProps {
   html: string | null;
   isLoading: boolean;
@@ -29,37 +18,6 @@ interface CarePlanPreviewProps {
   generationTime: number | null;
   onPrint: () => void;
 }
-
-// Generate HTML for extracted facts section
-const generateFactsHtml = (facts: ExtractedFacts) => {
-  return `
-    <div style="margin-bottom: 30px; padding: 20px; border: 1px solid #ddd;">
-      <h2 style="font-size: 16pt; font-weight: bold; margin-bottom: 15px;">Extracted Facts</h2>
-      
-      <div style="margin-bottom: 20px;">
-        <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Client Details</h3>
-        <p><strong>Name:</strong> ${escapeHtml(facts.clientDetails?.name) || "Not documented"}</p>
-        <p><strong>Language:</strong> ${escapeHtml(facts.clientDetails?.language) || "Not documented"}</p>
-        <p><strong>Interpreter Required:</strong> ${facts.clientDetails?.interpreterRequired !== undefined ? (facts.clientDetails?.interpreterRequired ? "Yes" : "No") : "Not documented"}</p>
-      </div>
-      
-      <div style="margin-bottom: 20px;">
-        <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Medical Information</h3>
-        <p><strong>GP:</strong> ${escapeHtml(facts.medical?.gp) || "Not documented"}</p>
-        <p><strong>Pharmacy:</strong> ${escapeHtml(facts.medical?.pharmacy) || "Not documented"}</p>
-        <p><strong>Medications:</strong> ${escapeHtml(facts.medical?.medications) || "Not documented"}</p>
-        <p><strong>Allergies:</strong> ${escapeHtml(facts.medical?.allergies) || "Not documented"}</p>
-      </div>
-      
-      <div style="margin-bottom: 20px;">
-        <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Support Network</h3>
-        <p><strong>Primary Contact:</strong> ${escapeHtml(facts.support?.primaryContact) || "Not documented"}</p>
-        <p><strong>Secondary Contact:</strong> ${escapeHtml(facts.support?.secondaryContact) || "Not documented"}</p>
-        <p><strong>Living Arrangement:</strong> ${escapeHtml(facts.support?.livingArrangement) || "Not documented"}</p>
-      </div>
-    </div>
-  `;
-};
 
 export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, generationStartTime, generationTime, onPrint }: CarePlanPreviewProps) {
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -101,9 +59,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const handleExportToPDF = () => {
     if (!sanitizedHtml) return;
     
-    // Generate extracted facts HTML if available
-    const factsSectionHtml = extractedFacts ? generateFactsHtml(extractedFacts) : '';
-    
     // Create a complete HTML document with Scrbl logo (using sanitized content)
     const htmlWithLogo = `
       <html>
@@ -126,7 +81,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
           <div class="logo-header">
             <img src="${scrblLogo}" alt="Scrbl Logo" />
           </div>
-          ${factsSectionHtml}
           ${sanitizedHtml}
         </body>
       </html>
@@ -154,9 +108,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const handleExportToWord = () => {
     if (!sanitizedHtml) return;
     
-    // Generate extracted facts HTML if available
-    const factsSectionHtml = extractedFacts ? generateFactsHtml(extractedFacts) : '';
-    
     // Create a complete HTML document with Scrbl logo for Word (using sanitized content)
     const htmlWithLogo = `
       <html>
@@ -179,7 +130,6 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
           <div class="logo-header">
             <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
           </div>
-          ${factsSectionHtml}
           ${sanitizedHtml}
         </body>
       </html>
@@ -240,7 +190,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
           <div className="flex items-center justify-center h-full">
             <div className="text-center max-w-md w-full">
               <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-lg font-medium text-foreground">Generating Draft Care Plan, Do Not Refresh or Leave the Page...</p>
+              <p className="text-lg font-medium text-foreground">Generating Care Plan...</p>
               <p className="text-sm text-muted-foreground mt-2">Processing transcript with AI</p>
               
               {/* Progress Bar */}
@@ -277,7 +227,8 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
               </div>
               <h3 className="text-xl font-semibold text-foreground mb-2">Ready to Generate</h3>
               <p className="text-muted-foreground mb-4 max-w-md">
-                Once your enter your transcript Scrbl 2.0 will generate you an accurate first draft care plan, ready for your team to review, edit and send  to your client.
+                Enter client information and transcript to generate a Gold Standard Care Plan
+                compliant with Australian Aged Care Standards.
               </p>
               <div className="bg-accent/10 border border-accent/20 rounded-lg p-4 max-w-md mx-auto">
                 <div className="flex items-center justify-center space-x-2 mb-2">

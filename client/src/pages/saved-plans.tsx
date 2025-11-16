@@ -34,7 +34,6 @@ export default function SavedPlans() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renamingClient, setRenamingClient] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
-  const [isExportingAll, setIsExportingAll] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -319,8 +318,6 @@ export default function SavedPlans() {
   const handleExportToWord = (plan: SavedCarePlan) => {
     // Sanitize HTML content to prevent XSS
     const sanitizedHtml = DOMPurify.sanitize(plan.html as string);
-    const facts = plan.extractedFacts as ExtractedFacts;
-    const factsSectionHtml = facts ? generateFactsHtml(facts) : '';
     
     // Create a complete HTML document with Scrbl logo for Word
     const htmlWithLogo = `
@@ -344,7 +341,6 @@ export default function SavedPlans() {
           <div class="logo-header">
             <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
           </div>
-          ${factsSectionHtml}
           ${sanitizedHtml}
         </body>
       </html>
@@ -394,53 +390,6 @@ export default function SavedPlans() {
         </div>
       </div>
     `;
-  };
-
-  const handleExportAllToZip = async () => {
-    if (savedPlans.length === 0) {
-      toast({
-        title: "No Care Plans",
-        description: "There are no care plans to export.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsExportingAll(true);
-    
-    try {
-      const response = await fetch('/api/saved-care-plans/export-all', {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to export care plans');
-      }
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `all-care-plans-${new Date().toISOString().split('T')[0]}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast({
-        title: "Export Complete",
-        description: `Successfully exported ${savedPlans.length} care plan${savedPlans.length !== 1 ? 's' : ''} to ZIP.`,
-      });
-    } catch (error) {
-      toast({
-        title: "Export Failed",
-        description: error instanceof Error ? error.message : "Failed to export care plans",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExportingAll(false);
-    }
   };
 
   // Show plan detail view
@@ -835,17 +784,6 @@ export default function SavedPlans() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <Button 
-              onClick={handleExportAllToZip}
-              disabled={isExportingAll || savedPlans.length === 0}
-              className="bg-blue-500 text-white hover:bg-blue-600"
-              data-testid="button-export-all-zip"
-              size="sm"
-            >
-              <Download className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">{isExportingAll ? "Exporting..." : "Export All to ZIP"}</span>
-              <span className="sm:hidden">{isExportingAll ? "..." : "Export"}</span>
-            </Button>
             <Link href="/">
               <Button variant="outline" data-testid="button-back-to-planner" size="sm" className="w-full sm:w-auto">
                 <ArrowLeft className="h-4 w-4 sm:mr-2" />

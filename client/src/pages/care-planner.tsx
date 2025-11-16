@@ -457,10 +457,10 @@ export default function CarePlanner() {
 
       {/* Profile Incomplete Warning */}
       {!isProfileComplete && (
-        <div className="bg-red-50 dark:bg-red-950 text-red-900 dark:text-red-100 border-b border-red-200 dark:border-red-800 px-4 py-3" data-testid="banner-profile-incomplete">
+        <div className="bg-orange-500 dark:bg-orange-600 text-white px-4 py-3" data-testid="banner-profile-incomplete">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              <AlertTriangle className="h-5 w-5" />
               <div>
                 <p className="font-medium">Complete Your Profile to Generate Care Plans</p>
                 <p className="text-sm opacity-90">Please fill in all required account information before generating care plans.</p>
@@ -471,7 +471,7 @@ export default function CarePlanner() {
                 variant="secondary"
                 size="sm"
                 data-testid="button-complete-profile"
-                className="bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700 border border-red-300 dark:border-red-700"
+                className="bg-white dark:bg-gray-800 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 Complete Profile
               </Button>
