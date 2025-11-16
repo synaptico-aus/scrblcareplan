@@ -116,7 +116,7 @@ export const exportToWord = (
         <title>Care Plan Draft - ${escapedClientName}</title>
         <meta charset="utf-8">
         <style>
-          body { font-family: Calibri, Arial, sans-serif; margin: 0.5in; line-height: 1.6; }
+          body { font-family: Calibri, Arial, sans-serif; margin: 0.3in; line-height: 1.6; }
           .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
           h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
           h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
@@ -181,7 +181,7 @@ const generateWordDocumentHtml = (
         <title>Care Plan Draft - ${escapedClientName}</title>
         <meta charset="utf-8">
         <style>
-          body { font-family: Calibri, Arial, sans-serif; margin: 0.5in; line-height: 1.6; }
+          body { font-family: Calibri, Arial, sans-serif; margin: 0.3in; line-height: 1.6; }
           .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
           h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
           h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
