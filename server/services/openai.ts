@@ -570,7 +570,7 @@ Your job: read a full assessment transcript between a care partner and a client/
 - Use <strong> for section labels (e.g., <strong>Medical History:</strong>).
 
 ## Required output order (exact template format)
-1. Care Plan (H1 title)
+1. Draft Care Plan (Ready for Review) (H1 title)
 2. Care Alerts
 3. My Care Plan
    - Date of this Care Plan: 

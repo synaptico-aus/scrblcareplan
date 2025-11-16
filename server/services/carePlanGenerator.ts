@@ -82,7 +82,7 @@ export function generateOfflineCarePlan(transcript: string, clientName: string):
   
   // Generate care plan structure matching exact template format
   return `
-    <h1>Care Plan</h1>
+    <h1>Draft Care Plan (Ready for Review)</h1>
     
     <h2><strong>Care Alerts:</strong></h2>
     <p>Not documented in this transcript; this section will be updated as further details are provided.</p>
