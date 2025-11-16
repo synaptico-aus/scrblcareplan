@@ -1,4 +1,5 @@
 import { ExtractedFacts } from "@shared/schema";
+import JSZip from "jszip";
 
 /**
  * Escapes HTML special characters to prevent XSS attacks
@@ -141,6 +142,112 @@ export const exportToWord = (
   const link = document.createElement('a');
   link.href = url;
   link.download = `${escapedClientName || 'care-plan'}-${new Date().toISOString().split('T')[0]}.doc`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * Generates Word document HTML (internal helper)
+ */
+const generateWordDocumentHtml = (
+  clientName: string,
+  carePlanHtml: string,
+  extractedFacts: ExtractedFacts | string | null
+): string => {
+  const escapedClientName = clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  
+  // Normalize extractedFacts - handle both JSON strings and objects
+  let factsObject: ExtractedFacts | null = null;
+  if (extractedFacts) {
+    if (typeof extractedFacts === 'string') {
+      try {
+        factsObject = JSON.parse(extractedFacts) as ExtractedFacts;
+      } catch (e) {
+        console.error('Failed to parse extracted facts:', e);
+        factsObject = null;
+      }
+    } else {
+      factsObject = extractedFacts;
+    }
+  }
+  
+  const extractedFactsHtml = formatExtractedFactsForWord(factsObject);
+  
+  return `
+    <html>
+      <head>
+        <title>Care Plan Draft - ${escapedClientName}</title>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
+          .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
+          h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
+          h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
+          h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
+          p { margin-bottom: 6pt; }
+          table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
+          th, td { border: 1px solid #000; padding: 6pt; text-align: left; vertical-align: top; }
+          th { background-color: #f0f0f0; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="logo-header">
+          <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
+        </div>
+        ${extractedFactsHtml}
+        ${carePlanHtml}
+      </body>
+    </html>
+  `;
+};
+
+/**
+ * Exports all care plans to a zip file containing individual Word documents
+ */
+export const exportAllToZip = async (
+  plans: Array<{
+    id: string;
+    clientName: string;
+    name: string;
+    html: string;
+    extractedFacts: ExtractedFacts | string | null;
+    saveDate: string;
+  }>
+): Promise<void> => {
+  if (plans.length === 0) {
+    throw new Error('No plans to export');
+  }
+
+  const zip = new JSZip();
+  
+  // Add each plan as a Word document to the zip
+  plans.forEach((plan) => {
+    const wordHtml = generateWordDocumentHtml(
+      plan.clientName,
+      plan.html,
+      plan.extractedFacts
+    );
+    
+    // Create a safe filename
+    const safeClientName = plan.clientName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const safePlanName = plan.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const date = new Date(plan.saveDate).toISOString().split('T')[0];
+    const filename = `${safeClientName}-${safePlanName}-${date}.doc`;
+    
+    // Add file to zip
+    zip.file(filename, wordHtml);
+  });
+  
+  // Generate the zip file
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  
+  // Download the zip
+  const url = URL.createObjectURL(zipBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `care-plans-export-${new Date().toISOString().split('T')[0]}.zip`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

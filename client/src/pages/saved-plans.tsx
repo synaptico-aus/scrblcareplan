@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus, Edit } from "lucide-react";
+import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Download, FileType, Folder, Upload, File, Plus, Edit, Archive } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts, ClientDocument, ClientFolderAlias } from "@shared/schema";
@@ -15,7 +15,7 @@ import scrblLogo from "@/assets/scrbl-logo.png";
 import html2pdf from "html2pdf.js";
 import DOMPurify from "dompurify";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import { exportToWord, escapeHtml } from "@/lib/word-export";
+import { exportToWord, escapeHtml, exportAllToZip } from "@/lib/word-export";
 
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -24,6 +24,7 @@ export default function SavedPlans() {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renamingClient, setRenamingClient] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState("");
+  const [isExportingAll, setIsExportingAll] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -338,6 +339,47 @@ export default function SavedPlans() {
       title: "Word Export Complete",
       description: `"${plan.name}" has been exported as a Word document.`,
     });
+  };
+
+  const handleExportAllToZip = async () => {
+    if (savedPlans.length === 0) {
+      toast({
+        title: "No Plans to Export",
+        description: "There are no saved care plans to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExportingAll(true);
+
+    try {
+      // Sanitize all plans before export
+      const sanitizedPlans = savedPlans.map(plan => ({
+        id: plan.id,
+        clientName: plan.clientName,
+        name: plan.name,
+        html: DOMPurify.sanitize(plan.html as string),
+        extractedFacts: plan.extractedFacts as ExtractedFacts | null,
+        saveDate: typeof plan.saveDate === 'string' ? plan.saveDate : new Date(plan.saveDate).toISOString()
+      }));
+
+      await exportAllToZip(sanitizedPlans);
+
+      toast({
+        title: "Bulk Export Complete",
+        description: `Successfully exported ${savedPlans.length} care plan${savedPlans.length > 1 ? 's' : ''} to a zip file.`,
+      });
+    } catch (error) {
+      console.error('Error exporting all plans:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export care plans. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingAll(false);
+    }
   };
 
   const generateFactsHtml = (facts: ExtractedFacts) => {
@@ -762,6 +804,26 @@ export default function SavedPlans() {
             </div>
           </div>
           <div className="flex items-center space-x-2">
+            <Button
+              onClick={handleExportAllToZip}
+              disabled={isExportingAll || savedPlans.length === 0}
+              className="bg-blue-500 text-white hover:bg-blue-600"
+              size="sm"
+              data-testid="button-export-all-zip"
+            >
+              {isExportingAll ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Archive className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Export All to Zip</span>
+                  <span className="sm:hidden">Export All</span>
+                </>
+              )}
+            </Button>
             <Link href="/">
               <Button variant="outline" data-testid="button-back-to-planner" size="sm" className="w-full sm:w-auto">
                 <ArrowLeft className="h-4 w-4 sm:mr-2" />
