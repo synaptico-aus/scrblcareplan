@@ -8,6 +8,7 @@ import { ExtractedFacts } from "@shared/schema";
 import html2pdf from "html2pdf.js";
 import DOMPurify from "dompurify";
 import scrblLogo from "@/assets/scrbl-logo.png";
+import { exportToWord } from "@/lib/word-export";
 
 interface CarePlanPreviewProps {
   html: string | null;
@@ -105,120 +106,10 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
     });
   };
 
-  // Helper function to escape HTML to prevent XSS
-  const escapeHtml = (text: string): string => {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  };
-
-  const formatExtractedFactsForWord = (facts: ExtractedFacts | null): string => {
-    if (!facts) return '';
-    
-    let html = '<div style="page-break-after: always;"><h1 style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10pt; margin-bottom: 20pt;">Extracted Facts Summary</h1>';
-    
-    // Client Details
-    if (facts.clientDetails.name || facts.clientDetails.language || facts.clientDetails.interpreterRequired !== undefined) {
-      html += '<h2>Client Details</h2><table>';
-      if (facts.clientDetails.name) html += `<tr><th style="width: 30%;">Name</th><td>${escapeHtml(facts.clientDetails.name)}</td></tr>`;
-      if (facts.clientDetails.language) html += `<tr><th>Language</th><td>${escapeHtml(facts.clientDetails.language)}</td></tr>`;
-      if (facts.clientDetails.interpreterRequired !== undefined) html += `<tr><th>Interpreter Required</th><td>${facts.clientDetails.interpreterRequired ? 'Yes' : 'No'}</td></tr>`;
-      html += '</table>';
-    }
-    
-    // Medical Information
-    if (facts.medical.gp || facts.medical.pharmacy || facts.medical.medications || facts.medical.allergies || facts.medical.equipment) {
-      html += '<h2>Medical Information</h2><table>';
-      if (facts.medical.gp) html += `<tr><th style="width: 30%;">GP</th><td>${escapeHtml(facts.medical.gp)}</td></tr>`;
-      if (facts.medical.pharmacy) html += `<tr><th>Pharmacy</th><td>${escapeHtml(facts.medical.pharmacy)}</td></tr>`;
-      if (facts.medical.medications) html += `<tr><th>Medications</th><td>${escapeHtml(facts.medical.medications)}</td></tr>`;
-      if (facts.medical.allergies) html += `<tr><th>Allergies</th><td>${escapeHtml(facts.medical.allergies)}</td></tr>`;
-      if (facts.medical.equipment && facts.medical.equipment.length > 0) html += `<tr><th>Equipment</th><td>${escapeHtml(facts.medical.equipment.join(', '))}</td></tr>`;
-      html += '</table>';
-    }
-    
-    // Support Network
-    if (facts.support.primaryContact || facts.support.secondaryContact || facts.support.livingArrangement) {
-      html += '<h2>Support Network</h2><table>';
-      if (facts.support.primaryContact) html += `<tr><th style="width: 30%;">Primary Contact</th><td>${escapeHtml(facts.support.primaryContact)}</td></tr>`;
-      if (facts.support.secondaryContact) html += `<tr><th>Secondary Contact</th><td>${escapeHtml(facts.support.secondaryContact)}</td></tr>`;
-      if (facts.support.livingArrangement) html += `<tr><th>Living Arrangement</th><td>${escapeHtml(facts.support.livingArrangement)}</td></tr>`;
-      html += '</table>';
-    }
-    
-    // Risk Assessment
-    if (facts.risks && facts.risks.length > 0) {
-      html += '<h2>Risk Assessment</h2>';
-      html += '<table><thead><tr><th style="width: 25%;">Risk Category</th><th style="width: 15%;">Severity</th><th>Details</th></tr></thead><tbody>';
-      facts.risks.forEach(risk => {
-        const severity = risk.severity || 'medium';
-        const severityColor = severity === 'high' ? '#dc2626' : severity === 'medium' ? '#ea580c' : '#16a34a';
-        const severityBg = severity === 'high' ? '#fee2e2' : severity === 'medium' ? '#ffedd5' : '#dcfce7';
-        html += `<tr>
-          <td><strong>${escapeHtml(risk.type)}</strong></td>
-          <td style="background-color: ${severityBg}; color: ${severityColor}; font-weight: bold; text-align: center;">${severity.toUpperCase()}</td>
-          <td>${escapeHtml(risk.description)}</td>
-        </tr>`;
-      });
-      html += '</tbody></table>';
-    }
-    
-    // Preferences
-    if (facts.preferences && (facts.preferences.workerPreferences || facts.preferences.serviceDeliveryPreferences || facts.preferences.culturalConsiderations)) {
-      html += '<h2>Preferences</h2><table>';
-      if (facts.preferences.workerPreferences) html += `<tr><th style="width: 30%;">Worker Preferences</th><td>${escapeHtml(facts.preferences.workerPreferences)}</td></tr>`;
-      if (facts.preferences.serviceDeliveryPreferences) html += `<tr><th>Service Delivery Preferences</th><td>${escapeHtml(facts.preferences.serviceDeliveryPreferences)}</td></tr>`;
-      if (facts.preferences.culturalConsiderations) html += `<tr><th>Cultural Considerations</th><td>${escapeHtml(facts.preferences.culturalConsiderations)}</td></tr>`;
-      html += '</table>';
-    }
-    
-    html += '</div>';
-    return html;
-  };
-
   const handleExportToWord = () => {
     if (!sanitizedHtml) return;
     
-    // Generate extracted facts HTML
-    const extractedFactsHtml = formatExtractedFactsForWord(extractedFacts);
-    
-    // Create a complete HTML document with Scrbl logo for Word (using sanitized content)
-    const htmlWithLogo = `
-      <html>
-        <head>
-          <title>Care Plan Draft - ${escapedClientName}</title>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
-            .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
-            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
-            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
-            p { margin-bottom: 6pt; }
-            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-            th, td { border: 1px solid #000; padding: 6pt; text-align: left; vertical-align: top; }
-            th { background-color: #f0f0f0; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="logo-header">
-            <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
-          </div>
-          ${extractedFactsHtml}
-          ${sanitizedHtml}
-        </body>
-      </html>
-    `;
-    
-    const blob = new Blob([htmlWithLogo], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${escapedClientName || 'care-plan'}-${new Date().toISOString().split('T')[0]}.doc`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportToWord(clientName, sanitizedHtml, extractedFacts);
     
     toast({
       title: "Word Export Complete",

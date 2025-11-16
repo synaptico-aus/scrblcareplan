@@ -15,17 +15,7 @@ import scrblLogo from "@/assets/scrbl-logo.png";
 import html2pdf from "html2pdf.js";
 import DOMPurify from "dompurify";
 import { ObjectUploader } from "@/components/ObjectUploader";
-
-// HTML escape function to prevent XSS
-function escapeHtml(unsafe: string | null | undefined): string {
-  if (!unsafe) return '';
-  return String(unsafe)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+import { exportToWord, escapeHtml } from "@/lib/word-export";
 
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,7 +31,23 @@ export default function SavedPlans() {
     queryKey: ["/api/saved-care-plans"],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/saved-care-plans");
-      return response.json() as Promise<SavedCarePlan[]>;
+      const plans = await response.json() as SavedCarePlan[];
+      
+      // Normalize extractedFacts for all plans - parse JSON strings
+      return plans.map(plan => {
+        if (plan.extractedFacts && typeof plan.extractedFacts === 'string') {
+          try {
+            return {
+              ...plan,
+              extractedFacts: JSON.parse(plan.extractedFacts)
+            };
+          } catch (e) {
+            console.error('Failed to parse extracted facts for plan:', plan.id, e);
+            return plan;
+          }
+        }
+        return plan;
+      });
     },
   });
   
@@ -180,6 +186,7 @@ export default function SavedPlans() {
   );
 
   const handleViewPlan = (plan: SavedCarePlan) => {
+    // extractedFacts is already normalized when plans are loaded from API
     setSelectedPlan(plan);
   };
   
@@ -319,42 +326,13 @@ export default function SavedPlans() {
     // Sanitize HTML content to prevent XSS
     const sanitizedHtml = DOMPurify.sanitize(plan.html as string);
     
-    // Create a complete HTML document with Scrbl logo for Word
-    const htmlWithLogo = `
-      <html>
-        <head>
-          <title>Care Plan Draft - ${escapeHtml(plan.clientName)}</title>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
-            .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
-            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
-            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
-            p { margin-bottom: 6pt; }
-            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-            th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
-            th { background-color: #f0f0f0; }
-          </style>
-        </head>
-        <body>
-          <div class="logo-header">
-            <h2>SCRBL 2.0 - AI Assisted Care Plan Drafts in Minutes</h2>
-          </div>
-          ${sanitizedHtml}
-        </body>
-      </html>
-    `;
-    
-    const blob = new Blob([htmlWithLogo], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${plan.clientName || 'care-plan'}-${new Date(plan.saveDate).toISOString().split('T')[0]}.doc`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // Use shared export utility which includes extracted facts
+    // Note: extractedFacts is normalized to an object in handleViewPlan
+    exportToWord(
+      plan.clientName, 
+      sanitizedHtml, 
+      plan.extractedFacts as ExtractedFacts | null
+    );
     
     toast({
       title: "Word Export Complete",
@@ -369,24 +347,24 @@ export default function SavedPlans() {
         
         <div style="margin-bottom: 20px;">
           <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Client Details</h3>
-          <p><strong>Name:</strong> ${escapeHtml(facts.clientDetails?.name) || "Not documented"}</p>
-          <p><strong>Language:</strong> ${escapeHtml(facts.clientDetails?.language) || "Not documented"}</p>
+          <p><strong>Name:</strong> ${facts.clientDetails?.name ? escapeHtml(facts.clientDetails.name) : "Not documented"}</p>
+          <p><strong>Language:</strong> ${facts.clientDetails?.language ? escapeHtml(facts.clientDetails.language) : "Not documented"}</p>
           <p><strong>Interpreter Required:</strong> ${facts.clientDetails?.interpreterRequired !== undefined ? (facts.clientDetails?.interpreterRequired ? "Yes" : "No") : "Not documented"}</p>
         </div>
         
         <div style="margin-bottom: 20px;">
           <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Medical Information</h3>
-          <p><strong>GP:</strong> ${escapeHtml(facts.medical?.gp) || "Not documented"}</p>
-          <p><strong>Pharmacy:</strong> ${escapeHtml(facts.medical?.pharmacy) || "Not documented"}</p>
-          <p><strong>Medications:</strong> ${escapeHtml(facts.medical?.medications) || "Not documented"}</p>
-          <p><strong>Allergies:</strong> ${escapeHtml(facts.medical?.allergies) || "Not documented"}</p>
+          <p><strong>GP:</strong> ${facts.medical?.gp ? escapeHtml(facts.medical.gp) : "Not documented"}</p>
+          <p><strong>Pharmacy:</strong> ${facts.medical?.pharmacy ? escapeHtml(facts.medical.pharmacy) : "Not documented"}</p>
+          <p><strong>Medications:</strong> ${facts.medical?.medications ? escapeHtml(facts.medical.medications) : "Not documented"}</p>
+          <p><strong>Allergies:</strong> ${facts.medical?.allergies ? escapeHtml(facts.medical.allergies) : "Not documented"}</p>
         </div>
         
         <div style="margin-bottom: 20px;">
           <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Support Network</h3>
-          <p><strong>Primary Contact:</strong> ${escapeHtml(facts.support?.primaryContact) || "Not documented"}</p>
-          <p><strong>Secondary Contact:</strong> ${escapeHtml(facts.support?.secondaryContact) || "Not documented"}</p>
-          <p><strong>Living Arrangement:</strong> ${escapeHtml(facts.support?.livingArrangement) || "Not documented"}</p>
+          <p><strong>Primary Contact:</strong> ${facts.support?.primaryContact ? escapeHtml(facts.support.primaryContact) : "Not documented"}</p>
+          <p><strong>Secondary Contact:</strong> ${facts.support?.secondaryContact ? escapeHtml(facts.support.secondaryContact) : "Not documented"}</p>
+          <p><strong>Living Arrangement:</strong> ${facts.support?.livingArrangement ? escapeHtml(facts.support.livingArrangement) : "Not documented"}</p>
         </div>
       </div>
     `;
