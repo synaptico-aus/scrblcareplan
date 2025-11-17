@@ -54,7 +54,7 @@ export default function Landing() {
     },
     {
       icon: Shield,
-      title: "100% Compliant",
+      title: "Compliant",
       description: "Meets all Aged Care Quality Standards and Privacy Act requirements"
     },
     {
