@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import scrblLogo from "@assets/scrbl-logo.png";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { FormLabel } from "@/components/ui/form";
 
 export default function Verify2FA() {
   const [, setLocation] = useLocation();
@@ -112,7 +111,7 @@ export default function Verify2FA() {
               </div>
 
               <div className="space-y-2 w-full">
-                <FormLabel className="text-center block">Verification Code</FormLabel>
+                <label className="text-sm font-medium text-center block">Verification Code</label>
                 <div className="flex justify-center">
                   <InputOTP
                     maxLength={6}
