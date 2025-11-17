@@ -358,10 +358,11 @@ export default function Settings() {
       }
       return response.json();
     },
-    onSuccess: async (updatedUser) => {
+    onSuccess: async (response) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       await refetchUser();
-      // Reset form with updated values
+      // Reset form with updated values from response
+      const updatedUser = response.user;
       form.reset({
         firstName: updatedUser.firstName || "",
         lastName: updatedUser.lastName || "",
