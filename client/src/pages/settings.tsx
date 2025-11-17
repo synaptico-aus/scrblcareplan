@@ -343,6 +343,19 @@ export default function Settings() {
     },
   });
 
+  // Update form when user data changes (e.g., after login)
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        firstName: user.firstName || "",
+        lastName: user.lastName || "",
+        email: user.email || "",
+        company: user.company || "",
+        phoneNumber: user.phoneNumber || "",
+      });
+    }
+  }, [user, form]);
+
   const updateProfileMutation = useMutation({
     mutationFn: async (data: UpdateUserProfile) => {
       const response = await fetch("/api/auth/me", {
