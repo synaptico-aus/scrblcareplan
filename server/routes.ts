@@ -81,8 +81,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
+            company: user.company,
+            phoneNumber: user.phoneNumber,
             role: user.role,
-            organizationId: user.organizationId
+            organizationId: user.organizationId,
+            monthlyPlanLimit: user.monthlyPlanLimit,
+            plansGeneratedThisMonth: user.plansGeneratedThisMonth
           }
         });
       });
@@ -142,8 +146,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
+            company: user.company,
+            phoneNumber: user.phoneNumber,
             role: user.role,
-            organizationId: user.organizationId
+            organizationId: user.organizationId,
+            monthlyPlanLimit: user.monthlyPlanLimit,
+            plansGeneratedThisMonth: user.plansGeneratedThisMonth
           }
         });
       });
@@ -394,8 +402,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          company: user.company,
+          phoneNumber: user.phoneNumber,
           role: user.role,
-          organizationId: user.organizationId
+          organizationId: user.organizationId,
+          monthlyPlanLimit: user.monthlyPlanLimit,
+          plansGeneratedThisMonth: user.plansGeneratedThisMonth
         }
       });
     } catch (error) {
