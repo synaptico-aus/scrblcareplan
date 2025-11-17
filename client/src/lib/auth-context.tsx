@@ -67,19 +67,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const login = async (email: string, password: string) => {
-    const response = await apiRequest("POST", "/api/auth/login", {
-      email,
-      password,
-    });
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.message || "Login failed");
-    }
 
-    const data = await response.json();
-    setUser(data.user);
-    setIsProfileComplete(checkProfileComplete(data.user));
+      // Check if 2FA is required (401 with requiresTwoFactor flag)
+      if (!response.ok && data.requiresTwoFactor) {
+        throw new Error("Two-factor authentication required");
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || "Login failed");
+      }
+
+      setUser(data.user);
+      setIsProfileComplete(checkProfileComplete(data.user));
+    } catch (error) {
+      throw error;
+    }
   };
 
   const logout = async () => {
