@@ -172,17 +172,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user as User;
       const session = req.session as any;
       
-      // Debug: Compare session user with fresh database lookup
-      const freshUser = await storage.getUser(user.id);
-      
-      if (freshUser) {
-        console.log('Session user vs Fresh DB user comparison:');
-        console.log(`Session - firstName: "${user.firstName}" | Fresh - firstName: "${freshUser.firstName}"`);
-        console.log(`Session - lastName: "${user.lastName}" | Fresh - lastName: "${freshUser.lastName}"`);
-        console.log(`Session - company: "${user.company}" | Fresh - company: "${freshUser.company}"`);
-        console.log(`Session - phoneNumber: "${user.phoneNumber}" | Fresh - phoneNumber: "${freshUser.phoneNumber}"`);
-      }
-      
       res.json({
         isAuthenticated: true,
         user: {
@@ -235,8 +224,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error("Session update error after profile update:", err);
           return res.status(500).json({ message: "Profile updated but session refresh failed" });
         }
-        
-        console.log(`Profile updated successfully for user ${fullUser.id}, session refreshed`);
         
         res.json({
           user: {
@@ -788,7 +775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template } = validatedData;
       const organizationId = getOrganizationId(req);
-      const userId = req.user!.id;
+      const userId = (req.user as User).id;
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -909,7 +896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template, sessionId } = validatedData;
-      const userId = req.user!.id;
+      const userId = (req.user as User).id;
 
       if (template !== "gold-standard") {
         return res.status(400).json({ 
@@ -1015,7 +1002,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript, template, sessionId } = validatedData;
-      const userId = req.user!.id;
+      const userId = (req.user as User).id;
       const organizationId = getOrganizationId(req);
 
       if (template !== "gold-standard") {
@@ -1191,7 +1178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = chatParityRequestSchema.parse(req.body);
       const { clientName, transcript } = validatedData;
-      const userId = req.user!.id;
+      const userId = (req.user as User).id;
       const organizationId = getOrganizationId(req);
 
       // Check user's monthly plan limit
@@ -1670,7 +1657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const organizationId = getOrganizationId(req);
       
-      // Validate and coerce hourlyRate to number or null
+      // Validate hourlyRate as string (PostgreSQL numeric type is stored as string)
       const rateSchema = z.object({
         hourlyRate: z.union([
           z.string().transform(val => {
@@ -1678,9 +1665,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (trimmed === '') return null;
             const parsed = parseFloat(trimmed);
             if (isNaN(parsed)) throw new Error('Invalid number');
-            return parsed;
+            return trimmed; // Keep as string for PostgreSQL numeric type
           }),
-          z.number(),
+          z.number().transform(val => val.toString()), // Convert number to string
           z.null()
         ]).nullable()
       });
