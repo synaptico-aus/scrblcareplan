@@ -12,6 +12,7 @@ import AdminDashboard from "@/pages/admin";
 import Settings from "@/pages/settings";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import Verify2FA from "@/pages/verify-2fa";
 import NotFound from "@/pages/not-found";
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             <Route path="/login" component={Login} />
             <Route path="/register" component={Register} />
             <Route path="/signup" component={Register} />
+            <Route path="/verify-2fa" component={Verify2FA} />
             <Route path="/care-planner">
               <ProtectedRoute>
                 <CarePlanner />

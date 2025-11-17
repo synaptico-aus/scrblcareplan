@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, BookOpen, Shield, FileText, Users, Download, Save, Clock, TrendingUp, Award } from "lucide-react";
+import { ArrowLeft, BookOpen, Shield, FileText, Users, Download, Save, Clock, TrendingUp, Award, KeyRound, CheckCircle2, Copy, QrCode } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import scrblLogo from "@assets/scrbl-logo.png";
 import { MarkdownUserGuide } from "@/components/MarkdownUserGuide";
@@ -18,6 +18,303 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+
+// Two-Factor Authentication Settings Component
+function TwoFactorSettingsCard() {
+  const { toast } = useToast();
+  const [showSetupDialog, setShowSetupDialog] = useState(false);
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const [qrCode, setQrCode] = useState<string | null>(null);
+  const [secret, setSecret] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [disablePassword, setDisablePassword] = useState("");
+
+  // Check 2FA status
+  const { data: statusData, isLoading: statusLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: ['/api/2fa/status'],
+  });
+
+  // Setup 2FA (get QR code)
+  const setupMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('/api/2fa/setup', 'POST');
+      return response as { secret: string; qrCode: string; otpauthURL: string };
+    },
+    onSuccess: (data) => {
+      setQrCode(data.qrCode);
+      setSecret(data.secret);
+      setShowSetupDialog(true);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Setup Failed",
+        description: error.message || "Failed to setup 2FA",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Enable 2FA (verify code)
+  const enableMutation = useMutation({
+    mutationFn: async (token: string) => {
+      return await apiRequest('/api/2fa/enable', 'POST', { token });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/2fa/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      setShowSetupDialog(false);
+      setVerificationCode("");
+      setQrCode(null);
+      setSecret(null);
+      toast({
+        title: "2FA Enabled",
+        description: "Two-factor authentication has been enabled successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Verification Failed",
+        description: error.message || "Invalid verification code",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Disable 2FA
+  const disableMutation = useMutation({
+    mutationFn: async (password: string) => {
+      return await apiRequest('/api/2fa/disable', 'POST', { password });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/2fa/status'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      setShowDisableDialog(false);
+      setDisablePassword("");
+      toast({
+        title: "2FA Disabled",
+        description: "Two-factor authentication has been disabled",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Disable Failed",
+        description: error.message || "Failed to disable 2FA",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSetup = () => {
+    setupMutation.mutate();
+  };
+
+  const handleVerify = () => {
+    if (verificationCode.length === 6) {
+      enableMutation.mutate(verificationCode);
+    }
+  };
+
+  const handleDisable = () => {
+    if (disablePassword) {
+      disableMutation.mutate(disablePassword);
+    }
+  };
+
+  const copySecret = () => {
+    if (secret) {
+      navigator.clipboard.writeText(secret);
+      toast({
+        title: "Copied",
+        description: "Secret key copied to clipboard",
+      });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center">
+              <KeyRound className="mr-2 h-5 w-5" />
+              Two-Factor Authentication
+            </CardTitle>
+            <CardDescription>
+              Add an extra layer of security to your account
+            </CardDescription>
+          </div>
+          {!statusLoading && (
+            <Badge variant={statusData?.enabled ? "default" : "secondary"}>
+              {statusData?.enabled ? "Enabled" : "Disabled"}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          Two-factor authentication adds an additional layer of security by requiring a code from your authenticator app when you sign in.
+        </p>
+
+        {statusData?.enabled ? (
+          <Button
+            variant="destructive"
+            onClick={() => setShowDisableDialog(true)}
+            data-testid="button-disable-2fa"
+          >
+            <Shield className="mr-2 h-4 w-4" />
+            Disable 2FA
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSetup}
+            disabled={setupMutation.isPending}
+            data-testid="button-setup-2fa"
+          >
+            <KeyRound className="mr-2 h-4 w-4" />
+            {setupMutation.isPending ? "Setting up..." : "Set up 2FA"}
+          </Button>
+        )}
+
+        {/* Setup Dialog */}
+        <Dialog open={showSetupDialog} onOpenChange={setShowSetupDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Set up Two-Factor Authentication</DialogTitle>
+              <DialogDescription>
+                Scan the QR code with your authenticator app (Google Authenticator, Microsoft Authenticator, Authy, etc.)
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {/* QR Code */}
+              {qrCode && (
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="p-4 bg-white rounded-lg border">
+                    <img src={qrCode} alt="2FA QR Code" className="w-48 h-48" />
+                  </div>
+                  
+                  {/* Manual Entry */}
+                  <div className="w-full space-y-2">
+                    <p className="text-sm font-medium">Or enter this code manually:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 p-2 bg-muted rounded text-sm font-mono break-all">
+                        {secret}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={copySecret}
+                        data-testid="button-copy-secret"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Verification */}
+                  <div className="w-full space-y-2">
+                    <FormLabel>Enter the 6-digit code from your app</FormLabel>
+                    <div className="flex justify-center">
+                      <InputOTP
+                        maxLength={6}
+                        value={verificationCode}
+                        onChange={setVerificationCode}
+                        data-testid="input-2fa-code"
+                      >
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSetupDialog(false);
+                  setVerificationCode("");
+                  setQrCode(null);
+                  setSecret(null);
+                }}
+                data-testid="button-cancel-2fa"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleVerify}
+                disabled={verificationCode.length !== 6 || enableMutation.isPending}
+                data-testid="button-verify-2fa"
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                {enableMutation.isPending ? "Verifying..." : "Verify & Enable"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Disable Dialog */}
+        <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Disable Two-Factor Authentication</DialogTitle>
+              <DialogDescription>
+                Enter your password to confirm disabling 2FA
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <Input
+                  type="password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                  placeholder="Enter your password"
+                  data-testid="input-disable-password"
+                />
+              </FormItem>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDisableDialog(false);
+                  setDisablePassword("");
+                }}
+                data-testid="button-cancel-disable"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDisable}
+                disabled={!disablePassword || disableMutation.isPending}
+                data-testid="button-confirm-disable"
+              >
+                {disableMutation.isPending ? "Disabling..." : "Disable 2FA"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const { user, refetchUser } = useAuth();
@@ -625,6 +922,9 @@ export default function Settings() {
               </Form>
             </CardContent>
           </Card>
+
+          {/* Two-Factor Authentication */}
+          <TwoFactorSettingsCard />
 
           {/* Privacy & Security Policy */}
           <Card>

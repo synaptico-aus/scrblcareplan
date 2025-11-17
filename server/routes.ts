@@ -13,6 +13,8 @@ import { z } from "zod";
 import { ObjectStorageService } from "./objectStorage";
 import { uploadFile, getFile, deleteFile, listFiles } from "./services/s3";
 import multer from "multer";
+import { TOTP, Secret } from "otpauth";
+import QRCode from "qrcode";
 
 // Event emitter for real-time updates
 const eventEmitter = new EventEmitter();
@@ -105,12 +107,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: info?.message || "Invalid email or password" });
       }
 
+      // Check if user has 2FA enabled
+      if (user.twoFactorEnabled === "true") {
+        // Store user ID in session temporarily (for 2FA verification)
+        // Complete the Passport login so session is established
+        req.login(user, (loginErr) => {
+          if (loginErr) {
+            console.error("Session creation error for 2FA:", loginErr);
+            return res.status(500).json({ message: "Login failed" });
+          }
+          
+          const session = req.session as any;
+          session.pendingUserId = user.id;
+          session.requires2FA = true;
+          
+          return res.status(401).json({
+            requiresTwoFactor: true,
+            message: "Two-factor authentication required"
+          });
+        });
+        return;
+      }
+
+      // No 2FA required, proceed with normal login
       req.login(user, (err) => {
         if (err) {
           console.error("Session login error:", err);
           return res.status(500).json({ message: "Login failed" });
         }
         res.json({
+          requiresTwoFactor: false,
           user: {
             id: user.id,
             email: user.email,
@@ -214,6 +240,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error updating user profile:", error);
       res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  // 2FA routes
+  app.get("/api/2fa/status", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      res.json({
+        enabled: user.twoFactorEnabled === "true"
+      });
+    } catch (error) {
+      console.error("Error checking 2FA status:", error);
+      res.status(500).json({ message: "Failed to check 2FA status" });
+    }
+  });
+
+  app.post("/api/2fa/setup", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+
+      // Generate a random secret
+      const secret = new Secret({ size: 20 });
+
+      // Create TOTP instance
+      const totp = new TOTP({
+        issuer: "SCRBL 2.0",
+        label: user.email,
+        algorithm: "SHA1",
+        digits: 6,
+        period: 30,
+        secret: secret
+      });
+
+      // Generate otpauth:// URL for QR code
+      const otpauthURL = totp.toString();
+
+      // Generate QR code as data URL
+      const qrCodeDataURL = await QRCode.toDataURL(otpauthURL);
+
+      // Save secret to user (but don't enable yet - that happens after verification)
+      await storage.update2FASecret(user.id, secret.base32);
+
+      res.json({
+        secret: secret.base32,
+        qrCode: qrCodeDataURL,
+        otpauthURL: otpauthURL
+      });
+    } catch (error) {
+      console.error("Error setting up 2FA:", error);
+      res.status(500).json({ message: "Failed to setup 2FA" });
+    }
+  });
+
+  app.post("/api/2fa/enable", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { token } = req.body;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Token is required" });
+      }
+
+      // Get the user's secret
+      const currentUser = await storage.getUser(user.id);
+      if (!currentUser || !currentUser.twoFactorSecret) {
+        return res.status(400).json({ message: "Please setup 2FA first" });
+      }
+
+      // Create TOTP instance with saved secret
+      const totp = new TOTP({
+        algorithm: "SHA1",
+        digits: 6,
+        period: 30,
+        secret: Secret.fromBase32(currentUser.twoFactorSecret)
+      });
+
+      // Validate token
+      const delta = totp.validate({ token, window: 2 });
+
+      if (delta === null) {
+        return res.status(401).json({ message: "Invalid verification code" });
+      }
+
+      // Enable 2FA
+      await storage.enable2FA(user.id, currentUser.twoFactorSecret);
+
+      res.json({ success: true, message: "2FA enabled successfully" });
+    } catch (error) {
+      console.error("Error enabling 2FA:", error);
+      res.status(500).json({ message: "Failed to enable 2FA" });
+    }
+  });
+
+  app.post("/api/2fa/verify", async (req, res) => {
+    try {
+      const { token } = req.body;
+
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Token is required" });
+      }
+
+      // Get userId from session
+      const session = req.session as any;
+      const userId = session.pendingUserId;
+
+      if (!userId) {
+        return res.status(400).json({ message: "No pending 2FA verification. Please log in again." });
+      }
+
+      // Get the user
+      const user = await storage.getUser(userId);
+      if (!user || !user.twoFactorSecret || user.twoFactorEnabled !== "true") {
+        return res.status(400).json({ message: "2FA not enabled for this user" });
+      }
+
+      // Create TOTP instance with saved secret
+      const totp = new TOTP({
+        algorithm: "SHA1",
+        digits: 6,
+        period: 30,
+        secret: Secret.fromBase32(user.twoFactorSecret)
+      });
+
+      // Validate token
+      const delta = totp.validate({ token, window: 2 });
+
+      if (delta === null) {
+        return res.status(401).json({ message: "Invalid verification code" });
+      }
+
+      // Clear pending 2FA flags and mark as verified
+      delete session.pendingUserId;
+      delete session.requires2FA;
+      session.twoFactorVerified = true;
+
+      res.json({
+        success: true,
+        message: "2FA verified successfully",
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          organizationId: user.organizationId
+        }
+      });
+    } catch (error) {
+      console.error("Error verifying 2FA:", error);
+      res.status(500).json({ message: "Failed to verify 2FA" });
+    }
+  });
+
+  app.post("/api/2fa/disable", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ message: "Password is required to disable 2FA" });
+      }
+
+      // Verify password
+      const currentUser = await storage.getUser(user.id);
+      if (!currentUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, currentUser.passwordHash);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "Invalid password" });
+      }
+
+      // Disable 2FA
+      await storage.disable2FA(user.id);
+
+      res.json({ success: true, message: "2FA disabled successfully" });
+    } catch (error) {
+      console.error("Error disabling 2FA:", error);
+      res.status(500).json({ message: "Failed to disable 2FA" });
     }
   });
 

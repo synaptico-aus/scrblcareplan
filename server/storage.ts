@@ -20,6 +20,11 @@ export interface IStorage {
   incrementUserPlanCount(userId: string): Promise<void>;
   checkAndResetUserPlanCount(userId: string): Promise<{ canGenerate: boolean; remainingPlans: number | null }>;
   
+  // 2FA operations
+  enable2FA(userId: string, secret: string): Promise<User | undefined>;
+  disable2FA(userId: string): Promise<User | undefined>;
+  update2FASecret(userId: string, secret: string): Promise<User | undefined>;
+  
   // Care analysis operations (organization-scoped)
   createCareAnalysis(organizationId: string, analysis: InsertCareAnalysis & { extractedFacts?: any; generatedHtml?: string }): Promise<CareAnalysis>;
   getCareAnalysis(organizationId: string, id: string): Promise<CareAnalysis | undefined>;
@@ -166,6 +171,44 @@ export class DatabaseStorage implements IStorage {
       canGenerate: remaining > 0,
       remainingPlans: Math.max(remaining, 0)
     };
+  }
+
+  async enable2FA(userId: string, secret: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        twoFactorSecret: secret,
+        twoFactorEnabled: "true",
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async disable2FA(userId: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        twoFactorSecret: null,
+        twoFactorEnabled: "false",
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
+  }
+
+  async update2FASecret(userId: string, secret: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        twoFactorSecret: secret,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return user || undefined;
   }
 
   async createCareAnalysis(organizationId: string, analysis: InsertCareAnalysis & { extractedFacts?: any; generatedHtml?: string }): Promise<CareAnalysis> {

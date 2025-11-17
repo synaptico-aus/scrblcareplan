@@ -36,6 +36,8 @@ export const users = pgTable("users", {
   monthlyPlanLimit: integer("monthly_plan_limit"), // null = unlimited
   plansGeneratedThisMonth: integer("plans_generated_this_month").notNull().default(0),
   limitResetDate: timestamp("limit_reset_date"),
+  twoFactorSecret: varchar("two_factor_secret"), // base32 encoded TOTP secret
+  twoFactorEnabled: varchar("two_factor_enabled").notNull().default("false"), // "true" or "false" as string
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
