@@ -220,7 +220,7 @@ function TwoFactorSettingsCard() {
 
                   {/* Verification */}
                   <div className="w-full space-y-2">
-                    <FormLabel>Enter the 6-digit code from your app</FormLabel>
+                    <label className="text-sm font-medium">Enter the 6-digit code from your app</label>
                     <div className="flex justify-center">
                       <InputOTP
                         maxLength={6}
@@ -279,8 +279,8 @@ function TwoFactorSettingsCard() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
-              <FormItem>
-                <FormLabel>Password</FormLabel>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Password</label>
                 <Input
                   type="password"
                   value={disablePassword}
@@ -288,7 +288,7 @@ function TwoFactorSettingsCard() {
                   placeholder="Enter your password"
                   data-testid="input-disable-password"
                 />
-              </FormItem>
+              </div>
             </div>
 
             <DialogFooter>
