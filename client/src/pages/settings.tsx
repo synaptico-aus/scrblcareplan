@@ -40,8 +40,8 @@ function TwoFactorSettingsCard() {
   // Setup 2FA (get QR code)
   const setupMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('/api/2fa/setup', 'POST');
-      return response as { secret: string; qrCode: string; otpauthURL: string };
+      const response = await apiRequest('POST', '/api/2fa/setup');
+      return await response.json() as { secret: string; qrCode: string; otpauthURL: string };
     },
     onSuccess: (data) => {
       setQrCode(data.qrCode);
@@ -60,7 +60,8 @@ function TwoFactorSettingsCard() {
   // Enable 2FA (verify code)
   const enableMutation = useMutation({
     mutationFn: async (token: string) => {
-      return await apiRequest('/api/2fa/enable', 'POST', { token });
+      const response = await apiRequest('POST', '/api/2fa/enable', { token });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/2fa/status'] });
@@ -86,7 +87,8 @@ function TwoFactorSettingsCard() {
   // Disable 2FA
   const disableMutation = useMutation({
     mutationFn: async (password: string) => {
-      return await apiRequest('/api/2fa/disable', 'POST', { password });
+      const response = await apiRequest('POST', '/api/2fa/disable', { password });
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/2fa/status'] });
@@ -356,9 +358,17 @@ export default function Settings() {
       }
       return response.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       await refetchUser();
+      // Reset form with updated values
+      form.reset({
+        firstName: updatedUser.firstName || "",
+        lastName: updatedUser.lastName || "",
+        email: updatedUser.email || "",
+        company: updatedUser.company || "",
+        phoneNumber: updatedUser.phoneNumber || "",
+      });
       toast({
         title: "Profile Updated",
         description: "Your profile has been updated successfully.",
