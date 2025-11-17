@@ -47,8 +47,9 @@ export default function Login() {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Login failed";
       
-      // Check if error is due to 2FA requirement
-      if (errorMessage.includes("2FA") || errorMessage.includes("two-factor")) {
+      // Check if error is due to 2FA requirement (case-insensitive)
+      const lowerMessage = errorMessage.toLowerCase();
+      if (lowerMessage.includes("2fa") || lowerMessage.includes("two-factor")) {
         toast({
           title: "2FA Required",
           description: "Please enter your authentication code",
