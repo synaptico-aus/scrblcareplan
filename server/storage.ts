@@ -70,12 +70,52 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        passwordHash: users.passwordHash,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        company: users.company,
+        phoneNumber: users.phoneNumber,
+        organizationId: users.organizationId,
+        role: users.role,
+        monthlyPlanLimit: users.monthlyPlanLimit,
+        plansGeneratedThisMonth: users.plansGeneratedThisMonth,
+        limitResetDate: users.limitResetDate,
+        twoFactorSecret: users.twoFactorSecret,
+        twoFactorEnabled: users.twoFactorEnabled,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.id, id));
     return user || undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        passwordHash: users.passwordHash,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        company: users.company,
+        phoneNumber: users.phoneNumber,
+        organizationId: users.organizationId,
+        role: users.role,
+        monthlyPlanLimit: users.monthlyPlanLimit,
+        plansGeneratedThisMonth: users.plansGeneratedThisMonth,
+        limitResetDate: users.limitResetDate,
+        twoFactorSecret: users.twoFactorSecret,
+        twoFactorEnabled: users.twoFactorEnabled,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      })
+      .from(users)
+      .where(eq(users.email, email));
     return user || undefined;
   }
 

@@ -17,7 +17,24 @@ export function setupPassport() {
       async (email, password, done) => {
         try {
           const [user] = await db
-            .select()
+            .select({
+              id: users.id,
+              email: users.email,
+              passwordHash: users.passwordHash,
+              firstName: users.firstName,
+              lastName: users.lastName,
+              company: users.company,
+              phoneNumber: users.phoneNumber,
+              organizationId: users.organizationId,
+              role: users.role,
+              monthlyPlanLimit: users.monthlyPlanLimit,
+              plansGeneratedThisMonth: users.plansGeneratedThisMonth,
+              limitResetDate: users.limitResetDate,
+              twoFactorSecret: users.twoFactorSecret,
+              twoFactorEnabled: users.twoFactorEnabled,
+              createdAt: users.createdAt,
+              updatedAt: users.updatedAt,
+            })
             .from(users)
             .where(eq(users.email, email))
             .limit(1);

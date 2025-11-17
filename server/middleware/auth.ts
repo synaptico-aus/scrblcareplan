@@ -50,6 +50,14 @@ export function requireProfileComplete(req: Request, res: Response, next: NextFu
   }
 
   const user = req.user as User;
+  
+  // Debug logging to identify missing fields
+  console.log(`Profile check for user ${user.email}:`);
+  console.log(`  firstName: "${user.firstName}" (${typeof user.firstName})`);
+  console.log(`  lastName: "${user.lastName}" (${typeof user.lastName})`);
+  console.log(`  company: "${user.company}" (${typeof user.company})`);
+  console.log(`  phoneNumber: "${user.phoneNumber}" (${typeof user.phoneNumber})`);
+  
   const isComplete = !!(
     user.firstName &&
     user.lastName &&
@@ -59,6 +67,14 @@ export function requireProfileComplete(req: Request, res: Response, next: NextFu
   );
 
   if (!isComplete) {
+    const missing = [];
+    if (!user.firstName) missing.push('firstName');
+    if (!user.lastName) missing.push('lastName');
+    if (!user.email) missing.push('email');
+    if (!user.company) missing.push('company');
+    if (!user.phoneNumber) missing.push('phoneNumber');
+    console.log(`  Profile INCOMPLETE - Missing: ${missing.join(', ')}`);
+    
     res.status(403).json({ 
       message: "Profile incomplete - Please complete your profile information (First Name, Last Name, Email, Company, and Phone Number) in Settings before generating care plans.",
       requiresProfileCompletion: true
@@ -66,6 +82,7 @@ export function requireProfileComplete(req: Request, res: Response, next: NextFu
     return;
   }
 
+  console.log(`  Profile COMPLETE ✓`);
   next();
 }
 

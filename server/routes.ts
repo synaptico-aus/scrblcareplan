@@ -159,10 +159,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get("/api/auth/me", (req, res) => {
+  app.get("/api/auth/me", async (req, res) => {
     if (req.isAuthenticated()) {
       const user = req.user as User;
       const session = req.session as any;
+      
+      // Debug: Compare session user with fresh database lookup
+      const freshUser = await storage.getUser(user.id);
+      
+      if (freshUser) {
+        console.log('Session user vs Fresh DB user comparison:');
+        console.log(`Session - firstName: "${user.firstName}" | Fresh - firstName: "${freshUser.firstName}"`);
+        console.log(`Session - lastName: "${user.lastName}" | Fresh - lastName: "${freshUser.lastName}"`);
+        console.log(`Session - company: "${user.company}" | Fresh - company: "${freshUser.company}"`);
+        console.log(`Session - phoneNumber: "${user.phoneNumber}" | Fresh - phoneNumber: "${freshUser.phoneNumber}"`);
+      }
       
       res.json({
         isAuthenticated: true,
