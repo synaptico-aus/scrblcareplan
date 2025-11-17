@@ -54,6 +54,7 @@ When you register for SCRBL 2.0, we collect:
 - **Organization Information**: Company name, organization identifier
 - **Professional Details**: Phone number, professional credentials
 - **Authentication Data**: Encrypted passwords (using bcrypt hashing)
+- **Two-Factor Authentication Data**: Optional TOTP secrets (encrypted, base32 encoded) stored securely when 2FA is enabled
 - **Session Data**: Login times, IP addresses for security monitoring
 
 ### Care Plan Data
@@ -141,9 +142,13 @@ SCRBL 2.0 implements industry-standard security practices:
 
 #### Access Controls
 - **Authentication**: Email/password authentication with secure session management
+- **Two-Factor Authentication (2FA)**: Optional TOTP-based 2FA using standard authenticator apps (Google Authenticator, Microsoft Authenticator, Authy)
+  - Session-based verification to prevent privilege escalation
+  - 30-second time window with clock drift tolerance
+  - Password required to disable 2FA
+  - Secrets stored encrypted in database
 - **Authorization**: Role-based access control (Super Admin, Admin, User)
 - **Session Management**: Automatic session expiration, secure cookie settings
-- **Multi-Factor Options**: Available for enhanced security (contact support)
 
 #### Database Security
 - **Isolation**: Complete data separation between organizations

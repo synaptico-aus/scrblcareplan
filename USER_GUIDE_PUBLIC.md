@@ -10,14 +10,15 @@
 
 1. [Welcome to SCRBL 2.0](#welcome-to-scrbl-20)
 2. [Getting Started](#getting-started)
-3. [Creating Care Plans](#creating-care-plans)
-4. [Understanding Your Care Plans](#understanding-your-care-plans)
-5. [Saving and Managing Plans](#saving-and-managing-plans)
-6. [Exporting Care Plans](#exporting-care-plans)
-7. [Managing Client Documents](#managing-client-documents)
-8. [Admin Features](#admin-features)
-9. [Troubleshooting](#troubleshooting)
-10. [Privacy and Compliance](#privacy-and-compliance)
+3. [Account Security](#account-security)
+4. [Creating Care Plans](#creating-care-plans)
+5. [Understanding Your Care Plans](#understanding-your-care-plans)
+6. [Saving and Managing Plans](#saving-and-managing-plans)
+7. [Exporting Care Plans](#exporting-care-plans)
+8. [Managing Client Documents](#managing-client-documents)
+9. [Admin Features](#admin-features)
+10. [Troubleshooting](#troubleshooting)
+11. [Privacy and Compliance](#privacy-and-compliance)
 
 ---
 
@@ -101,6 +102,84 @@ Complete profile information ensures:
 - Care plans include accurate contact information for the care professional
 - Your organization can track which team member created each plan
 - Compliance with quality assurance and accountability requirements
+
+---
+
+## Account Security
+
+### Two-Factor Authentication (2FA)
+
+Two-factor authentication adds an extra layer of security to your account by requiring both your password AND a 6-digit code from your phone when you log in.
+
+**Why Use 2FA?**
+
+- **Enhanced Security**: Protects your account even if someone learns your password
+- **Client Data Protection**: Extra safeguard for sensitive client information
+- **Compliance**: Demonstrates commitment to data security and privacy
+- **Peace of Mind**: Your account is protected even if you lose your password
+
+**How 2FA Works:**
+
+When 2FA is enabled, logging in requires:
+1. **Something you know**: Your password
+2. **Something you have**: Your phone with an authenticator app
+
+This means even if someone steals your password, they can't access your account without your phone.
+
+**Setting Up 2FA:**
+
+1. Go to Settings & Help (click your name in the top-right corner)
+2. Scroll to the "Two-Factor Authentication" section
+3. Click "Set up 2FA"
+4. **Scan the QR code** with your authenticator app:
+   - Google Authenticator (Android/iOS)
+   - Microsoft Authenticator (Android/iOS)
+   - Authy (Android/iOS/Desktop)
+   - Any TOTP-compatible authenticator app
+5. **Or manually enter the code** if you can't scan the QR code
+6. Enter the 6-digit code from your app to verify
+7. Click "Verify & Enable"
+
+**Logging In with 2FA:**
+
+Once 2FA is enabled:
+1. Enter your email and password as usual
+2. You'll be automatically redirected to a verification page
+3. Open your authenticator app and find the SCRBL 2.0 entry
+4. Enter the current 6-digit code (codes refresh every 30 seconds)
+5. You'll be logged in!
+
+**Important Notes:**
+
+- **Keep your authenticator app safe** - If you lose access to it, you won't be able to log in
+- **Codes change every 30 seconds** - Make sure to enter the current code
+- **You must enter BOTH password and code** - This is what makes it "two-factor"
+
+**Disabling 2FA:**
+
+If you need to disable 2FA:
+1. Go to Settings & Help
+2. Scroll to "Two-Factor Authentication"
+3. Click "Disable 2FA"
+4. Enter your password to confirm
+5. Click "Disable 2FA"
+
+**Warning**: Disabling 2FA makes your account less secure. Only disable if absolutely necessary.
+
+**Troubleshooting 2FA:**
+
+**"Invalid verification code" error:**
+- Make sure you're entering the current code (not an expired one)
+- Check that your phone's time is set correctly (authenticator apps rely on accurate time)
+- Try the next code if the current one doesn't work
+
+**"No pending 2FA verification" error:**
+- Start the login process again from the login page
+- Make sure you entered your password correctly first
+
+**Lost access to your authenticator app:**
+- Contact your organization's administrator for assistance
+- They can help you regain access to your account
 
 ---
 

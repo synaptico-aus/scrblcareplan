@@ -49,6 +49,12 @@ The backend implements a service-oriented architecture with separate services fo
 
 ### Authentication and Authorization
 - **Authentication System**: Multi-tenant Passport.js local strategy with bcrypt password hashing (10 rounds)
+- **Two-Factor Authentication (2FA)**: TOTP-based 2FA using otpauth and qrcode libraries
+  - Works with standard authenticator apps (Google Authenticator, Microsoft Authenticator, Authy)
+  - Session-based verification flow to prevent privilege escalation
+  - 30-second TOTP window with 2-step tolerance for clock drift
+  - Password confirmation required to disable 2FA
+  - Database fields: `twoFactorSecret` (base32 encoded), `twoFactorEnabled` (string flag)
 - **Session Management**: PostgreSQL-backed sessions with secure cookies
 - **Authorization**: Role-based access control (super_admin/admin/user roles)
 - **Data Isolation**: Complete organization-level data scoping enforced at storage layer
@@ -121,6 +127,18 @@ The application maintains two separate user guide files:
 This separation ensures that users get helpful documentation while protecting proprietary implementation details from being exposed.
 
 ## Recent Updates
+
+### Two-Factor Authentication (November 2025)
+- **Complete 2FA Implementation**: Added TOTP-based two-factor authentication using otpauth and qrcode libraries
+  - Setup flow: QR code generation → scan with authenticator app → verify code → enable
+  - Login flow: password authentication → session-based 2FA check → redirect to verification → complete login
+  - Database schema: Added `twoFactorSecret` and `twoFactorEnabled` columns to users table
+  - API endpoints: `/api/2fa/setup`, `/api/2fa/enable`, `/api/2fa/verify`, `/api/2fa/disable`
+  - Security model: Session-based pendingUserId (no client-side storage), password required to disable
+  - Settings UI: TwoFactorSettingsCard component with QR display, status badges, setup/disable flows
+  - Verification page: Dedicated `/verify-2fa` route with 6-digit OTP input and auto-submit
+- **Database Migration**: Created manual migration script (`scripts/apply-2fa-migration.ts`) to add 2FA columns
+- **User Documentation**: Updated USER_GUIDE_PUBLIC.md with comprehensive 2FA setup and troubleshooting guide
 
 ### Pre-Deployment Cleanup (November 2025)
 - **Code Audit**: Comprehensive pre-deployment security and code quality audit completed
