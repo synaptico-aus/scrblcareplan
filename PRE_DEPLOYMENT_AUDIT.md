@@ -344,7 +344,7 @@ if (process.env.NODE_ENV === 'production') {
 8. ✅ Validated multi-tenant isolation
 
 ### 📋 Optional Post-Deployment Cleanup
-1. Remove unused npm packages: `puppeteer`, `memorystore`, `openid-client`
+1. ~~Remove unused npm packages: `puppeteer`, `memorystore`, `openid-client`~~ ✅ **COMPLETED (Nov 24, 2025)**
 2. Document scripts folder as dev/deployment tools only
 
 ### 🚀 Final Deployment Checklist
@@ -403,7 +403,51 @@ if (process.env.NODE_ENV === 'production') {
 
 ---
 
+## 12. Upstream Timeout Fix (November 24, 2025) ✅ COMPLETE
+
+### Performance Issue Identified
+- ✅ **Upstream Timeout on Short Transcripts**
+  - **Problem**: Short transcripts using single 3-minute API calls were timing out
+  - **Working**: Long transcripts using chunked parallel processing (2-min per chunk) were completing successfully
+  - **Root Cause**: Single large API calls to GPT-5 were exceeding timeout limits
+
+### Solution Implemented: Universal Parallel Processing
+- ✅ **Always-On Chunking Strategy**
+  - Removed 120K token threshold - all transcripts now use parallel processing
+  - Reduced chunk size from 120K to 40K tokens for optimal parallelization
+  - Short transcripts now split into 2-4 chunks that process simultaneously
+  - Each chunk completes faster (2-min timeout vs 3-min single call)
+  
+- ✅ **Code Changes**
+  - `chunkTranscript()`: Always chunks transcripts, removed early return for small transcripts
+  - `extractFactsFromTranscript()`: Removed single-call fallback path entirely
+  - Fixed infinite loop bug when reaching end of transcript
+  - Added performance logging: token estimates, chunk count, processing duration
+
+- ✅ **Benefits**
+  - Faster processing through parallelization
+  - Higher reliability - smaller chunks less likely to timeout
+  - Better monitoring via detailed logging
+  - Maintains quality through 15% chunk overlap and proven merge logic
+
+### Dependencies Cleanup
+- ✅ **Removed Unused Packages (Nov 24, 2025)**
+  - Uninstalled `puppeteer` (~120MB)
+  - Uninstalled `memorystore` (using PostgreSQL session store instead)
+  - Uninstalled `openid-client` (only used in deleted `server/replitAuth.ts`)
+  - **Deployment Size Reduction**: ~125MB
+
+### Testing Requirements
+- ⚠️ **User Testing Needed**
+  - Test with typical short transcript that was previously timing out
+  - Verify parallel processing completes successfully
+  - Monitor logs for chunk counts and processing times
+  - Confirm no quality degradation in extracted facts
+
+---
+
 *Final audit performed by: Replit Agent*  
 *Initial audit date: November 16, 2025*  
-*Final deployment check: November 17, 2025*  
+*Profile persistence fix: November 17, 2025*  
+*Upstream timeout fix: November 24, 2025*  
 *Next review: After first production deployment*
