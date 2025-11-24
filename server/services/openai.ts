@@ -20,20 +20,21 @@ function estimateTokenCount(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-// Enhanced function to chunk transcript intelligently for 80-minute transcripts
-function chunkTranscript(transcript: string, maxTokens: number = 120000): string[] {
+// Enhanced function to chunk transcript intelligently for all transcripts
+// Always chunks to enable reliable parallel processing (prevents upstream timeouts)
+function chunkTranscript(transcript: string, maxTokens: number = 40000): string[] {
   const estimatedTokens = estimateTokenCount(transcript);
   
-  if (estimatedTokens <= maxTokens) {
-    return [transcript];
-  }
+  // Always chunk transcripts for parallel processing reliability
+  // This prevents upstream timeouts on single large API calls
+  console.log(`Chunking transcript: ${estimatedTokens} estimated tokens, target ${maxTokens} per chunk`);
   
   // Preprocess transcript to remove timestamps and clean up
   const cleanedTranscript = preprocessTranscript(transcript);
   
-  // Use intelligent chunking for very long transcripts
+  // Use intelligent chunking for all transcripts
   const chunks: string[] = [];
-  const maxChunkSize = Math.floor(maxTokens * 4 * 0.75); // 75% of max for safety margin
+  const maxChunkSize = Math.floor(maxTokens * 4); // 4 chars per token estimate
   const overlapSize = Math.floor(maxChunkSize * 0.15); // 15% overlap for better context
   
   let start = 0;
@@ -65,9 +66,15 @@ function chunkTranscript(transcript: string, maxTokens: number = 120000): string
       chunks.push(chunk);
     }
     
+    // If we've reached the end of the transcript, break out of the loop
+    if (chunkEnd >= cleanedTranscript.length) {
+      break;
+    }
+    
     start = chunkEnd - overlapSize;
   }
   
+  console.log(`Created ${chunks.length} chunks from transcript`);
   return chunks;
 }
 
@@ -114,113 +121,53 @@ function findSpeakerBreak(text: string, minPos: number, maxPos: number): number 
 
 export async function extractFactsFromTranscript(transcript: string, clientName: string, progressCallback?: (progress: number, stage: string) => void) {
   const startTime = Date.now();
+  const estimatedTokens = estimateTokenCount(transcript);
   
   progressCallback?.(5, 'Analyzing transcript structure');
   
   try {
-    // Check if transcript is too long and needs chunking
+    // Always chunk transcripts for reliable parallel processing
     progressCallback?.(10, 'Preparing transcript for processing');
-    const chunks = chunkTranscript(transcript, 120000); // GPT-5 context limit
+    const chunks = chunkTranscript(transcript, 40000); // Optimal chunk size for parallel processing
     
-    if (chunks.length > 1) {
-      // Process all chunks in parallel for faster extraction
-      progressCallback?.(15, `Processing ${chunks.length} chunks in parallel`);
-      
-      const chunkPromises = chunks.map(async (chunk, i) => {
-        try {
-          return await extractFactsFromChunk(chunk, clientName, i + 1, chunks.length);
-        } catch (error) {
-          console.error(`Error processing chunk ${i + 1}/${chunks.length}:`, error);
-          // Return empty facts object if chunk fails - don't fail entire extraction
-          return {
-            clientDetails: { name: clientName, language: null, interpreterRequired: null },
-            medical: { gp: null, pharmacy: null, equipment: [], medications: null, allergies: null },
-            support: { primaryContact: null, secondaryContact: null, livingArrangement: null },
-            risks: [],
-            preferences: { workerPreferences: null, serviceDeliveryPreferences: null, culturalConsiderations: null }
-          };
-        }
-      });
-      
-      // Wait for all chunks to complete in parallel
-      progressCallback?.(50, `Waiting for ${chunks.length} parallel extractions to complete`);
-      const allFacts = await Promise.all(chunkPromises);
-      
-      // Merge all facts from chunks with enhanced deduplication
-      progressCallback?.(90, 'Merging and deduplicating extracted facts');
-      const mergedFacts = mergeFacts(allFacts);
-      progressCallback?.(100, 'Fact extraction complete');
-      return mergedFacts;
-    }
+    console.log(`Processing transcript: ${estimatedTokens} tokens → ${chunks.length} chunks`);
     
-    // Process single transcript
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
-      messages: [
-        {
-          role: "system",
-          content: `You are an AI care-planning assistant for the Australian home care sector. Extract key facts from assessment transcripts.
-
-Rules:
-- Extract facts that are clearly mentioned or strongly implied in the transcript
-- Ignore IVR menus, timestamps, and administrative questions  
-- Look for: language mentions, communication needs, medical practitioners, equipment, family members, risks, daily routines, mobility aids, mental health mentions
-- Be thorough but accurate - extract information that's actually discussed
-
-Respond with JSON in this exact format:
-{
-  "clientDetails": {
-    "name": "string",
-    "language": "string or null",
-    "interpreterRequired": "boolean or null"
-  },
-  "medical": {
-    "gp": "string or null",
-    "pharmacy": "string or null", 
-    "equipment": ["array of strings or empty"],
-    "medications": "string or null",
-    "allergies": "string or null"
-  },
-  "support": {
-    "primaryContact": "string or null",
-    "secondaryContact": "string or null",
-    "livingArrangement": "string or null"
-  },
-  "risks": [
-    {
-      "type": "string",
-      "description": "string",
-      "severity": "low|medium|high or null"
-    }
-  ],
-  "preferences": {
-    "workerPreferences": "string or null",
-    "serviceDeliveryPreferences": "string or null",
-    "culturalConsiderations": "string or null"
-  }
-}`
-        },
-        {
-          role: "user", 
-          content: `Extract key facts from this assessment transcript. Look for clearly stated information about language, family, medical details, equipment, and social needs.
-
-Client Name: ${clientName}
-
-Transcript:
-${transcript}
-
-Build comprehensive facts from the information discussed, not just isolated details.`
-        }
-      ],
-      response_format: { type: "json_object" },
-    }, {
-      timeout: 180000, // 3 minutes for fact extraction
+    // Process all chunks in parallel for faster extraction and reliability
+    progressCallback?.(15, `Processing ${chunks.length} chunks in parallel`);
+    
+    const chunkPromises = chunks.map(async (chunk, i) => {
+      try {
+        return await extractFactsFromChunk(chunk, clientName, i + 1, chunks.length);
+      } catch (error) {
+        console.error(`Error processing chunk ${i + 1}/${chunks.length}:`, error);
+        // Return empty facts object if chunk fails - don't fail entire extraction
+        return {
+          clientDetails: { name: clientName, language: null, interpreterRequired: null },
+          medical: { gp: null, pharmacy: null, equipment: [], medications: null, allergies: null },
+          support: { primaryContact: null, secondaryContact: null, livingArrangement: null },
+          risks: [],
+          preferences: { workerPreferences: null, serviceDeliveryPreferences: null, culturalConsiderations: null }
+        };
+      }
     });
-
-    const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    // Wait for all chunks to complete in parallel
+    progressCallback?.(50, `Waiting for ${chunks.length} parallel extractions to complete`);
+    const chunkStartTime = Date.now();
+    const allFacts = await Promise.all(chunkPromises);
+    const chunkDuration = Date.now() - chunkStartTime;
+    
+    console.log(`Parallel chunk processing completed in ${chunkDuration}ms (${chunks.length} chunks)`);
+    
+    // Merge all facts from chunks with enhanced deduplication
+    progressCallback?.(90, 'Merging and deduplicating extracted facts');
+    const mergedFacts = mergeFacts(allFacts);
+    
+    const totalDuration = Date.now() - startTime;
+    console.log(`Total fact extraction completed in ${totalDuration}ms`);
     
     progressCallback?.(100, 'Fact extraction complete');
-    return result;
+    return mergedFacts;
   } catch (error) {
     const duration = Date.now() - startTime;
     console.error(`Fact extraction failed after ${duration}ms:`, error);
