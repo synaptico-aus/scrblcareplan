@@ -6,7 +6,9 @@ if (!process.env.OPENAI_API_KEY) {
   throw new Error('OPENAI_API_KEY environment variable is required');
 }
 
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+// Keep all AI processing on the same model; preserve the prompts and guardrails below.
+const OPENAI_MODEL = "gpt-6.2-sol";
+
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY,
   timeout: 300000, // 5 minutes timeout for long care plan generation
@@ -189,7 +191,7 @@ export async function extractFactsFromTranscript(transcript: string, clientName:
 // Helper function to extract facts from a single chunk
 async function extractFactsFromChunk(chunk: string, clientName: string, chunkNum: number, totalChunks: number) {
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: OPENAI_MODEL,
     messages: [
       {
         role: "system",
@@ -491,7 +493,7 @@ export async function generateCarePlanHtml(transcript: string, clientName: strin
     
     progressCallback?.(50, 'Generating Gold Standard Care Plan with AI');
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: OPENAI_MODEL,
       messages: [
         {
           role: "system",
@@ -700,7 +702,7 @@ Create comprehensive care plan sections based on the information provided in the
 // Helper function to summarize very long transcripts
 async function summarizeTranscript(transcript: string, clientName: string): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: OPENAI_MODEL,
     messages: [
       {
         role: "system",
@@ -744,7 +746,7 @@ async function multiPassSummarize(transcript: string, clientName: string): Promi
   for (let i = 0; i < sections.length; i++) {
     
     const sectionSummary = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: OPENAI_MODEL,
       messages: [
         {
           role: "system",
@@ -766,7 +768,7 @@ async function multiPassSummarize(transcript: string, clientName: string): Promi
   if (estimateTokenCount(combinedSummary) > 100000) {
     // Still too long, need final condensation
     const finalSummary = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: OPENAI_MODEL,
       messages: [
         {
           role: "system",

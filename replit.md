@@ -62,7 +62,7 @@ The backend implements a service-oriented architecture with separate services fo
 - **Security Features**: Fail-closed middleware, structured JSON audit logging, session-based impersonation state
 
 ### Processing Architecture
-- **AI Processing**: OpenAI GPT-5 integration for intelligent fact extraction and care plan generation
+- **AI Processing**: OpenAI GPT-6.2 Sol (`gpt-6.2-sol`) integration for intelligent fact extraction and care plan generation
 - **Offline Processing**: Rule-based keyword extraction and template-based care plan generation as fallback
 - **Fact Extraction**: Structured data extraction including client details, medical information, support networks, risks, and preferences
 - **Output Generation**: HTML-formatted care plans following specific clinical documentation standards
@@ -76,7 +76,7 @@ The backend implements a service-oriented architecture with separate services fo
 ## External Dependencies
 
 ### AI Services
-- **OpenAI API**: GPT-5 model for intelligent transcript analysis and care plan generation
+- **OpenAI API**: GPT-6.2 Sol model for intelligent transcript analysis and care plan generation
 - **Processing**: Natural language processing for extracting structured facts from unstructured assessment transcripts
 
 ### Database Integration
