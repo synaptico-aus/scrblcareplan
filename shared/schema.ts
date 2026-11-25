@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, jsonb, timestamp, index, integer, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+export { carePlanDocumentSchema, clinicalContentSchema, type CarePlanDocument } from "./care-plan-document";
 
 // Session storage table for Replit Auth
 export const sessions = pgTable(

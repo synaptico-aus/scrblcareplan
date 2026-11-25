@@ -15,6 +15,8 @@ import { uploadFile, getFile, deleteFile, listFiles } from "./services/s3";
 import multer from "multer";
 import { TOTP, Secret } from "otpauth";
 import QRCode from "qrcode";
+import { readCarePlanDocument, renderCarePlanDocument } from "../shared/care-plan-document";
+import type { FundingSelection } from "./services/structuredCarePlan";
 
 // Event emitter for real-time updates
 const eventEmitter = new EventEmitter();
@@ -795,7 +797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate care plan using AI
       const [extractedFacts, generatedHtml] = await Promise.all([
         extractFactsFromTranscript(transcript, clientName),
-        generateCarePlanHtml(transcript, clientName, organizationId)
+        generateCarePlanHtml(transcript, clientName, organizationId, undefined, validatedData)
       ]);
 
       // Store the analysis
@@ -940,7 +942,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Start background processing (don't await)
         const organizationId = getOrganizationId(req);
-        processAsyncJob(jobId, clientName, transcript, sessionId, organizationId, userId, asyncJobs, eventEmitter)
+        processAsyncJob(jobId, clientName, transcript, sessionId, organizationId, userId, asyncJobs, eventEmitter, validatedData)
           .catch((error: Error) => {
             console.error(`Async job ${jobId} failed:`, error);
             asyncJobs.set(jobId, {
@@ -1115,7 +1117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await new Promise(resolve => setTimeout(resolve, 1500));
 
-      const generatedHtml = await generateCarePlanHtml(transcript, clientName, organizationId);
+      const generatedHtml = await generateCarePlanHtml(transcript, clientName, organizationId, undefined, validatedData);
 
       // Step 3: Store analysis
       eventEmitter.emit('generation-update', {
@@ -1192,7 +1194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Generate care plan using offline processing
       const extractedFacts = generateOfflineFactsExtraction(transcript, clientName);
-      const generatedHtml = generateOfflineCarePlan(transcript, clientName);
+      const generatedHtml = generateOfflineCarePlan(transcript, clientName, validatedData, organizationId);
 
       // Store the analysis
       const analysis = await storage.createCareAnalysis(organizationId, {
@@ -1260,6 +1262,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/saved-care-plans", requireAuth, async (req, res) => {
     try {
       const validatedData = insertSavedCarePlanSchema.parse(req.body);
+      const document = readCarePlanDocument(validatedData.html);
+      if (document) {
+        if (document.clientName !== validatedData.clientName) return res.status(400).json({ message: "Care plan client name does not match" });
+        validatedData.html = renderCarePlanDocument(document);
+      }
       const organizationId = getOrganizationId(req);
       const savedCarePlan = await storage.createSavedCarePlan(organizationId, validatedData);
       
@@ -1702,7 +1709,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     organizationId: string,
     userId: string,
     asyncJobs: Map<string, any>, 
-    eventEmitter: any
+    eventEmitter: any,
+    funding: FundingSelection = {}
   ) {
     try {
       // Update job progress
@@ -1783,7 +1791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           progress: adjustedProgress,
           jobId
         });
-      });
+      }, funding);
 
       // Step 3: Store analysis
       asyncJobs.set(jobId, { 

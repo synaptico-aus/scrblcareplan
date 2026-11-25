@@ -1,0 +1,30 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "Ns5LidVzyq541xbYzm6u8"
+uri = "file://generated-artifacts/representative.pdf"
+type = "pdf"
+title = "Synthetic care-plan layout sample"
+description = "A4 sample with 21 goals, the retained appendices, and repeated headers and footers. Synthetic content only."
+logical_id = "0461289f-a3e2-446e-b9a2-c6af29e6d333"
+content_hash = "sha256:8866f8e693ec9cf3a6f8992bdcb8f326eaf5f90bb1c0336507beac9211330624"
+size = 257763
+mtime_ms = 1795596346667
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:a7f2294a-5fc7-452c-b22c-c83d17ec2d51/0461289f-a3e2-446e-b9a2-c6af29e6d333/09b2204d-b8bc-4482-af4a-88339648b5c4"
+storage_version_token = "1795596420623707"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "cLmMmt1Qbo-6cfYYAE22M"
+uri = "file://generated-artifacts/representative.doc"
+type = "word_document"
+title = "Editable care-plan Word sample"
+description = "Synthetic editable HTML-based Word document with real paragraphs and tables. External Word edits do not sync back."
+logical_id = "2e1f119d-7a1c-402a-a6a4-8e182e090b34"
+content_hash = "sha256:45c12b9fe1a8183e7c221bd3c204356b16b1ad58a2c9528687de0c50ce0f6b2d"
+size = 71959
+mtime_ms = 1795596346179
+storage_uri = "gcs://replit-rams-assets-riker/rams/assets/repl:a7f2294a-5fc7-452c-b22c-c83d17ec2d51/2e1f119d-7a1c-402a-a6a4-8e182e090b34/e2cb3224-ea56-4b8a-b0a5-6625deb30914"
+storage_version_token = "1795596421251207"
+content_type = "application/msword"

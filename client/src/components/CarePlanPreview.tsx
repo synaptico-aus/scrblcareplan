@@ -1,14 +1,12 @@
 import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Download, FileText, Printer, Clock, FileType } from "lucide-react";
+import { Download, FileText, Printer, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ExtractedFacts } from "@shared/schema";
-// @ts-ignore
-import html2pdf from "html2pdf.js";
-import DOMPurify from "dompurify";
-import scrblLogo from "@/assets/scrbl-logo.png";
 import { exportToWord } from "@/lib/word-export";
+import { carePlanCss } from "@shared/care-plan-document";
+import { downloadCarePlanPdf, sanitizeCarePlanHtml } from "@/lib/document-output";
 
 interface CarePlanPreviewProps {
   html: string | null;
@@ -25,13 +23,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
-  // Sanitize HTML content and escape clientName to prevent XSS
-  const sanitizedHtml = useMemo(() => html ? DOMPurify.sanitize(html) : null, [html]);
-  const escapedClientName = useMemo(() => {
-    const div = document.createElement('div');
-    div.textContent = clientName;
-    return div.innerHTML;
-  }, [clientName]);
+  const sanitizedHtml = useMemo(() => html ? sanitizeCarePlanHtml(html) : null, [html]);
 
   // Timer for elapsed time during generation
   useEffect(() => {
@@ -59,51 +51,10 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
 
   const handleExportToPDF = () => {
     if (!sanitizedHtml) return;
-    
-    // Create a complete HTML document with Scrbl logo (using sanitized content)
-    const htmlWithLogo = `
-      <html>
-        <head>
-          <title>Care Plan Draft - ${escapedClientName}</title>
-          <style>
-            body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
-            .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
-            .logo-header img { height: 60px; }
-            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
-            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
-            p { margin-bottom: 6pt; }
-            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-            th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
-            th { background-color: #f0f0f0; }
-          </style>
-        </head>
-        <body>
-          <div class="logo-header">
-            <img src="${scrblLogo}" alt="Scrbl Logo" />
-          </div>
-          ${sanitizedHtml}
-        </body>
-      </html>
-    `;
-    
-    const element = document.createElement('div');
-    element.innerHTML = htmlWithLogo;
-    
-    const opt = {
-      margin: 1,
-      filename: `${escapedClientName || 'care-plan'}-${new Date().toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(element).save();
-    
-    toast({
-      title: "PDF Export Started",
-      description: "Your care plan is being exported to PDF...",
-    });
+    const opened = downloadCarePlanPdf(`Care Plan Draft - ${clientName}`, sanitizedHtml);
+    toast(opened
+      ? { title: "Print dialog opened", description: "Choose “Save as PDF” to download an A4 copy." }
+      : { title: "Pop-up blocked", description: "Allow pop-ups for this site, then try PDF again.", variant: "destructive" });
   };
 
   const handleExportToWord = () => {
@@ -128,6 +79,17 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
             <Button
               variant="outline"
+              onClick={handleExportToPDF}
+              disabled={!sanitizedHtml}
+              data-testid="button-export-pdf"
+              size="sm"
+              className="w-full sm:w-auto"
+            >
+              <Download className="h-4 w-4 sm:mr-2" />
+              <span>Save as PDF</span>
+            </Button>
+            <Button
+              variant="outline"
               onClick={onPrint}
               disabled={!sanitizedHtml}
               data-testid="button-print"
@@ -140,7 +102,7 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
             <Button
               onClick={handleExportToWord}
               disabled={!sanitizedHtml}
-              className="bg-blue-500 text-white hover:bg-blue-600 w-full sm:w-auto"
+              className="w-full sm:w-auto"
               data-testid="button-export-word"
               size="sm"
             >
@@ -170,7 +132,10 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
             </div>
           </div>
         ) : sanitizedHtml ? (
-          <div className="max-w-4xl mx-auto care-plan-document bg-white shadow-lg rounded-lg p-8" data-testid="care-plan-content">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              Draft for clinical review. Confirm all details against the transcript before approval. Edits made in a downloaded Word document do not sync back to this plan.
+            </div>
             {/* Generation Time Header */}
             {generationTime && (
               <div className="mb-6 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -181,9 +146,10 @@ export function CarePlanPreview({ html, isLoading, clientName, extractedFacts, g
               </div>
             )}
             
-            <div 
-              dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-            />
+            <div className="care-plan-document bg-white shadow-lg rounded-lg p-8" data-testid="care-plan-content">
+              <style>{carePlanCss}</style>
+              <div dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />
+            </div>
           </div>
         ) : (
           <div className="flex items-center justify-center h-full">

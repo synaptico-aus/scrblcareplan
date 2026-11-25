@@ -10,12 +10,9 @@ import { FileText, Search, Trash2, Eye, Calendar, User, ArrowLeft, Info, Downloa
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { SavedCarePlan, ExtractedFacts, ClientDocument, ClientFolderAlias } from "@shared/schema";
-import scrblLogo from "@/assets/scrbl-logo.png";
-// @ts-ignore
-import html2pdf from "html2pdf.js";
-import DOMPurify from "dompurify";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import { exportToWord, escapeHtml, exportAllToZip } from "@/lib/word-export";
+import { exportToWord, exportAllToZip } from "@/lib/word-export";
+import { downloadCarePlanPdf, printCarePlanDocument, sanitizeCarePlanHtml } from "@/lib/document-output";
 
 export default function SavedPlans() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -273,65 +270,16 @@ export default function SavedPlans() {
   };
 
   const handleExportToPDF = (plan: SavedCarePlan) => {
-    // Sanitize HTML content to prevent XSS
-    const sanitizedHtml = DOMPurify.sanitize(plan.html as string);
-    
-    // Create a complete HTML document with Scrbl logo
-    const htmlWithLogo = `
-      <html>
-        <head>
-          <title>Care Plan Draft - ${escapeHtml(plan.clientName)}</title>
-          <style>
-            body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
-            .logo-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #ddd; }
-            .logo-header img { height: 60px; }
-            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
-            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
-            p { margin-bottom: 6pt; }
-            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-            th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
-            th { background-color: #f0f0f0; }
-          </style>
-        </head>
-        <body>
-          <div class="logo-header">
-            <img src="${scrblLogo}" alt="Scrbl Logo" />
-          </div>
-          ${sanitizedHtml}
-        </body>
-      </html>
-    `;
-    
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlWithLogo, 'text/html');
-    const element = doc.body;
-    
-    const opt = {
-      margin: 1,
-      filename: `${plan.clientName || 'care-plan'}-${new Date(plan.saveDate).toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(element).save();
-    
-    toast({
-      title: "PDF Export Started",
-      description: `Exporting "${plan.name}" to PDF...`,
-    });
+    const opened = downloadCarePlanPdf(`Care Plan Draft - ${plan.clientName}`, plan.html as string);
+    toast(opened
+      ? { title: "Print dialog opened", description: `Choose “Save as PDF” to download "${plan.name}" in A4 format.` }
+      : { title: "Pop-up blocked", description: "Allow pop-ups for this site, then try PDF again.", variant: "destructive" });
   };
 
   const handleExportToWord = (plan: SavedCarePlan) => {
-    // Sanitize HTML content to prevent XSS
-    const sanitizedHtml = DOMPurify.sanitize(plan.html as string);
-    
-    // Use shared export utility which includes extracted facts
-    // Note: extractedFacts is normalized to an object in handleViewPlan
     exportToWord(
       plan.clientName, 
-      sanitizedHtml, 
+      plan.html as string, 
       plan.extractedFacts as ExtractedFacts | null
     );
     
@@ -354,17 +302,16 @@ export default function SavedPlans() {
     setIsExportingAll(true);
 
     try {
-      // Sanitize all plans before export
-      const sanitizedPlans = savedPlans.map(plan => ({
+      const plansForExport = savedPlans.map(plan => ({
         id: plan.id,
         clientName: plan.clientName,
         name: plan.name,
-        html: DOMPurify.sanitize(plan.html as string),
+        html: plan.html as string,
         extractedFacts: plan.extractedFacts as ExtractedFacts | null,
         saveDate: typeof plan.saveDate === 'string' ? plan.saveDate : new Date(plan.saveDate).toISOString()
       }));
 
-      await exportAllToZip(sanitizedPlans);
+      await exportAllToZip(plansForExport);
 
       toast({
         title: "Bulk Export Complete",
@@ -380,36 +327,6 @@ export default function SavedPlans() {
     } finally {
       setIsExportingAll(false);
     }
-  };
-
-  const generateFactsHtml = (facts: ExtractedFacts) => {
-    return `
-      <div style="margin-bottom: 30px; padding: 20px; border: 1px solid #ddd;">
-        <h2 style="font-size: 16pt; font-weight: bold; margin-bottom: 15px;">Extracted Facts</h2>
-        
-        <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Client Details</h3>
-          <p><strong>Name:</strong> ${facts.clientDetails?.name ? escapeHtml(facts.clientDetails.name) : "Not documented"}</p>
-          <p><strong>Language:</strong> ${facts.clientDetails?.language ? escapeHtml(facts.clientDetails.language) : "Not documented"}</p>
-          <p><strong>Interpreter Required:</strong> ${facts.clientDetails?.interpreterRequired !== undefined ? (facts.clientDetails?.interpreterRequired ? "Yes" : "No") : "Not documented"}</p>
-        </div>
-        
-        <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Medical Information</h3>
-          <p><strong>GP:</strong> ${facts.medical?.gp ? escapeHtml(facts.medical.gp) : "Not documented"}</p>
-          <p><strong>Pharmacy:</strong> ${facts.medical?.pharmacy ? escapeHtml(facts.medical.pharmacy) : "Not documented"}</p>
-          <p><strong>Medications:</strong> ${facts.medical?.medications ? escapeHtml(facts.medical.medications) : "Not documented"}</p>
-          <p><strong>Allergies:</strong> ${facts.medical?.allergies ? escapeHtml(facts.medical.allergies) : "Not documented"}</p>
-        </div>
-        
-        <div style="margin-bottom: 20px;">
-          <h3 style="font-size: 12pt; font-weight: bold; margin-bottom: 8px;">Support Network</h3>
-          <p><strong>Primary Contact:</strong> ${facts.support?.primaryContact ? escapeHtml(facts.support.primaryContact) : "Not documented"}</p>
-          <p><strong>Secondary Contact:</strong> ${facts.support?.secondaryContact ? escapeHtml(facts.support.secondaryContact) : "Not documented"}</p>
-          <p><strong>Living Arrangement:</strong> ${facts.support?.livingArrangement ? escapeHtml(facts.support.livingArrangement) : "Not documented"}</p>
-        </div>
-      </div>
-    `;
   };
 
   // Show plan detail view
@@ -436,35 +353,27 @@ export default function SavedPlans() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
               <Button
                 variant="outline"
+                onClick={() => handleExportToPDF(selectedPlan)}
+                data-testid="button-export-pdf"
+                size="sm"
+                className="w-full sm:w-auto"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Save as PDF
+              </Button>
+              <Button
+                variant="outline"
                 onClick={() => {
-                  const printWindow = window.open('', '_blank');
-                  if (printWindow) {
-                    const facts = selectedPlan.extractedFacts as ExtractedFacts;
-                    const factsSectionHtml = facts ? generateFactsHtml(facts) : '';
-                    
-                    printWindow.document.write(`
-                      <html>
-                        <head>
-                          <title>Care Plan - ${escapeHtml(selectedPlan.clientName)}</title>
-                          <style>
-                            body { font-family: 'Inter', sans-serif; margin: 40px; line-height: 1.6; }
-                            h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
-                            h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-                            h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
-                            p { margin-bottom: 6pt; }
-                            table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-                            th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
-                            th { background-color: #f0f0f0; }
-                          </style>
-                        </head>
-                        <body>
-                          ${factsSectionHtml}
-                          ${selectedPlan.html}
-                        </body>
-                      </html>
-                    `);
-                    printWindow.document.close();
-                    printWindow.print();
+                  const opened = printCarePlanDocument(
+                    `Care Plan Draft - ${selectedPlan.clientName}`,
+                    selectedPlan.html as string,
+                  );
+                  if (!opened) {
+                    toast({
+                      title: "Pop-up blocked",
+                      description: "Allow pop-ups for this site, then try printing again.",
+                      variant: "destructive",
+                    });
                   }
                 }}
                 data-testid="button-print-plan"
@@ -475,7 +384,7 @@ export default function SavedPlans() {
               </Button>
               <Button
                 onClick={() => handleExportToWord(selectedPlan)}
-                className="bg-blue-500 text-white hover:bg-blue-600 w-full sm:w-auto"
+                className="w-full sm:w-auto"
                 data-testid="button-export-word"
                 size="sm"
               >
@@ -488,6 +397,9 @@ export default function SavedPlans() {
 
         {/* Care Plan Content */}
         <div className="p-4 sm:p-6 max-w-6xl mx-auto">
+          <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            Draft for clinical review. Confirm all details against the transcript before approval. Edits made in a downloaded Word document do not sync back to this plan.
+          </div>
           {/* Extracted Facts Section */}
           {Boolean(selectedPlan.extractedFacts && typeof selectedPlan.extractedFacts === 'object' && selectedPlan.extractedFacts !== null) && (
             <div className="bg-white shadow-lg rounded-lg p-6 mb-6">
@@ -618,18 +530,7 @@ export default function SavedPlans() {
           
           {/* Care Plan Document */}
           <div className="care-plan-document bg-white shadow-lg rounded-lg p-4 sm:p-8">
-            {/* Scrbl Logo Header */}
-            <div className="flex justify-center mb-8 pb-6 border-b border-gray-200">
-              <img 
-                src={scrblLogo} 
-                alt="Scrbl Logo" 
-                className="h-16 w-auto"
-              />
-            </div>
-            
-            <div 
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(selectedPlan.html as string) }}
-            />
+            <div dangerouslySetInnerHTML={{ __html: sanitizeCarePlanHtml(selectedPlan.html as string) }} />
           </div>
         </div>
       </div>

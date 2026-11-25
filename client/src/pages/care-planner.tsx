@@ -20,8 +20,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import DOMPurify from "dompurify";
 import scrblLogo from "@/assets/scrbl-logo.png";
+import { printCarePlanDocument } from "@/lib/document-output";
 
 export default function CarePlanner() {
   const [clientName, setClientName] = useState("");
@@ -396,36 +396,13 @@ export default function CarePlanner() {
 
   const handlePrint = () => {
     if (html) {
-      // Sanitize HTML and escape clientName to prevent XSS
-      const sanitizedHtml = DOMPurify.sanitize(html);
-      const div = document.createElement('div');
-      div.textContent = clientName;
-      const escapedClientName = div.innerHTML;
-      
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Care Plan - ${escapedClientName}</title>
-              <style>
-                body { font-family: 'Times New Roman', serif; margin: 40px; line-height: 1.6; }
-                h1 { font-size: 18pt; font-weight: bold; margin-bottom: 12pt; text-align: center; }
-                h2 { font-size: 14pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-                h3 { font-size: 12pt; font-weight: bold; margin-top: 6pt; margin-bottom: 3pt; }
-                p { margin-bottom: 6pt; }
-                table { width: 100%; border-collapse: collapse; margin: 12pt 0; }
-                th, td { border: 1px solid #000; padding: 6pt; text-align: left; }
-                th { background-color: #f0f0f0; }
-              </style>
-            </head>
-            <body>
-              ${sanitizedHtml}
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
+      const opened = printCarePlanDocument(`Care Plan Draft - ${clientName}`, html);
+      if (!opened) {
+        toast({
+          title: "Pop-up blocked",
+          description: "Allow pop-ups for this site, then try printing again.",
+          variant: "destructive",
+        });
       }
     }
   };

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
+import { generateStructuredCarePlan, type FundingSelection } from "./structuredCarePlan";
 
 // Validate API key on startup
 if (!process.env.OPENAI_API_KEY) {
@@ -418,7 +419,11 @@ function getSeverityScore(severity: string | null): number {
   return 0;
 }
 
-export async function generateCarePlanHtml(transcript: string, clientName: string, organizationId: string, progressCallback?: (progress: number, stage: string) => void) {
+export async function generateCarePlanHtml(transcript: string, clientName: string, organizationId: string, progressCallback?: (progress: number, stage: string) => void, funding: FundingSelection = {}) {
+  return generateStructuredCarePlan(openai, OPENAI_MODEL, transcript, clientName, organizationId, progressCallback, funding);
+}
+
+async function generateLegacyCarePlanHtml(transcript: string, clientName: string, organizationId: string, progressCallback?: (progress: number, stage: string) => void) {
   const startTime = Date.now();
   
   // Fetch service rates for this organization with fallback
