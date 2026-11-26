@@ -81,9 +81,22 @@ try {
   await waitFor('.care-template');
   assert.ok(await evaluate(`document.querySelector('.care-template').innerText.includes("Transcript Summary – Alex Example") && document.querySelector('.care-template').innerText.includes("Dignity of Risk Assessment")`), "Actual saved-plan preview lost appendices");
   await writeFile(`${out}/representative.doc`, result.word);
+  await writeFile(`${out}/representative-word.html`, result.word);
+  await cdp("Emulation.setEmulatedMedia", { media: "print" });
+  await cdp("Page.navigate", { url: `file://${out}/representative-word.html` });
+  await new Promise(r => setTimeout(r, 300));
+  assert.equal(await evaluate(`Array.from(document.querySelectorAll('.care-template table')).filter(t => t.scrollWidth > t.clientWidth + 2).length`), 0, "Word export has clipped tables");
+  const wordScreenshot = await cdp("Page.captureScreenshot", { format: "png" });
+  await writeFile(`${out}/representative-word-preview.png`, Buffer.from(wordScreenshot.data, "base64"));
+  const layoutMetrics = `Array.from(document.querySelectorAll('.care-template h1,.care-template h2,.care-template h3,.care-template table')).map(element => {
+    const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+    return { tag:element.tagName, width:Math.round(rect.width), height:Math.round(rect.height), font:style.fontSize, color:style.color };
+  })`;
+  const wordMetrics = await evaluate(layoutMetrics);
   await writeFile(`${out}/representative.html`, result.printHtml);
   await cdp("Page.navigate", { url: `file://${out}/representative.html` });
   await new Promise(r => setTimeout(r, 300));
+  assert.deepEqual(await evaluate(layoutMetrics), wordMetrics, "Word and PDF print layouts must share heading/table dimensions, fonts and colours");
   assert.equal(await evaluate(`Array.from(document.querySelectorAll('.care-template table')).filter(t => t.scrollWidth > t.clientWidth + 2).length`), 0, "Clipped tables");
   const screenshot = await cdp("Page.captureScreenshot", { format: "png" });
   await writeFile(`${out}/representative-preview.png`, Buffer.from(screenshot.data, "base64"));

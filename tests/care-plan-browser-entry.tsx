@@ -15,6 +15,17 @@ async function run() {
   const safe = sanitizeCarePlanHtml(saved);
   const word = generateWordDocumentHtml("Alex Example", safe);
   const parsed = new DOMParser().parseFromString(word, "text/html");
+  const canonical = new DOMParser().parseFromString(safe, "text/html");
+  if (parsed.querySelector("main,article,section")) throw Error("Word importer needs compatible block elements");
+  const wordTitle = parsed.querySelector<HTMLElement>(".care-template h1")!;
+  if (wordTitle.style.color !== "rgb(232, 140, 66)" || wordTitle.style.fontSize !== "25pt") throw Error("Word title must match PDF typography and colour");
+  if (parsed.querySelector<HTMLElement>(".field-grid td")!.style.borderTopColor !== "rgb(239, 184, 94)") throw Error("Word lost PDF field borders");
+  if (parsed.querySelector<HTMLElement>(".clinical-table th")!.getAttribute("bgcolor") !== "#f4eee8") throw Error("Word lost PDF table header shading");
+  if (!parsed.querySelector("thead tr")!.getAttribute("style")?.includes("mso-header-row:yes")) throw Error("Word table headings must repeat");
+  if (parsed.querySelector(".care-footer")) throw Error("Word should use its repeating footer, not a duplicate body footer");
+  if (!word.includes("margin:16mm 14mm 24mm") || !word.includes('mso-element:header') || !word.includes("Full Name: Alex Example") || !word.includes("mso-field-code:NUMPAGES")) throw Error("Word page setup, identity header or page fields differ from PDF");
+  if (parsed.querySelectorAll("table").length !== canonical.querySelectorAll("table").length) throw Error("Word lost PDF tables");
+  if (Array.from(parsed.querySelectorAll("h1,h2,h3")).map(e => e.textContent).join("|") !== Array.from(canonical.querySelectorAll("h1,h2,h3")).map(e => e.textContent).join("|")) throw Error("Word changed PDF section order");
   const headings = Array.from(parsed.querySelectorAll("h1,h2,h3")).map(e => e.textContent);
   if (!headings.includes("Transcript Summary – Alex Example") || !headings.includes("Dignity of Risk Assessment")) throw Error("Missing appendices in Word");
   if (parsed.body.querySelectorAll("table").length < 5 || parsed.body.querySelector("iframe,img")) throw Error("Word must contain editable tables and text, not images");

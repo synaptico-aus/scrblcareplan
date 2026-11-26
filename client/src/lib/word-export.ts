@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { ExtractedFacts } from "@shared/schema";
 import { createCarePlanDocumentHtml, sanitizeCarePlanHtml } from "@/lib/document-output";
 import { escapeText, readCarePlanDocument } from "@shared/care-plan-document";
+import { prepareWordLayout } from "./word-layout";
 
 /** Kept as a compatibility export for any remaining client-side callers. */
 export { escapeText as escapeHtml } from "@shared/care-plan-document";
@@ -16,15 +17,24 @@ export function generateWordDocumentHtml(clientName: string, carePlanHtml: strin
   const html = createCarePlanDocumentHtml(`Care Plan Draft - ${clientName}`, safeHtml);
   const document = readCarePlanDocument(safeHtml);
   const support = document ? [document.metadata.organisationName, document.metadata.supportPhone, document.metadata.supportEmail].filter(Boolean).join(" · ") : "";
-  // Word's HTML importer uses named page sections and Office footer fields.
-  return html.replace("<html lang=", '<html xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:o="urn:schemas-microsoft-com:office:office" lang=')
+  const output = new DOMParser().parseFromString(html, "text/html");
+  prepareWordLayout(output);
+  output.documentElement.setAttribute("xmlns:w", "urn:schemas-microsoft-com:office:word");
+  output.documentElement.setAttribute("xmlns:o", "urn:schemas-microsoft-com:office:office");
+  // Match the PDF's A4 page, 16/14/24mm margins, identity header and footer.
+  // Office fields remain live when the editable file is opened in Word.
+  return `<!doctype html>${output.documentElement.outerHTML}`
     .replace("</head>", `<style>
-      @page WordSection1 { size:595.3pt 841.9pt; margin:45pt 40pt 60pt; mso-footer:careWordFooter; }
+      @page WordSection1 { size:210mm 297mm; margin:16mm 14mm 24mm; mso-header:careWordHeader; mso-footer:careWordFooter; mso-header-margin:7mm; mso-footer-margin:9mm; }
       div.WordSection1 { page:WordSection1; }
-      @media screen { body { padding:0; background:white; } .care-template,.care-plan-document { padding:0; min-height:0; box-shadow:none; } }
+      body { margin:0; padding:0; background:white; font:10.5pt Arial,sans-serif; }
+      p.MsoHeader,p.MsoFooter { margin:0; font:8pt Arial,sans-serif; color:#303538; }
     </style></head>`)
-    .replace("<body>", '<body><div class="WordSection1">')
-    .replace("</body>", `</div><!--[if mso]><div style="mso-element:footer" id="careWordFooter"><p style="font-size:8pt;border-top:1pt solid #ed914d">CONFIDENTIAL ${escapeText(support)} · Page <span style="mso-field-code:PAGE">1</span> of <span style="mso-field-code:NUMPAGES">1</span></p></div><![endif]--></body>`);
+    .replace(/(<body[^>]*>)/, '$1<div class="WordSection1">')
+    .replace("</body>", `</div><!--[if mso]>
+      <div style="mso-element:header" id="careWordHeader"><p class="MsoHeader" style="tab-stops:right 182mm">${document ? `Full Name: ${escapeText(document.clientName)}<span style="mso-tab-count:1"> </span>DRAFT` : ""}</p></div>
+      <div style="mso-element:footer" id="careWordFooter"><p class="MsoFooter" style="tab-stops:right 182mm">CONFIDENTIAL<span style="mso-tab-count:1"> </span>Page <span style="mso-field-code:PAGE">1</span> of <span style="mso-field-code:NUMPAGES">1</span>${support ? `<br>${escapeText(support)}` : ""}</p></div>
+    <![endif]--></body>`);
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
