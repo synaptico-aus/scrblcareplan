@@ -1,2 +1,3 @@
 - [Model trials](model-trials.md) — preserve existing prompts and guardrails when comparing model quality.
 - [Care-plan policy](care-plan-policy.md) — complete drafts in Word; sample PDF values and annual review dates are not clinical defaults.
+- [Schema default semantics](schema-default-semantics.md) — validation-library upgrades must preserve sparse-document normalization and round-trip equality.

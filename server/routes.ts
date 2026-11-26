@@ -244,7 +244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid profile data", errors: error.errors });
+        return res.status(400).json({ message: "Invalid profile data", errors: error.issues });
       }
       console.error("Error updating user profile:", error);
       res.status(500).json({ message: "Failed to update profile" });
@@ -634,7 +634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error creating user:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
-          message: error.errors[0]?.message || "Validation failed" 
+          message: error.issues[0]?.message || "Validation failed"
         });
       }
       res.status(500).json({ message: "Failed to create user" });
@@ -673,7 +673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error updating user limit:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
-          message: error.errors[0]?.message || "Validation failed" 
+          message: error.issues[0]?.message || "Validation failed"
         });
       }
       res.status(500).json({ message: "Failed to update user limit" });
@@ -1448,7 +1448,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 
           error: "Validation failed",
-          details: error.errors 
+          details: error.issues
         });
       }
       

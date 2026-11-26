@@ -49,7 +49,7 @@ function textShape<T extends Record<string, string>>(labels: T): { [K in keyof T
   return Object.fromEntries(Object.keys(labels).map(k => [k, unknownText])) as { [K in keyof T]: typeof unknownText };
 }
 function fieldsSchema<T extends Record<string, string>>(labels: T) {
-  return z.object(textShape(labels)).strict().default({} as any);
+  return z.object(textShape(labels)).strict().prefault({} as any);
 }
 export const goalLabels = {
   title: "Goal", abilities: "Abilities and Considerations (Risks)", tasks: "How will we do this? (Tasks)",
@@ -99,7 +99,7 @@ export const clinicalContentSchema = z.object({
   summary: z.array(unknownText).length(6).default([null, null, null, null, null, null]),
   riskNarrative: unknownText, risks: z.array(riskSchema).default([]),
   // Exact transcript excerpts by content path; never printed as additional document sections.
-  evidence: z.record(z.array(z.string())).default({}),
+  evidence: z.record(z.string(), z.array(z.string())).default({}),
 }).strict();
 export const carePlanDocumentSchema = z.object({
   template: z.literal("salveo-layout"), version: z.literal(1), clientName: z.string().min(1),
