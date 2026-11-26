@@ -5,6 +5,7 @@ import { fundingLevels } from "../../shared/schema";
 import { storage } from "../storage";
 import { getCarePlanTemplateConfiguration } from "./carePlanTemplateConfig";
 import { transcriptQuoteMatcher } from "./transcriptEvidence";
+import { repairTranscriptEvidence } from "./evidenceRepair";
 
 export type FundingSelection = { fundingType?: "hcp" | "sah"; fundingLevel?: string };
 export function selectedFundingLabel(selection: FundingSelection = {}): string | null {
@@ -160,8 +161,9 @@ async function requestValidatedPart(
       throw new Error(`Transcript part ${context.part} was incomplete. No partial care plan was saved; please retry.`);
     }
     const raw = response.choices[0]?.message.content || "{}";
+    let parsed: ClinicalContent | undefined;
     try {
-      const parsed = hydrateKnownGoalTitles(clinicalContentSchema.parse(JSON.parse(raw)), knownGoals);
+      parsed = hydrateKnownGoalTitles(clinicalContentSchema.parse(JSON.parse(raw)), knownGoals);
       // A repair may not silently drop previously verified goals from this reply.
       for (const key of Array.from(requiredGoalKeys)) {
         if (!parsed.goals.some(goal => goal.key === key)) {
@@ -186,6 +188,23 @@ async function requestValidatedPart(
         throw new Error(`The supporting quotes for transcript part ${context.part} could not be verified after an automatic correction. No partial care plan was saved; please retry.`);
       }
       progress?.(context.progress, `Correcting supporting quotes in transcript part ${context.part}`);
+      if (parsed && error instanceof ClinicalEvidenceError &&
+        issues.every(issue => issue.reason === "quote_not_found" || issue.reason === "missing_evidence")) {
+        // Rewriting the entire draft to fix one quote can corrupt other, already
+        // verified goals. Repair only failed citations by selecting source IDs.
+        try {
+          const repaired = await repairTranscriptEvidence(openai, model, parsed, source, issues.map(issue => issue.path));
+          validateClinicalEvidence(repaired, source);
+          console.info("Care-plan evidence correction verified", {
+            ...context, repairedPaths: new Set(issues.map(issue => issue.path)).size,
+          });
+          return repaired;
+        } catch {
+          // Do not log generated repair replies, passages or clinical values.
+          console.warn("Care-plan evidence correction rejected", { ...context, attempt: 2 });
+          throw new Error(`The supporting quotes for transcript part ${context.part} could not be verified after an automatic correction. No partial care plan was saved; please retry.`);
+        }
+      }
       conversation = [...messages,
         { role: "assistant", content: raw },
         { role: "user", content: JSON.stringify({
