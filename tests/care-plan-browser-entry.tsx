@@ -8,6 +8,7 @@ import { representativeCarePlan } from "./care-plan-fixture";
 import JSZip from "jszip";
 import SavedPlans from "../client/src/pages/saved-plans";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TokenUsageSettings } from "../client/src/components/TokenUsageSettings";
 
 async function run() {
   const { html } = representativeCarePlan();
@@ -75,6 +76,23 @@ async function run() {
     }] : []), { headers: { "Content-Type": "application/json" } });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     root.render(<QueryClientProvider client={queryClient}><SavedPlans /></QueryClientProvider>);
+  };
+  (window as any).showTokenUsageTest = (mode: string) => {
+    const row = {
+      generationId: "synthetic-generation", startedAt: "2026-11-26T08:00:00Z", model: "gpt-6.2-sol",
+      calls: 3, failedCalls: 0, unreportedCalls: mode === "incomplete" ? 1 : 0,
+      inputTokens: 10000, cachedTokens: 2000, outputTokens: 5000, reasoningTokens: 3000,
+      estimatedUsd: mode === "incomplete" ? null : .0662,
+    };
+    const queryClient = new QueryClient({ defaultOptions: { queries: {
+      retry: false, queryFn: async () => {
+        if (mode === "error") throw Error("Synthetic usage service unavailable");
+        if (mode === "loading") return new Promise(() => {});
+        return {days:30,totals: mode === "empty" ? {...row,calls:0,inputTokens:0,cachedTokens:0,outputTokens:0,reasoningTokens:0,estimatedUsd:0} : row,
+          recent:mode === "empty" ? [] : [row]};
+      },
+    } } });
+    root.render(<QueryClientProvider key={mode} client={queryClient}><TokenUsageSettings /></QueryClientProvider>);
   };
 }
 run().catch(error => { (window as any).carePlanTest = { success: false, error: String(error), stack: error.stack }; });

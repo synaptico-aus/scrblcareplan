@@ -1,6 +1,6 @@
 import { build } from "esbuild";
 import { spawn } from "node:child_process";
-import { writeFile, mkdir, readdir, access } from "node:fs/promises";
+import { writeFile, mkdir, readdir, access, readFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import WebSocket from "ws";
@@ -9,7 +9,14 @@ import assert from "node:assert/strict";
 const out = resolve("generated-artifacts");
 await mkdir(out, { recursive: true });
 await build({ entryPoints: ["tests/care-plan-browser-entry.tsx"], outfile: `${out}/care-plan-browser.js`, bundle: true, platform: "browser", format: "iife", jsx: "automatic" });
-await writeFile(`${out}/care-plan-browser.html`, '<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:24px;background:#eee"><div id="root"></div><script src="care-plan-browser.js"></script></body></html>');
+// Reuse compiled application styles when available without requiring a build
+// for the functional export checks (the fixture also runs on fresh checkouts).
+let appCss = "";
+try {
+  const cssFile = (await readdir(resolve("dist/public/assets"))).find(name=>name.endsWith(".css"));
+  if (cssFile) appCss = await readFile(resolve("dist/public/assets", cssFile), "utf8");
+} catch { console.warn("Built app styles unavailable; browser fixture will run without visual styling."); }
+await writeFile(`${out}/care-plan-browser.html`, `<!doctype html><html><head><meta charset="utf-8"><style>${appCss}</style></head><body style="margin:24px;background:#eee"><div id="root"></div><script src="care-plan-browser.js"></script></body></html>`);
 let executable = process.argv[2];
 if (!executable) {
   // Use a modern installed browser: CSS print margin boxes require Chromium 131+.
@@ -80,6 +87,23 @@ try {
   await evaluate(`document.querySelector('[data-testid="button-view-plan-synthetic"]').click()`);
   await waitFor('.care-template');
   assert.ok(await evaluate(`document.querySelector('.care-template').innerText.includes("Transcript Summary – Alex Example") && document.querySelector('.care-template').innerText.includes("Dignity of Risk Assessment")`), "Actual saved-plan preview lost appendices");
+  for (const [mode, expected] of [
+    ["populated", "5,000"], ["empty", "No token usage recorded yet"],
+    ["error", "Synthetic usage service unavailable"], ["incomplete", "Unavailable"],
+  ]) {
+    await evaluate(`window.showTokenUsageTest(${JSON.stringify(mode)})`);
+    for (let attempt = 0; attempt < 60; attempt++) {
+      if (await evaluate(`document.body.innerText.includes(${JSON.stringify(expected)})`)) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    assert.ok(await evaluate(`document.body.innerText.includes(${JSON.stringify(expected)})`), `Usage ${mode} state failed`);
+  }
+  await evaluate(`window.showTokenUsageTest("populated")`);
+  await new Promise(resolve=>setTimeout(resolve,150));
+  assert.ok(await evaluate(`document.body.innerText.includes("$0.0662")`), "Usage cost formatting failed");
+  await writeFile(`${out}/token-usage-preview.png`, Buffer.from((await cdp("Page.captureScreenshot", { format:"png" })).data, "base64"));
+  await evaluate(`window.showTokenUsageTest("loading")`);
+  await waitFor('[aria-label="Loading token usage"]');
   await writeFile(`${out}/representative.doc`, result.word);
   await writeFile(`${out}/representative-word.html`, result.word);
   await cdp("Emulation.setEmulatedMedia", { media: "print" });

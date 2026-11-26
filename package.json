@@ -11,6 +11,7 @@
     "test:care-plan": "tsx --test tests/care-plan*.test.ts",
     "test:care-plan-browser": "node scripts/check-care-plan-browser.mjs",
     "test:dependencies": "tsx --test tests/dependency-compatibility.test.ts",
+    "test:token-usage": "tsx --test tests/token-usage.test.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

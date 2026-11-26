@@ -1,5 +1,20 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, timestamp, index, integer, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, timestamp, index, integer, numeric, boolean } from "drizzle-orm/pg-core";
+
+export const aiTokenUsage = pgTable("ai_token_usage", {
+  id: varchar("id").primaryKey(),
+  userId: varchar("user_id").notNull(),
+  organisationId: varchar("organisation_id").notNull(),
+  generationId: varchar("generation_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  model: text("model").notNull(),
+  failed: boolean("failed").notNull(),
+  inputTokens: integer("input_tokens"),
+  cachedTokens: integer("cached_tokens"),
+  outputTokens: integer("output_tokens"),
+  reasoningTokens: integer("reasoning_tokens"),
+  estimatedUsd: numeric("estimated_usd"),
+}, table => [index("ai_token_usage_owner_date").on(table.organisationId, table.userId, table.createdAt)]);
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 export { carePlanDocumentSchema, clinicalContentSchema, type CarePlanDocument } from "./care-plan-document";

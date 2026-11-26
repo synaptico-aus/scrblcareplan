@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { EventEmitter } from "events";
 import passport from "passport";
+import { scopeTokenUsage, getTokenUsage } from "./services/tokenUsage";
 import bcrypt from "bcrypt";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
@@ -34,6 +35,15 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.use("/api", scopeTokenUsage);
+  app.get("/api/token-usage", requireAuth, async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      res.json(await getTokenUsage((req.user as User).id, getOrganizationId(req)));
+    } catch {
+      res.status(503).json({ message: "Token usage is unavailable. Please retry shortly." });
+    }
+  });
   
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {

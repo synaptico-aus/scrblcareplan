@@ -21,6 +21,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { TokenUsageSettings } from "@/components/TokenUsageSettings";
 
 // Two-Factor Authentication Settings Component
 function TwoFactorSettingsCard() {
@@ -948,6 +949,7 @@ export default function Settings() {
           </Card>
 
           {/* Two-Factor Authentication */}
+          <TokenUsageSettings />
           <TwoFactorSettingsCard />
 
           {/* Privacy & Security Policy */}

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { createUsageFetch } from "./tokenUsage";
 import { storage } from "../storage";
 import { generateStructuredCarePlan, type FundingSelection } from "./structuredCarePlan";
 
@@ -14,7 +15,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   timeout: 300000, // 5 minutes timeout for long care plan generation
   maxRetries: 3,
-  dangerouslyAllowBrowser: false
+  dangerouslyAllowBrowser: false,
+  fetch: createUsageFetch()
 });
 
 // Utility function to check transcript length and estimate tokens
