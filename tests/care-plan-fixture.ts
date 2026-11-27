@@ -29,5 +29,9 @@ export function representativeCarePlan(goalCount = 21) {
   // Test-only organisation-scoped support configuration, never used by generation.
   doc.metadata.organisationName = "Synthetic Provider";
   doc.metadata.supportEmail = "support@example.invalid";
+  doc.metadata.sourceEvidence = [
+    { path: "goals.0.evidence", quote: "The notes describe an interest in swimming.", kinds: ["ai_notes"] },
+    { path: "goals.0.evidence", quote: "I would like to swim.", kinds: ["transcript"] },
+  ];
   return { doc, html: renderCarePlanDocument(doc) };
 }

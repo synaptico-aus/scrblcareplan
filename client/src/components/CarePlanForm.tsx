@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { assessmentSources } from "@shared/assessment-sources";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,6 +50,7 @@ export function CarePlanForm({
   isProfileComplete
 }: CarePlanFormProps) {
   const [isNottaOpen, setIsNottaOpen] = useState(false);
+  const hasMixedSources = useMemo(() => assessmentSources(transcript).some(source => source.kind === "ai_notes"), [transcript]);
   
   return (
     <div className="w-full lg:w-1/3 bg-card lg:border-r border-border flex flex-col lg:min-h-0">
@@ -211,6 +213,12 @@ export function CarePlanForm({
             </p>
           </CollapsibleContent>
         </Collapsible>
+        {hasMixedSources && (
+          <p role="status" data-testid="mixed-source-notice" className="text-sm text-muted-foreground mb-3">
+            AI Notes and Transcript sections detected. Both will be used, with separate evidence labels.
+            AI notes are secondary claims, not the participant’s original words. Review the source appendix before approval.
+          </p>
+        )}
         <div className="flex-1 relative">
           <Textarea
             data-testid="textarea-transcript"

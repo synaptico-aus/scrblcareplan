@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type OpenAI from "openai";
 import { assessmentSources } from "../shared/assessment-sources";
-import { readCarePlanDocument, renderCarePlanDocument } from "../shared/care-plan-document";
+import { createCarePlanDocument, readCarePlanDocument, renderCarePlanDocument } from "../shared/care-plan-document";
 import { generateStructuredCarePlan } from "../server/services/structuredCarePlan";
 import { storage } from "../server/storage";
 
@@ -14,6 +14,20 @@ test("explicit mixed-source detection preserves all text and is conservative", (
   for (const input of ["Just speech.", "AI Notes\nSummary only.", "Transcript\nSpeech.", "AI Notes mentioned within a sentence. Transcript follows."]) {
     assert.deepEqual(assessmentSources(input), [{ kind: "unclassified", text: input }]);
   }
+});
+
+test("old documents remain compatible and source excerpts are escaped in exports", () => {
+  const old = createCarePlanDocument("Synthetic participant", "ai");
+  assert.equal(old.metadata.sourceEvidence, undefined);
+  assert.ok(!renderCarePlanDocument(old).includes("Evidence Sources"));
+  old.metadata.sourceEvidence = [{
+    path: "goals.0.evidence", quote: "<script>alert('unsafe')</script>", kinds: ["ai_notes", "transcript"],
+  }];
+  const html = renderCarePlanDocument(old);
+  assert.ok(!html.includes("<script>"));
+  assert.match(html, /&lt;script&gt;/);
+  assert.match(html, /secondary source; Original transcript/);
+  assert.deepEqual(readCarePlanDocument(html), old);
 });
 
 test("mixed-source drafting, audit and repair carry labels through merging and saved rendering", async () => {

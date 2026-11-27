@@ -3,3 +3,4 @@
 - [Schema default semantics](schema-default-semantics.md) — validation-library upgrades must preserve sparse-document normalization and round-trip equality.
 - [Clinical evidence corrections](clinical-evidence-corrections.md) — repair citations without regenerating verified clinical content or weakening quote matching.
 - [Usage accounting safety](usage-accounting-safety.md) — provider counts are authoritative; accounting failures must never repeat paid model requests.
+- [Assessment evidence sources](assessment-evidence-sources.md) — retain both AI notes and transcript, with distinct provenance; summaries are not participant speech.

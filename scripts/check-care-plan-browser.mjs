@@ -136,6 +136,11 @@ try {
     assert.ok(page.includes("Full Name: Alex Example"), `Missing repeated client header on page ${i + 1}`);
   });
   const normalized = pdfText.replace(/\s+/g, " ");
+  // PDF extraction interleaves neighbouring table cells at wrapped lines.
+  assert.ok(normalized.includes("Evidence Sources") && normalized.includes("secondary source") &&
+    normalized.includes("Original transcript") && /\brecorded\b/.test(normalized) && /\bspeech\b/.test(normalized),
+    "PDF lost source provenance");
+  assert.ok(result.word.includes("secondary source") && result.word.includes("recorded speech"), "Word lost source provenance");
   // Columns and repeated headers/footers can interrupt phrase order in PDF text
   // extraction. Count constituent words to detect lost text without that artefact.
   for (const word of ["familiar", "people", "instructions\\."]) {
