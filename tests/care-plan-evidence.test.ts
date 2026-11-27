@@ -6,6 +6,7 @@ import { generateStructuredCarePlan, validateClinicalEvidence } from "../server/
 import { transcriptQuoteMatcher } from "../server/services/transcriptEvidence";
 import { repairTranscriptEvidence, transcriptEvidencePassages } from "../server/services/evidenceRepair";
 import { storage } from "../server/storage";
+import { EvidenceRepairError } from "../server/services/evidenceDiagnostics";
 
 function queuedClient(replies: unknown[]) {
   const calls: any[] = [];
@@ -157,8 +158,10 @@ test("citation-only repair preserves verified support and cannot change clinical
     goals: [{ key: "swim", title: "I want to swim", timing: "Mondays", evidence: ["I want to swim.", "On Monday please."] }],
   });
   const before = structuredClone(original);
-  const { client } = queuedClient([{ repairs: [{ path: "goals.0.evidence", sourceIds: ["source-2"] }] }]);
+  const { client, calls } = queuedClient([{ repairs: [{ path: "goals.0.evidence", sourceIds: ["source-2"] }] }]);
   const repaired = await repairTranscriptEvidence(client, "gpt-6.2-sol", original, source, ["goals.0.evidence"]);
+  assert.equal(JSON.parse(calls[0].messages[1].content).targets[0].value.title, before.goals[0].title,
+    "A newly asserted title must remain in the evidence repair target");
   assert.deepEqual(original, before, "Repair must not mutate the input draft");
   assert.deepEqual(repaired.goals[0], {
     ...before.goals[0], evidence: ["I want to swim.", "Mondays would suit me."],
@@ -247,4 +250,108 @@ test("later transcript parts can update a known goal without repeating its title
   assert.equal(goals[0].timing, "Mondays");
   assert.ok(calls.length >= 4);
   assert.ok(calls.every(call => call.messages.length === 2), "Valid cross-part updates should not trigger repairs");
+}));
+
+test("repair of a cross-part delta does not demand fresh evidence for an inherited title", async () => withoutRates(async () => {
+  const source = "I want to swim.\n" + "Administrative conversation.\n".repeat(1100) + "Mondays would suit me, with assistance.";
+  const calls: any[] = [];
+  const client = { chat: { completions: { create: async (request: any) => {
+    calls.push(request);
+    const payload = JSON.parse(request.messages[1].content);
+    let reply: unknown;
+    if (payload.targets) {
+      assert.equal(payload.targets[0].value.title, null, "An inherited title is not a current-part assertion");
+      assert.equal(payload.targets[0].value.timing, "Mondays, with assistance");
+      assert.equal(payload.targets[0].value.evidence, undefined);
+      const passage = payload.passages.find((p: any) => p.text === "Mondays would suit me, with assistance.");
+      assert.ok(passage);
+      assert.ok(!payload.passages.some((p: any) => p.text === "I want to swim."));
+      reply = { repairs: [{ path: payload.targets[0].path, sourceIds: [passage.id] }] };
+    } else if ("extractedGoals" in payload) reply = { goals: [] };
+    else reply = { goals: payload.transcriptPart.includes("I want to swim.") ? [
+      { key: "swim", title: "I want to swim", evidence: ["I want to swim."] },
+    ] : payload.transcriptPart.includes("Mondays would suit me") ? [
+      { key: "swim", timing: "Mondays, with assistance", evidence: ["Mondays suit me."] },
+    ] : [] };
+    return { choices: [{ finish_reason: "stop", message: { content: JSON.stringify(reply) } }] };
+  } } } } as unknown as OpenAI;
+  const html = await generateStructuredCarePlan(client, "gpt-6.2-sol", source, "Synthetic Client", "test-org");
+  const goals = readCarePlanDocument(html)!.content.goals;
+  assert.equal(goals.length, 1);
+  assert.equal(goals[0].title, "I want to swim");
+  assert.equal(goals[0].timing, "Mondays, with assistance");
+  assert.ok(goals[0].evidence.includes("Mondays would suit me, with assistance."));
+  assert.equal(calls.filter(call => JSON.parse(call.messages[1].content).targets).length, 1);
+}));
+
+test("repair rejections expose fixed safe categories, never model text", async () => {
+  const original = clinicalContentSchema.parse({
+    goals: [{ key: "swim", title: "I want to swim", evidence: ["Bad citation"] }],
+    medical: { allergies: "Unknown" },
+  });
+  const valid = { path: "goals.0.evidence", sourceIds: ["source-1"] };
+  const cases: [unknown, string][] = [
+    [{ repairs: [{ ...valid, sourceIds: [] }] }, "unsupported_content"],
+    [{ repairs: [{ ...valid, sourceIds: ["secret-source-text"] }] }, "unknown_source_id"],
+    [{ repairs: [valid, valid] }, "unexpected_or_duplicate_path"],
+    [{ repairs: [{ ...valid, path: "secret-clinical-value" }] }, "unexpected_or_duplicate_path"],
+    [{ repairs: [valid], goals: ["secret-clinical-value"] }, "invalid_structure"],
+    [{ repairs: [] }, "invalid_structure"],
+  ];
+  for (const [reply, category] of cases) {
+    const { client } = queuedClient([reply]);
+    await assert.rejects(
+      repairTranscriptEvidence(client, "gpt-6.2-sol", original, "I want to swim.", [valid.path]),
+      error => error instanceof EvidenceRepairError && error.category === category && !error.message.includes("secret"),
+    );
+  }
+  const { client } = queuedClient([{ repairs: [valid] }]);
+  await assert.rejects(
+    repairTranscriptEvidence(client, "gpt-6.2-sol", original, "I want to swim.", [valid.path, "medical.allergies"]),
+    error => error instanceof EvidenceRepairError && error.category === "missing_repair",
+  );
+  for (const category of ["invalid_json", "incomplete_response", "provider_request_failed"] as const) {
+    let count = 0;
+    const client = { chat: { completions: { create: async () => {
+      count++;
+      if (category === "provider_request_failed") throw new Error("secret provider reply");
+      return { choices: [{
+        finish_reason: category === "incomplete_response" ? "length" : "stop",
+        message: { content: "secret invalid JSON" },
+      }] };
+    } } } } as unknown as OpenAI;
+    await assert.rejects(
+      repairTranscriptEvidence(client, "gpt-6.2-sol", original, "I want to swim.", [valid.path]),
+      error => error instanceof EvidenceRepairError && error.category === category && !error.message.includes("secret"),
+    );
+    assert.equal(count, 1, "Diagnostics must not add provider retries");
+  }
+});
+
+test("generation outcome logs correlate attempts and redact clinical content", async () => withoutRates(async () => {
+  const events: any[][] = [];
+  const originalInfo = console.info;
+  console.info = (...args) => { events.push(args); };
+  try {
+    const success = queuedClient([{ goals: [] }, { goals: [] }]);
+    await generateStructuredCarePlan(success.client, "gpt-6.2-sol", "Private transcript sentinel.", "Private name sentinel", "private-org");
+    const failure = queuedClient([
+      { goals: [{ key: "swim", title: "Swim", evidence: ["Incorrect quote"] }] },
+      { repairs: [{ path: "goals.0.evidence", sourceIds: [] }] },
+    ]);
+    await assert.rejects(generateStructuredCarePlan(failure.client, "gpt-6.2-sol", "Private transcript sentinel.", "Private name sentinel", "private-org"));
+    const starts = events.filter(([event]) => event === "Care-plan generation started");
+    const completed = events.filter(([event]) => event === "Care-plan generation completed");
+    const failed = events.filter(([event]) => event === "Care-plan generation failed");
+    assert.equal(starts.length, 2);
+    assert.equal(completed.length, 1);
+    assert.equal(failed.length, 1);
+    assert.equal(completed[0][1].generationId, starts[0][1].generationId);
+    assert.equal(failed[0][1].generationId, starts[1][1].generationId);
+    assert.notEqual(starts[0][1].generationId, starts[1][1].generationId);
+    const rejected = events.find(([event]) => event === "Care-plan evidence correction rejected");
+    assert.equal(rejected[1].category, "unsupported_content");
+    assert.equal(rejected[1].generationId, failed[0][1].generationId);
+    assert.doesNotMatch(JSON.stringify(events), /Private|private-org|Incorrect quote|Swim/);
+  } finally { console.info = originalInfo; }
 }));

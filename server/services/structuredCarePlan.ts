@@ -6,6 +6,8 @@ import { storage } from "../storage";
 import { getCarePlanTemplateConfiguration } from "./carePlanTemplateConfig";
 import { transcriptQuoteMatcher } from "./transcriptEvidence";
 import { repairTranscriptEvidence } from "./evidenceRepair";
+import { randomUUID } from "node:crypto";
+import { EvidenceRepairError, generationDiagnostics, logEvidenceEvent } from "./evidenceDiagnostics";
 
 export type FundingSelection = { fundingType?: "hcp" | "sah"; fundingLevel?: string };
 export function selectedFundingLabel(selection: FundingSelection = {}): string | null {
@@ -162,8 +164,13 @@ async function requestValidatedPart(
     }
     const raw = response.choices[0]?.message.content || "{}";
     let parsed: ClinicalContent | undefined;
+    let inheritedTitlePaths = new Set<string>();
     try {
-      parsed = hydrateKnownGoalTitles(clinicalContentSchema.parse(JSON.parse(raw)), knownGoals);
+      parsed = clinicalContentSchema.parse(JSON.parse(raw));
+      inheritedTitlePaths = new Set(parsed.goals.flatMap((goal, index) =>
+        !goal.title?.trim() && knownGoals.some(known => known.key === goal.key && known.title)
+          ? [`goals.${index}.evidence`] : []));
+      parsed = hydrateKnownGoalTitles(parsed, knownGoals);
       // A repair may not silently drop previously verified goals from this reply.
       for (const key of Array.from(requiredGoalKeys)) {
         if (!parsed.goals.some(goal => goal.key === key)) {
@@ -183,7 +190,9 @@ async function requestValidatedPart(
     } catch (error) {
       // Never log source quotes, generated content, goal keys or participant data.
       const issues = error instanceof ClinicalEvidenceError ? error.issues : [{ path: "response", reason: "invalid_structure_or_missing_verified_goal" }];
-      console.warn("Care-plan evidence check requires correction", { ...context, attempt: attempt + 1, issues });
+      console.warn("Care-plan evidence check requires correction", {
+        generationId: generationDiagnostics.getStore(), ...context, attempt: attempt + 1, issues,
+      });
       if (attempt === 1) {
         throw new Error(`The supporting quotes for transcript part ${context.part} could not be verified after an automatic correction. No partial care plan was saved; please retry.`);
       }
@@ -193,15 +202,19 @@ async function requestValidatedPart(
         // Rewriting the entire draft to fix one quote can corrupt other, already
         // verified goals. Repair only failed citations by selecting source IDs.
         try {
-          const repaired = await repairTranscriptEvidence(openai, model, parsed, source, issues.map(issue => issue.path));
+          const repaired = await repairTranscriptEvidence(openai, model, parsed, source, issues.map(issue => issue.path), inheritedTitlePaths);
           validateClinicalEvidence(repaired, source);
           console.info("Care-plan evidence correction verified", {
+            generationId: generationDiagnostics.getStore(),
             ...context, repairedPaths: new Set(issues.map(issue => issue.path)).size,
           });
           return repaired;
-        } catch {
+        } catch (repairError) {
           // Do not log generated repair replies, passages or clinical values.
-          console.warn("Care-plan evidence correction rejected", { ...context, attempt: 2 });
+          logEvidenceEvent("Care-plan evidence correction rejected", {
+            ...context, attempt: 2,
+            category: repairError instanceof EvidenceRepairError ? repairError.category : "post_repair_validation",
+          });
           throw new Error(`The supporting quotes for transcript part ${context.part} could not be verified after an automatic correction. No partial care plan was saved; please retry.`);
         }
       }
@@ -226,6 +239,24 @@ async function requestValidatedPart(
 }
 
 export async function generateStructuredCarePlan(
+  openai: OpenAI, model: string, transcript: string, clientName: string, organizationId: string,
+  progress?: (progress: number, stage: string) => void, funding: FundingSelection = {},
+): Promise<string> {
+  return generationDiagnostics.run(randomUUID(), async () => {
+    const started = Date.now();
+    logEvidenceEvent("Care-plan generation started", { model });
+    try {
+      const result = await generateStructuredCarePlanContent(openai, model, transcript, clientName, organizationId, progress, funding);
+      logEvidenceEvent("Care-plan generation completed", { durationMs: Date.now() - started });
+      return result;
+    } catch (error) {
+      logEvidenceEvent("Care-plan generation failed", { durationMs: Date.now() - started });
+      throw error;
+    }
+  });
+}
+
+async function generateStructuredCarePlanContent(
   openai: OpenAI, model: string, transcript: string, clientName: string, organizationId: string,
   progress?: (progress: number, stage: string) => void, funding: FundingSelection = {},
 ): Promise<string> {
