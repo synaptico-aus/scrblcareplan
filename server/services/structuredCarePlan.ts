@@ -8,6 +8,7 @@ import { transcriptQuoteMatcher } from "./transcriptEvidence";
 import { repairTranscriptEvidence } from "./evidenceRepair";
 import { randomUUID } from "node:crypto";
 import { EvidenceRepairError, generationDiagnostics, logEvidenceEvent } from "./evidenceDiagnostics";
+import { assessmentSources, assessmentSourceLabels } from "../../shared/assessment-sources";
 
 export type FundingSelection = { fundingType?: "hcp" | "sah"; fundingLevel?: string };
 export function selectedFundingLabel(selection: FundingSelection = {}): string | null {
@@ -152,6 +153,7 @@ async function requestValidatedPart(
   openai: OpenAI, model: string, messages: ChatCompletionMessageParam[], source: string,
   knownGoals: CareGoal[], context: { part: number; stage: "draft" | "goal_check"; progress: number },
   progress?: (progress: number, stage: string) => void,
+  sourceContext = "",
 ): Promise<ClinicalContent> {
   const requiredGoalKeys = new Set<string>();
   let conversation = messages;
@@ -202,7 +204,7 @@ async function requestValidatedPart(
         // Rewriting the entire draft to fix one quote can corrupt other, already
         // verified goals. Repair only failed citations by selecting source IDs.
         try {
-          const repaired = await repairTranscriptEvidence(openai, model, parsed, source, issues.map(issue => issue.path), inheritedTitlePaths);
+          const repaired = await repairTranscriptEvidence(openai, model, parsed, source, issues.map(issue => issue.path), inheritedTitlePaths, sourceContext);
           validateClinicalEvidence(repaired, source);
           console.info("Care-plan evidence correction verified", {
             generationId: generationDiagnostics.getStore(),
@@ -264,7 +266,10 @@ async function generateStructuredCarePlanContent(
     .filter(r => r.hourlyRate && Number(r.hourlyRate) > 0)
     .map(r => ({ service: r.serviceName, hourlyRate: Number(r.hourlyRate) }));
   let content = clinicalContentSchema.parse({});
-  const chunks = documentChunks(transcript);
+  const sources = assessmentSources(transcript);
+  const mixedSources = sources.some(source => source.kind === "ai_notes");
+  const parts = sources.flatMap(source => documentChunks(source.text).map(text => ({ ...source, text })));
+  const chunks = parts.map(part => part.text);
   const empty = clinicalContentSchema.parse({});
   const goalShape = Object.fromEntries(Object.keys(goalLabels).map(k => [k, null]));
   const shape = {
@@ -274,9 +279,13 @@ async function generateStructuredCarePlanContent(
     risks: [{ risk: null, choice: null, consequences: null, mitigation: null, acknowledgement: null, date: null }],
   };
   for (let i = 0; i < chunks.length; i++) {
+    const sourceContext = mixedSources ? `
+This input part is labelled: ${assessmentSourceLabels[parts[i].kind]}.
+The document contains AI-written notes AND original transcript speech. Keep their provenance distinct. Notes are secondary claims, not verbatim speech or independent confirmation. Do not convert a summary claim into "I said", "I consented", an agreed goal or confirmed outcome. Preserve uncertainty and attribution in narratives. Do not resolve contradictions by guessing or silently replacing a conflicting value: retain attributed accounts for clinical review. Copy evidence exactly from this part, including pronouns; never rewrite an excerpt to match the participant's name.
+` : "";
     progress?.(10 + 80 * i / chunks.length, `Drafting evidence from transcript part ${i + 1} of ${chunks.length}`);
     const addition = await requestValidatedPart(openai, model, [
-        { role: "system", content: instructions },
+        { role: "system", content: instructions + sourceContext },
         { role: "user", content: JSON.stringify({
           clientName, fieldLabels: fieldGroups, goalLabels, shape,
           personShape: shape.providers[0], note: "supporters, careTeam and recipients use personShape",
@@ -284,11 +293,11 @@ async function generateStructuredCarePlanContent(
           priorGoals: content.goals.map(g => ({ key: g.key, title: g.title, evidence: g.evidence })),
           transcriptPart: chunks[i],
         }) },
-      ], chunks[i], content.goals, { part: i + 1, stage: "draft", progress: 10 + 80 * i / chunks.length }, progress);
+      ], chunks[i], content.goals, { part: i + 1, stage: "draft", progress: 10 + 80 * i / chunks.length }, progress, sourceContext);
     // A separate source-to-goal pass catches omissions from the main extraction,
     // especially a final goal or added detail after a long clinical discussion.
     const goalAdditions = await requestValidatedPart(openai, model, [
-        { role: "system", content: `${instructions}
+        { role: "system", content: `${instructions}${sourceContext}
 This pass audits goal coverage only. Compare the ORIGINAL transcript part against extractedGoals and priorGoals.
 Return {"goals": [...]} containing every omitted distinct goal and any supported tasks, preferences or timing missing from an existing goal. Reuse existing keys; do not repeat already captured details. An existing goal's title may be omitted in an update because the verified title is retained. Every new goal requires its own title. If nothing is missing, return {"goals":[]}. Do not produce other content fields. Absence of a goal is not a reason to invent one. Supply exact quotes from transcriptPart for every returned goal or update, not quotes copied from priorGoals or extractedGoals unless they actually occur in this part.` },
         { role: "user", content: JSON.stringify({
@@ -296,7 +305,7 @@ Return {"goals": [...]} containing every omitted distinct goal and any supported
           priorGoals: content.goals.map(g => ({ key: g.key, title: g.title })),
           extractedGoals: addition.goals, transcriptPart: chunks[i],
         }) },
-      ], chunks[i], [...content.goals, ...addition.goals], { part: i + 1, stage: "goal_check", progress: 10 + 80 * i / chunks.length }, progress);
+      ], chunks[i], [...content.goals, ...addition.goals], { part: i + 1, stage: "goal_check", progress: 10 + 80 * i / chunks.length }, progress, sourceContext);
     content = mergeClinicalContent(content, mergeClinicalContent(addition, goalAdditions));
   }
   const firstMention = (goal: CareGoal) => Math.min(...goal.evidence.map(quote => transcript.indexOf(quote)).filter(index => index >= 0));
@@ -305,6 +314,17 @@ Return {"goals": [...]} containing every omitted distinct goal and any supported
   // Application input is authoritative for the identity; it is not model-inferred.
   (doc.content as any).profile.fullName = clientName;
   doc.metadata.rates = rates;
+  if (mixedSources) {
+    const evidence = [
+      ...Object.entries(content.evidence).flatMap(([path, quotes]) => quotes.map(quote => ({ path, quote }))),
+      ...content.goals.flatMap((goal, index) => goal.evidence.map(quote => ({ path: `goals.${index}.evidence`, quote }))),
+    ];
+    doc.metadata.sourceEvidence = evidence.map(entry => {
+      const kinds = Array.from(new Set(sources.filter(source => source.text.includes(entry.quote)).map(source => source.kind)));
+      if (!kinds.length) throw new Error("Evidence source attribution could not be verified. No partial care plan was saved.");
+      return { ...entry, kinds };
+    });
+  }
   Object.assign(doc.metadata, getCarePlanTemplateConfiguration(organizationId));
   progress?.(100, "Validated care-plan draft ready for clinical review");
   return renderCarePlanDocument(doc);

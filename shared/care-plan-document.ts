@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { assessmentSourceLabels } from "./assessment-sources";
 
 // Labels are the reference's fields, not sample answers. Null is an unanswered field.
 export const fieldGroups = {
@@ -112,6 +113,10 @@ export const carePlanDocumentSchema = z.object({
     organisationName: z.string().nullable().default(null),
     careWording: z.string().nullable().default(null), supportPhone: z.string().nullable().default(null),
     supportEmail: z.string().nullable().default(null),
+    sourceEvidence: z.array(z.object({
+      path: z.string(), quote: z.string(),
+      kinds: z.array(z.enum(["ai_notes", "transcript", "unclassified"])).min(1),
+    }).strict()).optional(),
   }).strict(),
   content: clinicalContentSchema,
 }).strict();
@@ -168,10 +173,12 @@ export function renderCarePlanDocument(input: CarePlanDocument): string {
     return `<div class="goal"><h3>GOAL ${i + 1}</h3>${fields(goalLabels, g)}${cost ? fields({ cost: "How much will it cost?" }, { cost }) : ""}</div>`;
   }).join("");
   const signature = `<table class="field-grid signature"><tbody><tr><td><strong>Participant or Support Person's Signature</strong><p>&nbsp;</p></td><td><strong>Date Signed</strong><p>&nbsp;</p></td></tr></tbody></table>`;
+  const sourceEvidence = doc.metadata.sourceEvidence;
   const body = [
     section("Care Alerts", c.alerts.map(a => `<p>${escapeText(a)}</p>`).join("")),
     `<h1>My Care Plan</h1><p class="draft-status">DRAFT — Ready for clinical review${doc.metadata.mode === "offline" ? " · Offline draft: verify transcript details" : ""}</p>`,
     fields({ generated: "Draft generated", version: "Version History" }, { generated: doc.metadata.generatedAt.slice(0, 10), version: "1" }),
+    sourceEvidence ? `<p class="completion-note">Source review required: this draft uses both AI-written notes and original transcript text. AI notes are secondary claims, not verbatim participant statements or confirmation of consent. Check the Evidence Sources appendix and resolve discrepancies before approval.</p>` : "",
     doc.metadata.careWording ? `<p>${escapeText(doc.metadata.careWording)}</p>` : "",
     f("profile"), f("funding"),
     doc.metadata.selectedFunding ? fields({ selected: "Selected funding (application input; not confirmation of approval)" }, { selected: doc.metadata.selectedFunding }) : "",
@@ -194,6 +201,11 @@ export function renderCarePlanDocument(input: CarePlanDocument): string {
     section("Care Plan Prepared By", `${f("prepared")}${fields({ cycle: "Default review cycle" }, { cycle: doc.metadata.reviewCycle })}<p>Review may be requested earlier if needs or circumstances change.</p><p>Care Partner's Signature: ______________________________</p>`, true),
     section(`Transcript Summary – ${doc.clientName}`, standards.map((s, i) => `<h3>${escapeText(s)}</h3><p>${present(c.summary[i]) ? escapeText(c.summary[i]!) : "&nbsp;"}</p>`).join(""), true),
     section("Dignity of Risk Assessment", `<h3>Narrative</h3><p>${present(c.riskNarrative) ? escapeText(c.riskNarrative) : "&nbsp;"}</p>${clinicalTable(["Risk identified", "Client’s choice / decision", "Potential consequences", "Mitigation strategies", "Acknowledgement", "Date"], c.risks.map(r => [r.risk, r.choice, r.consequences, r.mitigation, r.acknowledgement, r.date]), true)}`, true),
+    sourceEvidence ? section("Evidence Sources — Clinical Review", `<p>Labels identify where each supporting excerpt occurred, not whether its clinical meaning has been independently verified. An excerpt found in both sections is labelled with both sources. Unknown information remains unknown.</p>${clinicalTable(["Care-plan field / goal", "Source", "Exact supporting excerpt"], sourceEvidence.map(entry => {
+      const goal = /^goals\.(\d+)\.evidence$/.exec(entry.path);
+      const label = goal ? `Goal ${Number(goal[1]) + 1}` : entry.path;
+      return [label, entry.kinds.map(kind => assessmentSourceLabels[kind]).join("; "), entry.quote];
+    }))}`, true) : "",
     `<footer class="care-footer"><strong>CONFIDENTIAL</strong><span>${[doc.metadata.organisationName, doc.metadata.supportPhone, doc.metadata.supportEmail].filter(present).map(escapeText).join(" · ")}</span></footer>`,
   ].join("");
   return `<article class="care-template" data-care-document="${encodeURIComponent(JSON.stringify(doc))}">${body}</article>`;
