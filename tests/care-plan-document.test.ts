@@ -4,7 +4,8 @@ import {
   carePlanDocumentSchema, clinicalContentSchema, createCarePlanDocument, goalSchema,
   readCarePlanDocument, renderCarePlanDocument, standards, carePlanCss, escapeText,
 } from "../shared/care-plan-document";
-import { documentChunks, generateStructuredCarePlan, mergeClinicalContent, validateClinicalEvidence, selectedFundingLabel } from "../server/services/structuredCarePlan";
+import { documentChunks, mergeClinicalContent, validateClinicalEvidence, selectedFundingLabel } from "../server/services/structuredCarePlan";
+import { generateStructuredCarePlan } from "./source-selection-fixture";
 import { generateOfflineCarePlan, generateOfflineFactsExtraction } from "../server/services/carePlanGenerator";
 import { storage } from "../server/storage";
 import type OpenAI from "openai";

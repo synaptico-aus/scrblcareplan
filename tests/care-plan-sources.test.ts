@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type OpenAI from "openai";
 import { assessmentSources } from "../shared/assessment-sources";
 import { createCarePlanDocument, readCarePlanDocument, renderCarePlanDocument } from "../shared/care-plan-document";
-import { generateStructuredCarePlan } from "../server/services/structuredCarePlan";
+import { generateStructuredCarePlan } from "./source-selection-fixture";
 import { storage } from "../server/storage";
 
 test("explicit mixed-source detection preserves all text and is conservative", () => {

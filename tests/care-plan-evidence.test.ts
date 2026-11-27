@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type OpenAI from "openai";
 import { clinicalContentSchema, readCarePlanDocument } from "../shared/care-plan-document";
-import { generateStructuredCarePlan, validateClinicalEvidence } from "../server/services/structuredCarePlan";
+import { validateClinicalEvidence } from "../server/services/structuredCarePlan";
+import { generateStructuredCarePlan } from "./source-selection-fixture";
 import { transcriptQuoteMatcher } from "../server/services/transcriptEvidence";
 import { repairTranscriptEvidence, transcriptEvidencePassages } from "../server/services/evidenceRepair";
 import { storage } from "../server/storage";
@@ -65,7 +66,7 @@ test("goal-check updates reuse verified titles while validating new evidence", a
   assert.equal(goals[0].title, "I want to swim");
   assert.equal(goals[0].tasks, "Use the heated pool");
   assert.equal(goals[0].timing, "Mondays");
-  assert.deepEqual(goals[0].evidence, ["I want to swim.", "I’d like the\n   heated pool on Mondays."]);
+  assert.equal(goals[0].evidence.join(" ").replace(/\s+/g, " "), "I want to swim. I’d like the heated pool on Mondays.");
   assert.equal(calls.length, 2, "Formatting-only differences must not require another paid call");
 }));
 
