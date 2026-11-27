@@ -18,6 +18,9 @@ test("real wire contract selects IDs in draft and audit, then renders original e
       { id: "part-1-source-2", text: "Mondays suit me." },
     ]);
     assert.match(request.messages[0].content, /Never write quotes in evidence/);
+    assert.match(request.messages[0].content, /Write all non-goal narrative content in the client's first person/);
+    assert.match(request.messages[0].content, /goal narratives may use third person or "my provider"/);
+    assert.match(request.messages[0].content, /Do not introduce ordinary care narratives with "The notes report"/);
     const reply = calls === 1
       ? { goals: [{ key: "swim", title: "Swim with assistance", evidence: ["part-1-source-1"] }],
           mobility: { access: "With assistance" }, evidence: { "mobility.access": ["part-1-source-1"] } }

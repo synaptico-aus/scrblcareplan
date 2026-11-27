@@ -38,6 +38,16 @@ test("mixed-source drafting, audit and repair carry labels through merging and s
   const client = { chat: { completions: { create: async (request: any) => {
     requests.push(request);
     const payload = JSON.parse(request.messages[1].content);
+    const instructions = request.messages[0].content;
+    assert.match(instructions, /Write supported non-goal care narratives in first person regardless of source type/);
+    assert.match(instructions, /Goals may use third person or "my provider"/);
+    assert.match(instructions, /If accounts conflict, explicitly distinguish the conflicting accounts for clinical review/);
+    assert.match(instructions, /Never write or rewrite excerpts in evidence arrays/);
+    if (!payload.targets) {
+      assert.match(instructions, /Write all non-goal narrative content in the client's first person/);
+      assert.match(instructions, /Factual labels, names and contact details need not be rewritten/);
+      assert.match(instructions, /Goals are the exception/);
+    }
     let reply: unknown;
     if (payload.targets) {
       assert.match(request.messages[0].content, /Original transcript — recorded speech/);
